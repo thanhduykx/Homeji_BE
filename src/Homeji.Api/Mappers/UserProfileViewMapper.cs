@@ -1,4 +1,4 @@
-using Homeji.Api.ViewModels.Profiles;
+using Homeji.Api.Views.Profiles;
 using Homeji.Application.DTOs.Profiles;
 
 namespace Homeji.Api.Mappers;

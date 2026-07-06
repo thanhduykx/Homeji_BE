@@ -1,5 +1,5 @@
 using Homeji.Api.Mappers;
-using Homeji.Api.ViewModels.Profiles;
+using Homeji.Api.Views.Profiles;
 using Homeji.Application.IServices.Profiles;
 using Microsoft.AspNetCore.Mvc;
 

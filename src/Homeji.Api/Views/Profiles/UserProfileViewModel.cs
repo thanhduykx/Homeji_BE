@@ -1,4 +1,4 @@
-namespace Homeji.Api.ViewModels.Profiles;
+namespace Homeji.Api.Views.Profiles;
 
 public sealed record UserProfileViewModel(
     Guid Id,

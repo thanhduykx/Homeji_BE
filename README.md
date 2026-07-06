@@ -8,8 +8,8 @@ ASP.NET Core 9 Web API theo Clean Architecture, sử dụng PostgreSQL của Sup
 src/
 ├── Homeji.Api/
 │   ├── Controllers/        Controller layer
-│   ├── ViewModels/         View/API contracts nhận và trả về cho client
-│   ├── Mappers/            Map ViewModel <-> Application DTO
+│   ├── Views/              View/API contracts nhận và trả về cho client
+│   ├── Mappers/            Map View <-> Application DTO
 │   ├── Authentication/     JWT/Supabase authentication
 │   └── ErrorHandling/      ProblemDetails và exception handling
 ├── Homeji.Application/
@@ -23,8 +23,8 @@ src/
 │   ├── Entities/           Domain entities và business invariants
 │   └── Exceptions/         Domain exceptions
 └── Homeji.Infrastructure/
-    ├── Context/            EF Core DbContext và Fluent API configuration
-    ├── Repositories/       Repository implementations
+    ├── Context/            DAL: EF Core DbContext và Fluent API configuration
+    ├── Repositories/       DAL: repository implementations
     ├── Migrations/         EF Core migrations
     └── Health/             Infrastructure health checks
 tests/
@@ -41,6 +41,14 @@ Api ───────────────> Application ──> Domain
 ```
 
 `IRepository` nằm trong Application để service không phụ thuộc Infrastructure. Infrastructure chỉ implement repository và context. Đây là điểm quan trọng để giữ Clean Architecture và testability.
+
+Runtime flow:
+
+```text
+View/API contract -> Controller -> IService -> Service -> IRepository -> Repository/DAL -> DbContext -> Supabase PostgreSQL
+```
+
+Controller chỉ nhận/trả `Views`, sau đó mapper chuyển sang DTO cho service. Service không biết HTTP, không biết controller. DAL không được gọi trực tiếp từ controller.
 
 ## Quy ước cấu hình
 
