@@ -20,10 +20,20 @@ Dependency chỉ đi vào phía domain:
 ```text
 Api ───────────────> Application ──> Domain
  └──> Infrastructure ──────────────> Domain
-             └──────> Application
+              └──────> Application
 ```
 
 `Homeji.Domain` không phụ thuộc ASP.NET Core, EF Core hay Supabase. Supabase Auth là nguồn danh tính duy nhất; API không lưu hoặc xử lý mật khẩu.
+
+## Quy ước cấu hình
+
+Project không dùng `.env`, environment variables hoặc .NET User Secrets cho application config.
+
+- `src/Homeji.Api/appsettings.json`: cấu hình mặc định an toàn, có thể commit.
+- `src/Homeji.Api/appsettings.Local.json`: cấu hình local/server thật, không commit.
+- `src/Homeji.Api/appsettings.Local.example.json`: file mẫu để copy.
+
+Trade-off: cách này đơn giản cho repo hiện tại, nhưng file `appsettings.Local.json` sẽ chứa connection string/password thật. Khi deploy, phải bảo vệ file này bằng quyền truy cập của server/CI và không đưa vào Git.
 
 ## Yêu cầu
 
@@ -53,30 +63,41 @@ Lấy connection string từ **Connect** trong Supabase Dashboard.
 Host=<host>;Port=5432;Database=postgres;Username=<username>;Password=<password>;SSL Mode=Require;Trust Server Certificate=false
 ```
 
-Lưu cấu hình local bằng .NET User Secrets:
+Tạo file cấu hình local:
 
 ```powershell
-dotnet user-secrets set --project src/Homeji.Api "ConnectionStrings:DefaultConnection" "<connection-string>"
-dotnet user-secrets set --project src/Homeji.Api "Supabase:ProjectUrl" "https://<project-ref>.supabase.co"
-dotnet user-secrets set --project src/Homeji.Api "Cors:AllowedOrigins:0" "http://localhost:3000"
+Copy-Item src/Homeji.Api/appsettings.Local.example.json src/Homeji.Api/appsettings.Local.json
 ```
 
-Trong môi trường deploy, dùng environment variables hoặc secret manager:
+Sau đó sửa `src/Homeji.Api/appsettings.Local.json`:
 
-```text
-ConnectionStrings__DefaultConnection
-Supabase__ProjectUrl
-Supabase__Audience=authenticated
-Cors__AllowedOrigins__0
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=<host>;Port=5432;Database=postgres;Username=<username>;Password=<password>;SSL Mode=Require;Trust Server Certificate=false"
+  },
+  "Supabase": {
+    "ProjectUrl": "https://<project-ref>.supabase.co",
+    "Audience": "authenticated"
+  },
+  "Cors": {
+    "AllowedOrigins": [
+      "http://localhost:3000"
+    ]
+  },
+  "Api": {
+    "EnableOpenApi": true,
+    "UseHsts": false
+  }
+}
 ```
 
-Không commit connection string, database password hoặc Supabase secret key.
+Không commit `appsettings.Local.json`, connection string, database password hoặc Supabase secret key.
 
 ### 3. Apply migration
 
 ```powershell
 dotnet tool restore
-$env:ASPNETCORE_ENVIRONMENT = "Development"
 dotnet ef database update `
   --project src/Homeji.Infrastructure `
   --startup-project src/Homeji.Api
@@ -99,7 +120,7 @@ dotnet build --no-restore
 dotnet run --project src/Homeji.Api
 ```
 
-OpenAPI JSON chỉ được bật trong môi trường Development tại `/openapi/v1.json`.
+OpenAPI JSON được bật/tắt bằng `Api:EnableOpenApi`. File mẫu local đang bật OpenAPI tại `/openapi/v1.json`.
 
 ## Authentication flow
 
@@ -108,7 +129,7 @@ OpenAPI JSON chỉ được bật trong môi trường Development tại `/opena
 3. Frontend gửi `Authorization: Bearer <access-token>` tới Homeji API.
 4. API kiểm tra signature, issuer, audience, expiry và lấy user id từ claim `sub`.
 
-Các controller được bảo vệ mặc định bằng fallback authorization policy. Chỉ health checks và OpenAPI Development được anonymous.
+Các controller được bảo vệ mặc định bằng fallback authorization policy. Chỉ health checks và OpenAPI khi được bật bằng cấu hình là anonymous.
 
 ## API mẫu
 
@@ -139,7 +160,7 @@ dotnet test --no-restore
 
 - Unit tests kiểm tra validation và profile use case.
 - Integration tests kiểm tra health endpoint và authorization boundary.
-- Kiểm thử database thật cần Supabase connection riêng cho môi trường test; không dùng production database.
+- Kiểm thử database thật cần Supabase connection riêng cho test; không dùng production database.
 
 ## Quy ước phát triển
 

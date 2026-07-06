@@ -1,8 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <UserSecretsId>homeji-api-local-development</UserSecretsId>
-  </PropertyGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\Homeji.Application\Homeji.Application.csproj" />
     <ProjectReference Include="..\Homeji.Infrastructure\Homeji.Infrastructure.csproj" />

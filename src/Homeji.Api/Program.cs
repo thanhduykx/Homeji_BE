@@ -5,8 +5,12 @@ using Homeji.Application.Abstractions.Authentication;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
+
+RemoveEnvironmentBackedConfigurationSources(builder.Configuration);
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -51,11 +55,12 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
+if (builder.Configuration.GetValue("Api:EnableOpenApi", false))
 {
     app.MapOpenApi().AllowAnonymous();
 }
-else
+
+if (builder.Configuration.GetValue("Api:UseHsts", true))
 {
     app.UseHsts();
 }
@@ -78,5 +83,17 @@ app.MapHealthChecks(
 app.MapControllers();
 
 app.Run();
+
+static void RemoveEnvironmentBackedConfigurationSources(ConfigurationManager configuration)
+{
+    for (var index = configuration.Sources.Count - 1; index >= 0; index--)
+    {
+        var sourceName = configuration.Sources[index].GetType().Name;
+        if (sourceName is "EnvironmentVariablesConfigurationSource" or "UserSecretsConfigurationSource")
+        {
+            configuration.Sources.RemoveAt(index);
+        }
+    }
+}
 
 public partial class Program;
