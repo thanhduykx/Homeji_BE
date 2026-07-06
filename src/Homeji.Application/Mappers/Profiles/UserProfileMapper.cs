@@ -12,6 +12,17 @@ public static class UserProfileMapper
         return new UserProfileDto(
             profile.Id,
             profile.DisplayName,
+            profile.Role,
+            profile.Phone,
+            profile.AvatarPath,
+            profile.School,
+            profile.PreferredArea,
+            profile.SleepHabit,
+            profile.PetPreference,
+            profile.SmokingPreference,
+            profile.MaxBudget,
+            profile.OnboardingCompleted,
+            profile.LandlordVerificationStatus,
             profile.CreatedAt,
             profile.UpdatedAt);
     }

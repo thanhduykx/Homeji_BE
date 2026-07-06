@@ -9,4 +9,8 @@ public interface IUserProfileService
     Task<UserProfileDto> UpsertMyProfileAsync(
         UpdateMyProfileDto request,
         CancellationToken cancellationToken = default);
+
+    Task<UserProfileDto> UpdateMyLifestyleAsync(
+        UpdateLifestyleDto request,
+        CancellationToken cancellationToken = default);
 }
