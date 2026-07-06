@@ -1,6 +1,6 @@
 using Homeji.Domain.Exceptions;
 
-namespace Homeji.Domain.Profiles;
+namespace Homeji.Domain.Entities;
 
 public sealed class UserProfile
 {

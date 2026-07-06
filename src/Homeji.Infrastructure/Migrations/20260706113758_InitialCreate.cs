@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Homeji.Infrastructure.Persistence.Migrations;
+namespace Homeji.Infrastructure.Migrations;
 
 /// <inheritdoc />
 public partial class InitialCreate : Migration

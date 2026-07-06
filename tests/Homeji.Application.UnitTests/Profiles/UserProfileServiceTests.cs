@@ -1,10 +1,10 @@
 using Homeji.Application.Abstractions.Authentication;
-using Homeji.Application.Abstractions.Persistence;
 using Homeji.Application.Common.Exceptions;
-using Homeji.Application.Profiles;
-using Homeji.Application.Profiles.Models;
-using Homeji.Application.Profiles.Validation;
-using Homeji.Domain.Profiles;
+using Homeji.Application.DTOs.Profiles;
+using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.Services.Profiles;
+using Homeji.Application.Services.Profiles.Validation;
+using Homeji.Domain.Entities;
 
 namespace Homeji.Application.UnitTests.Profiles;
 
@@ -19,7 +19,7 @@ public sealed class UserProfileServiceTests
         var repository = new InMemoryUserProfileRepository();
         var service = CreateService(repository);
 
-        var result = await service.UpsertMyProfileAsync(new UpdateMyProfileRequest("  Duy  "));
+        var result = await service.UpsertMyProfileAsync(new UpdateMyProfileDto("  Duy  "));
 
         Assert.Equal(UserId, result.Id);
         Assert.Equal("Duy", result.DisplayName);
@@ -34,9 +34,9 @@ public sealed class UserProfileServiceTests
         var service = CreateService(repository);
 
         var exception = await Assert.ThrowsAsync<RequestValidationException>(() =>
-            service.UpsertMyProfileAsync(new UpdateMyProfileRequest(" ")));
+            service.UpsertMyProfileAsync(new UpdateMyProfileDto(" ")));
 
-        Assert.Contains(nameof(UpdateMyProfileRequest.DisplayName), exception.Errors.Keys);
+        Assert.Contains(nameof(UpdateMyProfileDto.DisplayName), exception.Errors.Keys);
         Assert.Null(repository.UpsertedProfile);
     }
 
@@ -53,7 +53,7 @@ public sealed class UserProfileServiceTests
         return new UserProfileService(
             new StubCurrentUser(UserId),
             repository,
-            new UpdateMyProfileRequestValidator(),
+            new UpdateMyProfileDtoValidator(),
             new StubTimeProvider(UtcNow));
     }
 

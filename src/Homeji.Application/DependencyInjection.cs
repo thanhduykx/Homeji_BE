@@ -1,5 +1,6 @@
 using FluentValidation;
-using Homeji.Application.Profiles;
+using Homeji.Application.IServices.Profiles;
+using Homeji.Application.Services.Profiles;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Homeji.Application;

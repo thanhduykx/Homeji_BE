@@ -1,8 +1,8 @@
-using Homeji.Domain.Profiles;
+using Homeji.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace Homeji.Infrastructure.Persistence.Configurations;
+namespace Homeji.Infrastructure.Context.Configurations;
 
 public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProfile>
 {

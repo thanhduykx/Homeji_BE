@@ -2,14 +2,31 @@
 
 ASP.NET Core 9 Web API theo Clean Architecture, sử dụng PostgreSQL của Supabase và xác thực access token do Supabase Auth phát hành.
 
-## Kiến trúc
+## Kiến trúc thư mục
 
 ```text
 src/
-├── Homeji.Api/             HTTP boundary, JWT, middleware, controllers
-├── Homeji.Application/     Use cases, validation, contracts
-├── Homeji.Domain/          Entities và business invariants
-└── Homeji.Infrastructure/  EF Core, PostgreSQL, repository, migrations
+├── Homeji.Api/
+│   ├── Controllers/        Controller layer
+│   ├── ViewModels/         View/API contracts nhận và trả về cho client
+│   ├── Mappers/            Map ViewModel <-> Application DTO
+│   ├── Authentication/     JWT/Supabase authentication
+│   └── ErrorHandling/      ProblemDetails và exception handling
+├── Homeji.Application/
+│   ├── Services/           Business/use-case services
+│   ├── IServices/          Service contracts
+│   ├── DTOs/               Internal application DTOs
+│   ├── Mappers/            Map Domain Entity <-> DTO
+│   ├── IRepositories/      Repository contracts
+│   └── Common/             Shared exceptions/common application types
+├── Homeji.Domain/
+│   ├── Entities/           Domain entities và business invariants
+│   └── Exceptions/         Domain exceptions
+└── Homeji.Infrastructure/
+    ├── Context/            EF Core DbContext và Fluent API configuration
+    ├── Repositories/       Repository implementations
+    ├── Migrations/         EF Core migrations
+    └── Health/             Infrastructure health checks
 tests/
 ├── Homeji.Application.UnitTests/
 └── Homeji.Api.IntegrationTests/
@@ -23,7 +40,7 @@ Api ───────────────> Application ──> Domain
               └──────> Application
 ```
 
-`Homeji.Domain` không phụ thuộc ASP.NET Core, EF Core hay Supabase. Supabase Auth là nguồn danh tính duy nhất; API không lưu hoặc xử lý mật khẩu.
+`IRepository` nằm trong Application để service không phụ thuộc Infrastructure. Infrastructure chỉ implement repository và context. Đây là điểm quan trọng để giữ Clean Architecture và testability.
 
 ## Quy ước cấu hình
 

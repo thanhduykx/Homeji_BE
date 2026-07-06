@@ -1,7 +1,7 @@
-using Homeji.Domain.Profiles;
+using Homeji.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homeji.Infrastructure.Persistence;
+namespace Homeji.Infrastructure.Context;
 
 public sealed class ApplicationDbContext : DbContext
 {

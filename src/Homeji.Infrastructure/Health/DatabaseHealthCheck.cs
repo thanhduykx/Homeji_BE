@@ -1,4 +1,4 @@
-using Homeji.Infrastructure.Persistence;
+using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 

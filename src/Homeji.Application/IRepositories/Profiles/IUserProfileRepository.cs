@@ -1,6 +1,6 @@
-using Homeji.Domain.Profiles;
+using Homeji.Domain.Entities;
 
-namespace Homeji.Application.Abstractions.Persistence;
+namespace Homeji.Application.IRepositories.Profiles;
 
 public interface IUserProfileRepository
 {

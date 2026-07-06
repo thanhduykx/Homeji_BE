@@ -1,8 +1,9 @@
-using Homeji.Application.Abstractions.Persistence;
-using Homeji.Domain.Profiles;
+using Homeji.Application.IRepositories.Profiles;
+using Homeji.Domain.Entities;
+using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homeji.Infrastructure.Persistence.Repositories;
+namespace Homeji.Infrastructure.Repositories;
 
 public sealed class UserProfileRepository : IUserProfileRepository
 {

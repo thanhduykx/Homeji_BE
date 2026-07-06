@@ -1,6 +1,6 @@
-using Homeji.Application.Abstractions.Persistence;
-using Homeji.Infrastructure.Persistence;
-using Homeji.Infrastructure.Persistence.Repositories;
+using Homeji.Application.IRepositories.Profiles;
+using Homeji.Infrastructure.Context;
+using Homeji.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

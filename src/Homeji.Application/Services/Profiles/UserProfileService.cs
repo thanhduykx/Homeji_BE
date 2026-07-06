@@ -1,23 +1,25 @@
 using FluentValidation;
 using Homeji.Application.Abstractions.Authentication;
-using Homeji.Application.Abstractions.Persistence;
 using Homeji.Application.Common.Exceptions;
-using Homeji.Application.Profiles.Models;
-using Homeji.Domain.Profiles;
+using Homeji.Application.DTOs.Profiles;
+using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IServices.Profiles;
+using Homeji.Application.Mappers.Profiles;
+using Homeji.Domain.Entities;
 
-namespace Homeji.Application.Profiles;
+namespace Homeji.Application.Services.Profiles;
 
 public sealed class UserProfileService : IUserProfileService
 {
     private readonly ICurrentUser _currentUser;
     private readonly IUserProfileRepository _repository;
-    private readonly IValidator<UpdateMyProfileRequest> _validator;
+    private readonly IValidator<UpdateMyProfileDto> _validator;
     private readonly TimeProvider _timeProvider;
 
     public UserProfileService(
         ICurrentUser currentUser,
         IUserProfileRepository repository,
-        IValidator<UpdateMyProfileRequest> validator,
+        IValidator<UpdateMyProfileDto> validator,
         TimeProvider timeProvider)
     {
         _currentUser = currentUser;
@@ -26,7 +28,7 @@ public sealed class UserProfileService : IUserProfileService
         _timeProvider = timeProvider;
     }
 
-    public async Task<UserProfileResponse> GetMyProfileAsync(
+    public async Task<UserProfileDto> GetMyProfileAsync(
         CancellationToken cancellationToken = default)
     {
         var userId = GetRequiredUserId();
@@ -34,11 +36,11 @@ public sealed class UserProfileService : IUserProfileService
 
         return profile is null
             ? throw new NotFoundException(nameof(UserProfile), userId)
-            : Map(profile);
+            : UserProfileMapper.ToDto(profile);
     }
 
-    public async Task<UserProfileResponse> UpsertMyProfileAsync(
-        UpdateMyProfileRequest request,
+    public async Task<UserProfileDto> UpsertMyProfileAsync(
+        UpdateMyProfileDto request,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -61,7 +63,7 @@ public sealed class UserProfileService : IUserProfileService
         var profile = UserProfile.Create(userId, request.DisplayName!, now);
         var persistedProfile = await _repository.UpsertAsync(profile, cancellationToken);
 
-        return Map(persistedProfile);
+        return UserProfileMapper.ToDto(persistedProfile);
     }
 
     private Guid GetRequiredUserId()
@@ -69,14 +71,5 @@ public sealed class UserProfileService : IUserProfileService
         return _currentUser.UserId is { } userId && userId != Guid.Empty
             ? userId
             : throw new UnauthorizedAccessException("The authenticated token does not contain a valid subject.");
-    }
-
-    private static UserProfileResponse Map(UserProfile profile)
-    {
-        return new UserProfileResponse(
-            profile.Id,
-            profile.DisplayName,
-            profile.CreatedAt,
-            profile.UpdatedAt);
     }
 }
