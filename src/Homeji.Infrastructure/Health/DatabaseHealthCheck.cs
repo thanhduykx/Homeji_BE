@@ -6,11 +6,11 @@ namespace Homeji.Infrastructure.Health;
 
 public sealed class DatabaseHealthCheck : IHealthCheck
 {
-    private readonly IDbContextFactory<ApplicationDbContext> _dbContextFactory;
+    private readonly ApplicationDbContext _dbContext;
 
-    public DatabaseHealthCheck(IDbContextFactory<ApplicationDbContext> dbContextFactory)
+    public DatabaseHealthCheck(ApplicationDbContext dbContext)
     {
-        _dbContextFactory = dbContextFactory;
+        _dbContext = dbContext;
     }
 
     public async Task<HealthCheckResult> CheckHealthAsync(
@@ -19,8 +19,7 @@ public sealed class DatabaseHealthCheck : IHealthCheck
     {
         try
         {
-            await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
-            var canConnect = await dbContext.Database.CanConnectAsync(cancellationToken);
+            var canConnect = await _dbContext.Database.CanConnectAsync(cancellationToken);
 
             return canConnect
                 ? HealthCheckResult.Healthy()
