@@ -28,7 +28,7 @@ public static class DependencyInjection
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "Connection string 'DefaultConnection' is required. Configure it in src/Homeji.Api/appsettings.Local.json.");
+                "Connection string 'DefaultConnection' is required. Configure it in src/Homeji.Api/appsettings.json.");
         }
 
         try
