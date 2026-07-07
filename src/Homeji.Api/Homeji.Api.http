@@ -6,13 +6,13 @@ Accept: application/json
 
 ###
 
-GET {{Homeji_Api_HostAddress}}/api/v1/profile/me
+GET {{Homeji_Api_HostAddress}}/api/profile/me
 Authorization: Bearer {{AccessToken}}
 Accept: application/json
 
 ###
 
-PUT {{Homeji_Api_HostAddress}}/api/v1/profile/me
+PUT {{Homeji_Api_HostAddress}}/api/profile/me
 Authorization: Bearer {{AccessToken}}
 Content-Type: application/json
 

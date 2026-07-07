@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/profile")]
+[Route("api/profile")]
 public sealed class ProfileController : ControllerBase
 {
     private readonly IUserProfileService _profileService;

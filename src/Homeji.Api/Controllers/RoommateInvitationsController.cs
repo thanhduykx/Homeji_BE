@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/roommate-invitations")]
+[Route("api/roommate-invitations")]
 public sealed class RoommateInvitationsController : ControllerBase
 {
     private readonly IRoommateInvitationService _invitationService;

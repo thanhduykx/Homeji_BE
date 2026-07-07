@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/reports")]
+[Route("api/reports")]
 public sealed class ReportsController : ControllerBase
 {
     private readonly IReportService _reportService;
@@ -20,6 +20,6 @@ public sealed class ReportsController : ControllerBase
     public async Task<ActionResult<ReportDto>> Create([FromBody] CreateReportDto request, CancellationToken cancellationToken)
     {
         var report = await _reportService.CreateAsync(request, cancellationToken);
-        return Created($"/api/v1/reports/{report.Id}", report);
+        return Created($"/api/reports/{report.Id}", report);
     }
 }

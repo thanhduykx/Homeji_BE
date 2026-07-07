@@ -26,7 +26,7 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [Fact]
     public async Task ProfileEndpoint_WithoutAccessToken_ReturnsUnauthorized()
     {
-        var response = await _client.GetAsync(new Uri("/api/v1/profile/me", UriKind.Relative));
+        var response = await _client.GetAsync(new Uri("/api/profile/me", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

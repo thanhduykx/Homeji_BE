@@ -99,6 +99,111 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("notifications", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.PaymentTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Deeplink")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("deeplink");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("ExternalTransactionId")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("external_transaction_id");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer")
+                        .HasColumnName("method");
+
+                    b.Property<string>("OrderCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("order_code");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("paid_at");
+
+                    b.Property<string>("PaymentUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("payment_url");
+
+                    b.Property<string>("ProviderMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("provider_message");
+
+                    b.Property<string>("QrCode")
+                        .HasColumnType("text")
+                        .HasColumnName("qr_code");
+
+                    b.Property<string>("QrCodeUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("qr_code_url");
+
+                    b.Property<string>("QrDataUrl")
+                        .HasColumnType("text")
+                        .HasColumnName("qr_data_url");
+
+                    b.Property<string>("RawProviderPayload")
+                        .HasColumnType("text")
+                        .HasColumnName("raw_provider_payload");
+
+                    b.Property<string>("RequestId")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("request_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_transactions");
+
+                    b.HasIndex("OrderCode")
+                        .IsUnique()
+                        .HasDatabaseName("ux_payment_transactions_order_code");
+
+                    b.HasIndex("RequestId")
+                        .HasDatabaseName("ix_payment_transactions_request_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_payment_transactions_user_id");
+
+                    b.ToTable("payment_transactions", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.RentalPost", b =>
                 {
                     b.Property<Guid>("Id")
