@@ -19,6 +19,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BadWord> BadWords => Set<BadWord>();
+    public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -354,18 +354,6 @@
           "Microsoft.Extensions.Primitives": "9.0.17"
         }
       },
-      "Microsoft.Extensions.Options.ConfigurationExtensions": {
-        "type": "Transitive",
-        "resolved": "9.0.17",
-        "contentHash": "DtDKGG1xP1oSYbf5C268r+YRWz+gYXu0oP5JOXM4hR6aGfeki2YFKDWiUg2B8JWcecTuwi21IbDUoU42Z3DvJw==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "9.0.17",
-          "Microsoft.Extensions.Configuration.Binder": "9.0.17",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.17",
-          "Microsoft.Extensions.Options": "9.0.17",
-          "Microsoft.Extensions.Primitives": "9.0.17"
-        }
-      },
       "Microsoft.Extensions.Primitives": {
         "type": "Transitive",
         "resolved": "9.0.17",
@@ -568,6 +556,8 @@
           "Microsoft.EntityFrameworkCore.Relational": "[9.0.17, )",
           "Microsoft.Extensions.Configuration.Abstractions": "[9.0.17, )",
           "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "[9.0.17, )",
+          "Microsoft.Extensions.Http": "[9.0.17, )",
+          "Microsoft.Extensions.Options.ConfigurationExtensions": "[9.0.17, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[9.0.4, )"
         }
       },
@@ -628,6 +618,33 @@
         "requested": "[9.0.17, )",
         "resolved": "9.0.17",
         "contentHash": "mf8rssO7Clh69CIW4u5PAwqYVJrk/qlM6/bl8nQ0Op6hqHM64PXWDlLoR9XfefdSPLeogVdS9ycrkOWbcoKPkQ=="
+      },
+      "Microsoft.Extensions.Http": {
+        "type": "CentralTransitive",
+        "requested": "[9.0.17, )",
+        "resolved": "9.0.17",
+        "contentHash": "okplKfAdaWNyYV20UyIVT32+8SQBIRZ6O6TVhqEAIevoK5VFEcEVsqLwZbghBGdB5qkRdEdMvMb1x6qG+C83iA==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "9.0.17",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.17",
+          "Microsoft.Extensions.Diagnostics": "9.0.17",
+          "Microsoft.Extensions.Logging": "9.0.17",
+          "Microsoft.Extensions.Logging.Abstractions": "9.0.17",
+          "Microsoft.Extensions.Options": "9.0.17"
+        }
+      },
+      "Microsoft.Extensions.Options.ConfigurationExtensions": {
+        "type": "CentralTransitive",
+        "requested": "[9.0.17, )",
+        "resolved": "9.0.17",
+        "contentHash": "DtDKGG1xP1oSYbf5C268r+YRWz+gYXu0oP5JOXM4hR6aGfeki2YFKDWiUg2B8JWcecTuwi21IbDUoU42Z3DvJw==",
+        "dependencies": {
+          "Microsoft.Extensions.Configuration.Abstractions": "9.0.17",
+          "Microsoft.Extensions.Configuration.Binder": "9.0.17",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.17",
+          "Microsoft.Extensions.Options": "9.0.17",
+          "Microsoft.Extensions.Primitives": "9.0.17"
+        }
       },
       "Npgsql.EntityFrameworkCore.PostgreSQL": {
         "type": "CentralTransitive",
