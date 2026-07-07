@@ -13,7 +13,8 @@ RemoveEnvironmentBackedConfigurationSources(builder.Configuration);
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
 
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -57,7 +58,13 @@ app.UseExceptionHandler();
 
 if (builder.Configuration.GetValue("Api:EnableOpenApi", false))
 {
-    app.MapOpenApi().AllowAnonymous();
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Homeji API v1");
+        options.RoutePrefix = "swagger";
+    });
+
 }
 
 if (builder.Configuration.GetValue("Api:UseHsts", true))
@@ -78,6 +85,22 @@ app.MapHealthChecks(
 app.MapHealthChecks(
         "/health/ready",
         new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") })
+    .AllowAnonymous();
+
+app.MapGet(
+        "/",
+        () => Results.Ok(new
+        {
+            name = "Homeji Backend API",
+            status = "running",
+            health = new
+            {
+                live = "/health/live",
+                ready = "/health/ready",
+            },
+            swagger = "/swagger",
+            openApi = "/swagger/v1/swagger.json",
+        }))
     .AllowAnonymous();
 
 app.MapControllers();
