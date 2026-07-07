@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/admin/moderation")]
+[Route("api/admin/moderation")]
 public sealed class AdminModerationController : ControllerBase
 {
     private readonly IAdminModerationService _moderationService;

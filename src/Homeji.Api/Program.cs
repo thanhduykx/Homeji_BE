@@ -14,7 +14,13 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("api", new Microsoft.OpenApi.OpenApiInfo
+    {
+        Title = "Homeji API",
+    });
+});
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -58,10 +64,14 @@ app.UseExceptionHandler();
 
 if (builder.Configuration.GetValue("Api:EnableOpenApi", false))
 {
-    app.UseSwagger();
+    app.UseSwagger(options =>
+    {
+        options.RouteTemplate = "swagger/{documentName}/swagger.json";
+    });
+
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Homeji API v1");
+        options.SwaggerEndpoint("/swagger/api/swagger.json", "Homeji API");
         options.RoutePrefix = "swagger";
     });
 

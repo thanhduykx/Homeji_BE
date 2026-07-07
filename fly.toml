@@ -1,4 +1,4 @@
-app = "homeji-be-thanhduy"
+app = "homeji-api"
 primary_region = "sin"
 
 [build]

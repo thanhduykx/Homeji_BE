@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/notifications")]
+[Route("api/notifications")]
 public sealed class NotificationsController : ControllerBase
 {
     private readonly INotificationService _notificationService;

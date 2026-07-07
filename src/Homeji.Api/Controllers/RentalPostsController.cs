@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/rental-posts")]
+[Route("api/rental-posts")]
 public sealed class RentalPostsController : ControllerBase
 {
     private readonly IRentalPostService _rentalPostService;

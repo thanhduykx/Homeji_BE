@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Homeji.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/saved-posts")]
+[Route("api/saved-posts")]
 public sealed class SavedPostsController : ControllerBase
 {
     private readonly ISavedPostService _savedPostService;
