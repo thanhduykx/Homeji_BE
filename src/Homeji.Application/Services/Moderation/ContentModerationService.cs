@@ -3,7 +3,7 @@ using Homeji.Application.IRepositories.Moderation;
 
 namespace Homeji.Application.Services.Moderation;
 
-internal sealed class ContentModerationService
+public sealed class ContentModerationService
 {
     private static readonly Regex HiddenPhoneRegex = new(@"\d(?:[\s.\-_\(\)]*\d){9}", RegexOptions.Compiled);
     private readonly IBadWordRepository _badWords;

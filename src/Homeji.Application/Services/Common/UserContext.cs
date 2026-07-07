@@ -6,7 +6,7 @@ using Homeji.Domain.Enums;
 
 namespace Homeji.Application.Services.Common;
 
-internal sealed class UserContext
+public sealed class UserContext
 {
     private readonly ICurrentUser _currentUser;
     private readonly IUserProfileRepository _profiles;

@@ -27,18 +27,46 @@ public sealed class UserProfileRepository : IUserProfileRepository
         UserProfile profile,
         CancellationToken cancellationToken = default)
     {
-        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"""
-             INSERT INTO homeji.user_profiles (id, display_name, created_at, updated_at)
-             VALUES ({profile.Id}, {profile.DisplayName}, {profile.CreatedAt}, {profile.UpdatedAt})
-             ON CONFLICT (id) DO UPDATE
-             SET display_name = EXCLUDED.display_name,
-                 updated_at = EXCLUDED.updated_at;
-             """,
-            cancellationToken);
+        var existingProfile = await _dbContext.UserProfiles
+            .SingleOrDefaultAsync(item => item.Id == profile.Id, cancellationToken);
+
+        if (existingProfile is null)
+        {
+            _dbContext.UserProfiles.Add(profile);
+        }
+        else
+        {
+            _dbContext.Entry(existingProfile).CurrentValues.SetValues(profile);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return await _dbContext.UserProfiles
             .AsNoTracking()
             .SingleAsync(existingProfile => existingProfile.Id == profile.Id, cancellationToken);
+    }
+
+    public async Task<UserProfile> SaveAsync(
+        UserProfile profile,
+        CancellationToken cancellationToken = default)
+    {
+        _dbContext.UserProfiles.Update(profile);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return profile;
+    }
+
+    public async Task<IReadOnlyList<UserProfile>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (userIds.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.UserProfiles
+            .AsNoTracking()
+            .Where(profile => userIds.Contains(profile.Id))
+            .ToListAsync(cancellationToken);
     }
 }

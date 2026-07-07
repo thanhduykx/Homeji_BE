@@ -54,6 +54,7 @@ public sealed class UserProfileServiceTests
             new StubCurrentUser(UserId),
             repository,
             new UpdateMyProfileDtoValidator(),
+            new UpdateLifestyleDtoValidator(),
             new StubTimeProvider(UtcNow));
     }
 
@@ -91,6 +92,25 @@ public sealed class UserProfileServiceTests
             Profile = profile;
             UpsertedProfile = profile;
             return Task.FromResult(profile);
+        }
+
+        public Task<UserProfile> SaveAsync(
+            UserProfile profile,
+            CancellationToken cancellationToken = default)
+        {
+            Profile = profile;
+            return Task.FromResult(profile);
+        }
+
+        public Task<IReadOnlyList<UserProfile>> GetByIdsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<UserProfile> profiles = Profile is not null && userIds.Contains(Profile.Id)
+                ? [Profile]
+                : [];
+
+            return Task.FromResult(profiles);
         }
     }
 }

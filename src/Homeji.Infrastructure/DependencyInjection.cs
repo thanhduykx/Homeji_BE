@@ -1,4 +1,10 @@
+using Homeji.Application.IRepositories.Moderation;
+using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IRepositories.RentalPosts;
+using Homeji.Application.IRepositories.Reports;
+using Homeji.Application.IRepositories.Roommates;
+using Homeji.Application.IRepositories.SavedPosts;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -30,7 +36,7 @@ public static class DependencyInjection
             throw new InvalidOperationException("Connection string 'DefaultConnection' is invalid.", exception);
         }
 
-        services.AddDbContextFactory<ApplicationDbContext>(options =>
+        services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(
                 connectionString,
                 npgsqlOptions =>
@@ -43,6 +49,12 @@ public static class DependencyInjection
                 }));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<IRentalPostRepository, RentalPostRepository>();
+        services.AddScoped<ISavedPostRepository, SavedPostRepository>();
+        services.AddScoped<IRoommateInvitationRepository, RoommateInvitationRepository>();
+        services.AddScoped<IReportRepository, ReportRepository>();
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IBadWordRepository, BadWordRepository>();
 
         return services;
     }

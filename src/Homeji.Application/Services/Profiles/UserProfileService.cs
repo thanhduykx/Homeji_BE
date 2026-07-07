@@ -5,6 +5,7 @@ using Homeji.Application.DTOs.Profiles;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IServices.Profiles;
 using Homeji.Application.Mappers.Profiles;
+using Homeji.Domain.Entities;
 
 namespace Homeji.Application.Services.Profiles;
 

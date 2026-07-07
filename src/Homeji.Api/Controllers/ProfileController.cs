@@ -41,4 +41,19 @@ public sealed class ProfileController : ControllerBase
 
         return Ok(UserProfileViewMapper.ToViewModel(profile));
     }
+
+    [HttpPut("me/lifestyle")]
+    [ProducesResponseType<UserProfileViewModel>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UserProfileViewModel>> UpdateMyLifestyle(
+        [FromBody] UpdateLifestyleViewModel request,
+        CancellationToken cancellationToken)
+    {
+        var profile = await _profileService.UpdateMyLifestyleAsync(
+            UserProfileViewMapper.ToDto(request),
+            cancellationToken);
+
+        return Ok(UserProfileViewMapper.ToViewModel(profile));
+    }
 }
