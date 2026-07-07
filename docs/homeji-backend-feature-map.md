@@ -375,7 +375,7 @@ Validation nên làm trước khi build quá rộng:
 - Supabase Auth là source of identity.
 - BE không lưu password.
 - Supabase PostgreSQL là database chính.
-- Không dùng env theo yêu cầu project; dùng `appsettings.Local.json`.
+- Không dùng file cấu hình local riêng, `.env`, .NET User Secrets hoặc environment variables cho application config; toàn bộ runtime config nằm trong `src/Homeji.Api/appsettings.json`.
 - API giữ flow `Views -> Services -> DAL`.
 - Mọi table app nằm trong schema `homeji`.
 - Public data chỉ query qua backend API; không expose trực tiếp bảng app qua Supabase Data API ở giai đoạn này.

@@ -6,22 +6,19 @@ namespace Homeji.Api.DesignTime;
 
 public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<ApplicationDbContext>
 {
-    private const string ToolingConnectionString =
-        "Host=localhost;Port=5432;Database=postgres;Username=postgres";
-
     public ApplicationDbContext CreateDbContext(string[] args)
     {
         var apiProjectPath = ResolveApiProjectPath();
         var configuration = new ConfigurationBuilder()
             .SetBasePath(apiProjectPath)
             .AddJsonFile("appsettings.json", optional: false)
-            .AddJsonFile("appsettings.Local.json", optional: true)
             .Build();
 
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            connectionString = ToolingConnectionString;
+            throw new InvalidOperationException(
+                "Connection string 'DefaultConnection' is required in src/Homeji.Api/appsettings.json.");
         }
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
