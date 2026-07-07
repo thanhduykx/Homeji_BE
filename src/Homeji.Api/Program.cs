@@ -89,18 +89,7 @@ app.MapHealthChecks(
 
 app.MapGet(
         "/",
-        () => Results.Ok(new
-        {
-            name = "Homeji Backend API",
-            status = "running",
-            health = new
-            {
-                live = "/health/live",
-                ready = "/health/ready",
-            },
-            swagger = "/swagger",
-            openApi = "/swagger/v1/swagger.json",
-        }))
+        () => Results.Redirect("/swagger"))
     .AllowAnonymous();
 
 app.MapControllers();
