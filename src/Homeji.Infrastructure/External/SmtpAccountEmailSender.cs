@@ -42,14 +42,13 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             return new EmailSendResultDto(false, "SMTP registration confirmation email is disabled by configuration.");
         }
 
-        ValidateOptions();
-
-        var recipientName = NormalizeDisplayName(displayName);
-        using var mailMessage = CreateRegistrationMessage(email, recipientName);
-        using var smtpClient = CreateClient();
-
         try
         {
+            ValidateOptions();
+            var recipientName = NormalizeDisplayName(displayName);
+            using var mailMessage = CreateRegistrationMessage(email, recipientName);
+            using var smtpClient = CreateClient();
+
             await smtpClient.SendMailAsync(mailMessage, cancellationToken);
             return new EmailSendResultDto(true, "SMTP registration confirmation email was sent.");
         }
@@ -59,6 +58,11 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
         }
         catch (InvalidOperationException exception)
+        {
+            InvalidSmtpConfiguration(_logger, email, exception);
+            return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
+        }
+        catch (FormatException exception)
         {
             InvalidSmtpConfiguration(_logger, email, exception);
             return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
