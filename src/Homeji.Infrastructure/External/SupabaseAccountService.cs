@@ -2,7 +2,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Accounts;
+using Homeji.Application.DTOs.Emails;
 using Homeji.Application.IServices.Accounts;
+using Homeji.Application.IServices.Emails;
 using Microsoft.Extensions.Options;
 
 namespace Homeji.Infrastructure.External;
@@ -10,15 +12,18 @@ namespace Homeji.Infrastructure.External;
 public sealed class SupabaseAccountService : IAccountService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private readonly IAccountEmailSender _accountEmailSender;
     private readonly HttpClient _httpClient;
     private readonly SupaBaseAuthOptions _options;
 
     public SupabaseAccountService(
         HttpClient httpClient,
-        IOptions<SupaBaseAuthOptions> options)
+        IOptions<SupaBaseAuthOptions> options,
+        IAccountEmailSender accountEmailSender)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _accountEmailSender = accountEmailSender;
     }
 
     public async Task<AuthSessionDto> RegisterAsync(
@@ -44,7 +49,16 @@ public sealed class SupabaseAccountService : IAccountService
             });
 
         var json = await SendAsync(httpRequest, cancellationToken);
-        return ParseAuthSession(json, emailConfirmationMessage: "Registration succeeded. Check email if confirmation is enabled.");
+        var authSession = ParseAuthSession(json, emailConfirmationMessage: "Registration succeeded.");
+        var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
+            request.Email!,
+            request.DisplayName,
+            cancellationToken);
+
+        return authSession with
+        {
+            Message = BuildRegistrationMessage(authSession, emailResult),
+        };
     }
 
     public async Task<AuthSessionDto> LoginAsync(
@@ -177,6 +191,15 @@ public sealed class SupabaseAccountService : IAccountService
         }
 
         return new Uri(relative, UriKind.Relative);
+    }
+
+    private static string BuildRegistrationMessage(AuthSessionDto authSession, EmailSendResultDto emailResult)
+    {
+        var authMessage = authSession.EmailConfirmationRequired
+            ? "Registration succeeded. Email confirmation may be required before login."
+            : "Registration succeeded.";
+
+        return $"{authMessage} {emailResult.Message}";
     }
 
     private void EnsureConfigured()

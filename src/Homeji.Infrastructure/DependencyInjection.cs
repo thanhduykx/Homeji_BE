@@ -7,6 +7,7 @@ using Homeji.Application.IRepositories.Reports;
 using Homeji.Application.IRepositories.Roommates;
 using Homeji.Application.IRepositories.SavedPosts;
 using Homeji.Application.IServices.Accounts;
+using Homeji.Application.IServices.Emails;
 using Homeji.Application.IServices.Payments;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.External;
@@ -62,8 +63,10 @@ public static class DependencyInjection
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
+        services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
+        services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
         services.AddHttpClient<IAccountService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
 

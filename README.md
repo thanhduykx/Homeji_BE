@@ -72,6 +72,28 @@ Khuyến nghị Supabase Auth dùng asymmetric JWT signing key. Frontend dùng S
 Authorization: Bearer <supabase-access-token>
 ```
 
+## SMTP đăng ký account
+
+API gửi email xác nhận đăng ký sau khi Supabase tạo account thành công. Cấu hình tại:
+
+```json
+"Email": {
+  "Smtp": {
+    "Enabled": true,
+    "Host": "smtp.gmail.com",
+    "Port": 587,
+    "EnableSsl": true,
+    "Username": "your-smtp-user",
+    "Password": "your-smtp-password-or-app-password",
+    "FromEmail": "no-reply@homeji.vn",
+    "FromName": "Homeji",
+    "LoginUrl": "http://localhost:3000/login"
+  }
+}
+```
+
+Email SMTP này là email thông báo/xác nhận đăng ký từ Homeji. Nếu cần email verification token chính thức của Supabase Auth, cấu hình Supabase Auth custom SMTP trong Supabase Dashboard.
+
 ## Database migration
 
 ```powershell
