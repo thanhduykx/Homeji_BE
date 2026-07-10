@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: homeji-api-thanhduy
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    autoDeployTrigger: commit
+    healthCheckPath: /health/live
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: Ai__Gemini__ApiKey
+        sync: false

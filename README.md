@@ -123,7 +123,7 @@ dotnet run --project src/Homeji.Api
 Swagger:
 
 ```text
-https://homeji-api.fly.dev/swagger
+https://homeji-api-thanhduy.onrender.com/swagger
 ```
 
 Local Swagger sẽ nằm tại:
@@ -172,24 +172,26 @@ Current test suites:
 - `Homeji.Application.UnitTests`
 - `Homeji.Api.IntegrationTests`
 
-## Deploy Fly.io
+## Deploy Render
 
-Fly app hiện tại:
+Render Blueprint hiện tại:
 
 ```text
-homeji-api
+homeji-api-thanhduy
 ```
 
-Manual deploy:
+Tạo service lần đầu:
 
 ```powershell
-flyctl deploy --remote-only --app homeji-api
+1. Vào https://dashboard.render.com/.
+2. Chọn **New +** → **Blueprint**, rồi kết nối `thanhduykx/Homeji_BE` ở branch `main`.
+3. Render đọc `render.yaml`, tạo Docker service và tự deploy mỗi lần push `main`.
 ```
 
-GitHub Actions deploy khi push vào `main` hoặc chạy `workflow_dispatch`:
+Trước khi deploy, đặt secret Gemini trong phần **Environment** của service:
 
 ```text
-.github/workflows/fly-deploy.yml
+Ai__Gemini__ApiKey = <Gemini API key>
 ```
 
 ## Quy ước phát triển
