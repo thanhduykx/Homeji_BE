@@ -2,6 +2,7 @@ using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Profiles;
 using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.Services.Profiles;
 using Homeji.Application.Services.Profiles.Validation;
 using Homeji.Domain.Entities;
@@ -53,6 +54,7 @@ public sealed class UserProfileServiceTests
         return new UserProfileService(
             new StubCurrentUser(UserId),
             repository,
+            new EmptyUserSubscriptionRepository(),
             new UpdateMyProfileDtoValidator(),
             new UpdateLifestyleDtoValidator(),
             new StubTimeProvider(UtcNow));
@@ -111,6 +113,43 @@ public sealed class UserProfileServiceTests
                 : [];
 
             return Task.FromResult(profiles);
+        }
+    }
+
+    private sealed class EmptyUserSubscriptionRepository : IUserSubscriptionRepository
+    {
+        public Task<UserSubscription?> GetActivePremiumAsync(
+            Guid userId,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<UserSubscription?>(null);
+        }
+
+        public Task<IReadOnlyDictionary<Guid, UserSubscription>> GetActivePremiumByUserIdsAsync(
+            IReadOnlyCollection<Guid> userIds,
+            DateTimeOffset now,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyDictionary<Guid, UserSubscription>>(
+                new Dictionary<Guid, UserSubscription>());
+        }
+
+        public Task<UserSubscription?> GetByPaymentTransactionIdAsync(
+            Guid paymentTransactionId,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<UserSubscription?>(null);
+        }
+
+        public Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

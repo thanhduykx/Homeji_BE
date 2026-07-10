@@ -13,6 +13,8 @@ public static class PaymentMapper
             payment.Method,
             payment.Status,
             payment.Amount,
+            payment.Purpose,
+            payment.PackageCode,
             payment.OrderCode,
             payment.RequestId,
             payment.Description,

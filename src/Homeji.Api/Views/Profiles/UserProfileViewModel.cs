@@ -14,5 +14,8 @@ public sealed record UserProfileViewModel(
     decimal? MaxBudget,
     bool OnboardingCompleted,
     Homeji.Domain.Enums.LandlordVerificationStatus LandlordVerificationStatus,
+    bool IsPremium,
+    string SubscriptionBadge,
+    DateTimeOffset? PremiumExpiresAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

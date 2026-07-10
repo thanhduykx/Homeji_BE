@@ -140,6 +140,11 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("order_code");
 
+                    b.Property<string>("PackageCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("package_code");
+
                     b.Property<DateTimeOffset?>("PaidAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("paid_at");
@@ -153,6 +158,10 @@ namespace Homeji.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("provider_message");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose");
 
                     b.Property<string>("QrCode")
                         .HasColumnType("text")
@@ -575,6 +584,73 @@ namespace Homeji.Infrastructure.Migrations
                         .HasName("pk_user_profiles");
 
                     b.ToTable("user_profiles", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.UserSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("PackageCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("package_code");
+
+                    b.Property<string>("PackageName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("package_name");
+
+                    b.Property<Guid?>("PaymentTransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_transaction_id");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("started_at");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<int>("Tier")
+                        .HasColumnType("integer")
+                        .HasColumnName("tier");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_subscriptions");
+
+                    b.HasIndex("PaymentTransactionId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_user_subscriptions_payment_transaction_id")
+                        .HasFilter("payment_transaction_id IS NOT NULL");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_subscriptions_user_id");
+
+                    b.HasIndex("UserId", "Tier", "Status", "StartedAt", "ExpiresAt")
+                        .HasDatabaseName("ix_user_subscriptions_active_lookup");
+
+                    b.ToTable("user_subscriptions", "homeji");
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.RentalPostAmenity", b =>

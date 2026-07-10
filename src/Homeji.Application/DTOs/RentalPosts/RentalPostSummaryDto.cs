@@ -13,4 +13,8 @@ public sealed record RentalPostSummaryDto(
     decimal Longitude,
     string? ThumbnailPath,
     int ViewCount,
-    int SaveCount);
+    int SaveCount,
+    bool IsOwnerPremium,
+    string? OwnerBadge,
+    decimal BoostScore,
+    string? HighlightTag);

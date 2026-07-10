@@ -30,7 +30,11 @@ public static class RentalPostMapper
             post.UpdatedAt);
     }
 
-    public static RentalPostSummaryDto ToSummaryDto(RentalPost post)
+    public static RentalPostSummaryDto ToSummaryDto(
+        RentalPost post,
+        bool isOwnerPremium = false,
+        decimal boostScore = 0,
+        string? highlightTag = null)
     {
         return new RentalPostSummaryDto(
             post.Id,
@@ -46,7 +50,11 @@ public static class RentalPostMapper
                 .ThenBy(media => media.SortOrder)
                 .FirstOrDefault(media => media.MediaType == MediaType.Image)?.Path,
             post.ViewCount,
-            post.SaveCount);
+            post.SaveCount,
+            isOwnerPremium,
+            isOwnerPremium ? "Premium" : null,
+            boostScore,
+            highlightTag);
     }
 
     private static RentalPostMediaDto ToDto(RentalPostMedia media)

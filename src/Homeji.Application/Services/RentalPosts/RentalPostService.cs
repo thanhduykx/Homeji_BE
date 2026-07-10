@@ -2,6 +2,7 @@ using FluentValidation;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IRepositories.RentalPosts;
+using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.RentalPosts;
 using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Application.Services.Common;
@@ -15,6 +16,7 @@ public sealed class RentalPostService : IRentalPostService
 {
     private readonly UserContext _userContext;
     private readonly IRentalPostRepository _posts;
+    private readonly IUserSubscriptionRepository _subscriptions;
     private readonly IValidator<UpdateRentalPostDto> _updateValidator;
     private readonly IValidator<AddRentalPostMediaDto> _mediaValidator;
     private readonly ContentModerationService _moderation;
@@ -23,6 +25,7 @@ public sealed class RentalPostService : IRentalPostService
     public RentalPostService(
         UserContext userContext,
         IRentalPostRepository posts,
+        IUserSubscriptionRepository subscriptions,
         IValidator<UpdateRentalPostDto> updateValidator,
         IValidator<AddRentalPostMediaDto> mediaValidator,
         ContentModerationService moderation,
@@ -30,6 +33,7 @@ public sealed class RentalPostService : IRentalPostService
     {
         _userContext = userContext;
         _posts = posts;
+        _subscriptions = subscriptions;
         _updateValidator = updateValidator;
         _mediaValidator = mediaValidator;
         _moderation = moderation;
@@ -138,7 +142,34 @@ public sealed class RentalPostService : IRentalPostService
         CancellationToken cancellationToken = default)
     {
         var posts = await _posts.SearchActiveAsync(request, cancellationToken);
-        return posts.Select(RentalPostMapper.ToSummaryDto).ToArray();
+        var now = _timeProvider.GetUtcNow();
+        var premiumByUserId = await _subscriptions.GetActivePremiumByUserIdsAsync(
+            posts.Select(post => post.OwnerId).ToArray(),
+            now,
+            cancellationToken);
+
+        return posts
+            .Select(post =>
+            {
+                var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
+                var boostScore = CalculateBoostScore(post, isPremium, now);
+                return RentalPostMapper.ToSummaryDto(post, isPremium, boostScore);
+            })
+            .OrderByDescending(post => post.IsOwnerPremium)
+            .ThenByDescending(post => post.BoostScore)
+            .ThenByDescending(post => post.SaveCount)
+            .ThenByDescending(post => post.ViewCount)
+            .ToArray();
+    }
+
+    private static decimal CalculateBoostScore(RentalPost post, bool isPremium, DateTimeOffset now)
+    {
+        var recencyDays = Math.Max(0, (now - post.UpdatedAt).TotalDays);
+        var recencyScore = Math.Max(0, 30 - (decimal)recencyDays);
+        var engagementScore = (post.SaveCount * 5) + Math.Min(post.ViewCount, 500) / 10m;
+        var premiumScore = isPremium ? 100 : 0;
+
+        return Math.Round(premiumScore + engagementScore + recencyScore, 2);
     }
 
     private async Task<RentalPost> GetOwnedPostAsync(Guid postId, CancellationToken cancellationToken)

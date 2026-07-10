@@ -6,9 +6,11 @@ using System.Text.Json;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Payments;
 using Homeji.Application.IRepositories.Payments;
+using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.Payments;
 using Homeji.Application.Mappers.Payments;
 using Homeji.Application.Services.Common;
+using Homeji.Application.Services.Subscriptions;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
 using Microsoft.Extensions.Options;
@@ -21,23 +23,29 @@ public sealed class PaymentService : IPaymentService
     private readonly HttpClient _httpClient;
     private readonly UserContext _userContext;
     private readonly IPaymentTransactionRepository _payments;
+    private readonly IUserSubscriptionRepository _subscriptions;
     private readonly MomoOptions _momoOptions;
     private readonly PayOsOptions _payOsOptions;
+    private readonly PremiumSubscriptionOptions _premiumOptions;
     private readonly TimeProvider _timeProvider;
 
     public PaymentService(
         HttpClient httpClient,
         UserContext userContext,
         IPaymentTransactionRepository payments,
+        IUserSubscriptionRepository subscriptions,
         IOptions<MomoOptions> momoOptions,
         IOptions<PayOsOptions> payOsOptions,
+        IOptions<PremiumSubscriptionOptions> premiumOptions,
         TimeProvider timeProvider)
     {
         _httpClient = httpClient;
         _userContext = userContext;
         _payments = payments;
+        _subscriptions = subscriptions;
         _momoOptions = momoOptions.Value;
         _payOsOptions = payOsOptions.Value;
+        _premiumOptions = premiumOptions.Value;
         _timeProvider = timeProvider;
     }
 
@@ -74,10 +82,38 @@ public sealed class PaymentService : IPaymentService
         CreateMomoPaymentDto request,
         CancellationToken cancellationToken = default)
     {
+        return await CreateMomoPaymentInternalAsync(
+            request.Amount,
+            request.Description,
+            PaymentPurpose.General,
+            null,
+            cancellationToken);
+    }
+
+    public async Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsurePremiumConfigured();
+
+        return await CreateMomoPaymentInternalAsync(
+            _premiumOptions.Price,
+            BuildPremiumDescription(),
+            PaymentPurpose.PremiumSubscription,
+            _premiumOptions.Code,
+            cancellationToken);
+    }
+
+    private async Task<MomoPaymentResponseDto> CreateMomoPaymentInternalAsync(
+        decimal requestedAmount,
+        string? requestedDescription,
+        PaymentPurpose purpose,
+        string? packageCode,
+        CancellationToken cancellationToken)
+    {
         EnsureMomoConfigured();
         var userId = _userContext.GetRequiredUserId();
-        var amount = ToWholeVnd(request.Amount);
-        var description = NormalizeDescription(request.Description);
+        var amount = ToWholeVnd(requestedAmount);
+        var description = NormalizeDescription(requestedDescription);
         var now = _timeProvider.GetUtcNow();
         var orderCode = $"MOMO{now.ToUnixTimeMilliseconds()}";
         var requestId = $"{orderCode}{RandomNumberGenerator.GetInt32(1000, 9999)}";
@@ -121,7 +157,7 @@ public sealed class PaymentService : IPaymentService
 
         using var document = JsonDocument.Parse(responseText);
         var root = document.RootElement;
-        var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now);
+        var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
         payment.AttachMomoPayment(
             requestId,
             GetString(root, "payUrl"),
@@ -181,6 +217,7 @@ public sealed class PaymentService : IPaymentService
         if (request.ResultCode == 0)
         {
             payment.MarkPaid(request.TransId.ToString(CultureInfo.InvariantCulture), request.Message, rawPayload, now);
+            await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
         }
         else
         {
@@ -195,10 +232,38 @@ public sealed class PaymentService : IPaymentService
         CreatePayOsPaymentDto request,
         CancellationToken cancellationToken = default)
     {
+        return await CreatePayOsPaymentInternalAsync(
+            request.Amount,
+            request.Description,
+            PaymentPurpose.General,
+            null,
+            cancellationToken);
+    }
+
+    public async Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(
+        CancellationToken cancellationToken = default)
+    {
+        EnsurePremiumConfigured();
+
+        return await CreatePayOsPaymentInternalAsync(
+            _premiumOptions.Price,
+            BuildPremiumDescription(),
+            PaymentPurpose.PremiumSubscription,
+            _premiumOptions.Code,
+            cancellationToken);
+    }
+
+    private async Task<PayOsPaymentResponseDto> CreatePayOsPaymentInternalAsync(
+        decimal requestedAmount,
+        string? requestedDescription,
+        PaymentPurpose purpose,
+        string? packageCode,
+        CancellationToken cancellationToken)
+    {
         EnsurePayOsConfigured();
         var userId = _userContext.GetRequiredUserId();
-        var amount = ToWholeVnd(request.Amount);
-        var description = NormalizeDescription(request.Description);
+        var amount = ToWholeVnd(requestedAmount);
+        var description = NormalizeDescription(requestedDescription);
         var orderCode = GeneratePayOsOrderCode();
         var now = _timeProvider.GetUtcNow();
 
@@ -237,7 +302,15 @@ public sealed class PaymentService : IPaymentService
         using var document = JsonDocument.Parse(responseText);
         var root = document.RootElement;
         var data = root.TryGetProperty("data", out var dataElement) ? dataElement : root;
-        var payment = new PaymentTransaction(userId, PaymentMethod.PayOs, amount, orderCode.ToString(CultureInfo.InvariantCulture), description, now);
+        var payment = new PaymentTransaction(
+            userId,
+            PaymentMethod.PayOs,
+            amount,
+            orderCode.ToString(CultureInfo.InvariantCulture),
+            description,
+            now,
+            purpose,
+            packageCode);
         payment.AttachPayOsQrPayment(
             GetString(data, "qrCode"),
             null,
@@ -290,6 +363,7 @@ public sealed class PaymentService : IPaymentService
         if (request.Success && request.Code == "00" && request.Data.Code == "00")
         {
             payment.MarkPaid(request.Data.Reference, request.Data.Desc ?? request.Desc, rawPayload, now);
+            await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
         }
         else
         {
@@ -298,6 +372,41 @@ public sealed class PaymentService : IPaymentService
 
         await _payments.SaveChangesAsync(cancellationToken);
         return PaymentMapper.ToDto(payment);
+    }
+
+    private async Task ActivatePremiumSubscriptionIfNeededAsync(
+        PaymentTransaction payment,
+        DateTimeOffset paidAt,
+        CancellationToken cancellationToken)
+    {
+        if (payment.Purpose != PaymentPurpose.PremiumSubscription || payment.Status != PaymentStatus.Paid)
+        {
+            return;
+        }
+
+        EnsurePremiumConfigured();
+
+        var existingSubscription = await _subscriptions.GetByPaymentTransactionIdAsync(payment.Id, cancellationToken);
+        if (existingSubscription is not null)
+        {
+            return;
+        }
+
+        var currentPremium = await _subscriptions.GetActivePremiumAsync(payment.UserId, paidAt, cancellationToken);
+        var startsAt = currentPremium is not null && currentPremium.ExpiresAt > paidAt
+            ? currentPremium.ExpiresAt
+            : paidAt;
+
+        var subscription = UserSubscription.CreatePremium(
+            payment.UserId,
+            payment.PackageCode ?? _premiumOptions.Code,
+            _premiumOptions.Name,
+            payment.Id,
+            startsAt,
+            _premiumOptions.DurationDays,
+            paidAt);
+
+        await _subscriptions.AddAsync(subscription, cancellationToken);
     }
 
     private static string BuildPayOsWebhookSignaturePayload(PayOsWebhookDataDto data)
@@ -350,6 +459,27 @@ public sealed class PaymentService : IPaymentService
         return normalized.Length <= PaymentTransaction.MaxDescriptionLength
             ? normalized
             : normalized[..PaymentTransaction.MaxDescriptionLength];
+    }
+
+    private string BuildPremiumDescription()
+    {
+        var packageName = string.IsNullOrWhiteSpace(_premiumOptions.Name)
+            ? "Premium"
+            : _premiumOptions.Name.Trim();
+
+        return $"Homeji {packageName} {_premiumOptions.DurationDays} ngay";
+    }
+
+    private void EnsurePremiumConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(_premiumOptions.Code)
+            || string.IsNullOrWhiteSpace(_premiumOptions.Name)
+            || _premiumOptions.Price <= 0
+            || decimal.Truncate(_premiumOptions.Price) != _premiumOptions.Price
+            || _premiumOptions.DurationDays <= 0)
+        {
+            throw new InvalidOperationException("Premium subscription settings are not configured.");
+        }
     }
 
     private void EnsureMomoConfigured()

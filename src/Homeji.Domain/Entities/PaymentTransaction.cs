@@ -11,6 +11,7 @@ public sealed class PaymentTransaction
     public const int MaxUrlLength = 2_000;
     public const int MaxExternalTransactionIdLength = 120;
     public const int MaxProviderMessageLength = 500;
+    public const int MaxPackageCodeLength = 80;
 
     private PaymentTransaction()
     {
@@ -24,7 +25,9 @@ public sealed class PaymentTransaction
         decimal amount,
         string orderCode,
         string description,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        PaymentPurpose purpose = PaymentPurpose.General,
+        string? packageCode = null)
     {
         if (userId == Guid.Empty)
         {
@@ -36,12 +39,21 @@ public sealed class PaymentTransaction
             throw new DomainException("Payment amount must be greater than zero.");
         }
 
+        if (!Enum.IsDefined(purpose))
+        {
+            throw new DomainException("Payment purpose is invalid.");
+        }
+
         Id = Guid.NewGuid();
         UserId = userId;
         Method = method;
         Amount = amount;
         OrderCode = NormalizeRequired(orderCode, MaxOrderCodeLength, nameof(OrderCode));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
+        Purpose = purpose;
+        PackageCode = purpose == PaymentPurpose.General
+            ? NormalizeOptional(packageCode, MaxPackageCodeLength, nameof(PackageCode))
+            : NormalizeRequired(packageCode!, MaxPackageCodeLength, nameof(PackageCode));
         Status = PaymentStatus.Pending;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -56,6 +68,10 @@ public sealed class PaymentTransaction
     public PaymentStatus Status { get; private set; }
 
     public decimal Amount { get; private set; }
+
+    public PaymentPurpose Purpose { get; private set; } = PaymentPurpose.General;
+
+    public string? PackageCode { get; private set; }
 
     public string OrderCode { get; private set; }
 

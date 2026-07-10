@@ -6,9 +6,13 @@ using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Reports;
 using Homeji.Application.IRepositories.Roommates;
 using Homeji.Application.IRepositories.SavedPosts;
+using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.Accounts;
+using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Emails;
 using Homeji.Application.IServices.Payments;
+using Homeji.Application.Services.AI;
+using Homeji.Application.Services.Subscriptions;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.External;
 using Homeji.Infrastructure.Repositories;
@@ -61,14 +65,19 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IBadWordRepository, BadWordRepository>();
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
+        services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
+        services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
+        services.Configure<AiSearchOptions>(configuration.GetSection(AiSearchOptions.SectionName));
+        services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
         services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
         services.AddHttpClient<IAccountService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
+        services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
 
         return services;
     }

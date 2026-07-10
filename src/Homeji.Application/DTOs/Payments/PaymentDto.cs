@@ -8,6 +8,8 @@ public sealed record PaymentDto(
     PaymentMethod Method,
     PaymentStatus Status,
     decimal Amount,
+    PaymentPurpose Purpose,
+    string? PackageCode,
     string OrderCode,
     string? RequestId,
     string Description,

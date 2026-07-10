@@ -286,15 +286,6 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.17"
         }
       },
-      "Microsoft.Extensions.Options": {
-        "type": "Transitive",
-        "resolved": "9.0.17",
-        "contentHash": "+UNeX4y+YJ4CNzwKy8Gf2pOo2++CGFLHFha9QbzUrsutLVne6O8CD+Khz9aWuSkm+l4Wzqa7+qhyC1OGENuQ6g==",
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.17",
-          "Microsoft.Extensions.Primitives": "9.0.17"
-        }
-      },
       "Microsoft.Extensions.Primitives": {
         "type": "Transitive",
         "resolved": "9.0.17",
@@ -406,7 +397,8 @@
         "type": "Project",
         "dependencies": {
           "FluentValidation.DependencyInjectionExtensions": "[12.1.1, )",
-          "Homeji.Domain": "[1.0.0, )"
+          "Homeji.Domain": "[1.0.0, )",
+          "Microsoft.Extensions.Options": "[9.0.17, )"
         }
       },
       "homeji.domain": {
@@ -420,6 +412,16 @@
         "dependencies": {
           "FluentValidation": "12.1.1",
           "Microsoft.Extensions.DependencyInjection.Abstractions": "2.1.0"
+        }
+      },
+      "Microsoft.Extensions.Options": {
+        "type": "CentralTransitive",
+        "requested": "[9.0.17, )",
+        "resolved": "9.0.17",
+        "contentHash": "+UNeX4y+YJ4CNzwKy8Gf2pOo2++CGFLHFha9QbzUrsutLVne6O8CD+Khz9aWuSkm+l4Wzqa7+qhyC1OGENuQ6g==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "9.0.17",
+          "Microsoft.Extensions.Primitives": "9.0.17"
         }
       }
     }

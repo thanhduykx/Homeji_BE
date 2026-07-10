@@ -16,5 +16,8 @@ public sealed record UserProfileDto(
     decimal? MaxBudget,
     bool OnboardingCompleted,
     LandlordVerificationStatus LandlordVerificationStatus,
+    bool IsPremium,
+    string SubscriptionBadge,
+    DateTimeOffset? PremiumExpiresAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

@@ -5,7 +5,10 @@ namespace Homeji.Application.Mappers.Profiles;
 
 public static class UserProfileMapper
 {
-    public static UserProfileDto ToDto(UserProfile profile)
+    public static UserProfileDto ToDto(
+        UserProfile profile,
+        bool isPremium = false,
+        DateTimeOffset? premiumExpiresAt = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
@@ -23,6 +26,9 @@ public static class UserProfileMapper
             profile.MaxBudget,
             profile.OnboardingCompleted,
             profile.LandlordVerificationStatus,
+            isPremium,
+            isPremium ? "Premium" : "Basic",
+            premiumExpiresAt,
             profile.CreatedAt,
             profile.UpdatedAt);
     }

@@ -3,6 +3,7 @@ using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Profiles;
 using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.Profiles;
 using Homeji.Application.Mappers.Profiles;
 using Homeji.Domain.Entities;
@@ -13,6 +14,7 @@ public sealed class UserProfileService : IUserProfileService
 {
     private readonly ICurrentUser _currentUser;
     private readonly IUserProfileRepository _repository;
+    private readonly IUserSubscriptionRepository _subscriptions;
     private readonly IValidator<UpdateMyProfileDto> _validator;
     private readonly IValidator<UpdateLifestyleDto> _lifestyleValidator;
     private readonly TimeProvider _timeProvider;
@@ -20,12 +22,14 @@ public sealed class UserProfileService : IUserProfileService
     public UserProfileService(
         ICurrentUser currentUser,
         IUserProfileRepository repository,
+        IUserSubscriptionRepository subscriptions,
         IValidator<UpdateMyProfileDto> validator,
         IValidator<UpdateLifestyleDto> lifestyleValidator,
         TimeProvider timeProvider)
     {
         _currentUser = currentUser;
         _repository = repository;
+        _subscriptions = subscriptions;
         _validator = validator;
         _lifestyleValidator = lifestyleValidator;
         _timeProvider = timeProvider;
@@ -36,10 +40,11 @@ public sealed class UserProfileService : IUserProfileService
     {
         var userId = GetRequiredUserId();
         var profile = await _repository.GetByIdAsync(userId, cancellationToken);
+        var premium = await _subscriptions.GetActivePremiumAsync(userId, _timeProvider.GetUtcNow(), cancellationToken);
 
         return profile is null
             ? throw new NotFoundException(nameof(UserProfile), userId)
-            : UserProfileMapper.ToDto(profile);
+            : UserProfileMapper.ToDto(profile, premium is not null, premium?.ExpiresAt);
     }
 
     public async Task<UserProfileDto> UpsertMyProfileAsync(

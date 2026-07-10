@@ -15,6 +15,8 @@ public sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration<P
         builder.Property(payment => payment.Method).HasColumnName("method").HasConversion<int>().IsRequired();
         builder.Property(payment => payment.Status).HasColumnName("status").HasConversion<int>().IsRequired();
         builder.Property(payment => payment.Amount).HasColumnName("amount").HasPrecision(18, 2).IsRequired();
+        builder.Property(payment => payment.Purpose).HasColumnName("purpose").HasConversion<int>().IsRequired();
+        builder.Property(payment => payment.PackageCode).HasColumnName("package_code").HasMaxLength(PaymentTransaction.MaxPackageCodeLength);
         builder.Property(payment => payment.OrderCode).HasColumnName("order_code").HasMaxLength(PaymentTransaction.MaxOrderCodeLength).IsRequired();
         builder.Property(payment => payment.RequestId).HasColumnName("request_id").HasMaxLength(PaymentTransaction.MaxRequestIdLength);
         builder.Property(payment => payment.Description).HasColumnName("description").HasMaxLength(PaymentTransaction.MaxDescriptionLength).IsRequired();

@@ -48,6 +48,9 @@ public static class UserProfileViewMapper
             dto.MaxBudget,
             dto.OnboardingCompleted,
             dto.LandlordVerificationStatus,
+            dto.IsPremium,
+            dto.SubscriptionBadge,
+            dto.PremiumExpiresAt,
             dto.CreatedAt,
             dto.UpdatedAt);
     }

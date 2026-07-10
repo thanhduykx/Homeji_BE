@@ -40,7 +40,7 @@ public sealed class AdminModerationService : IAdminModerationService
     {
         await EnsureAdminAsync(cancellationToken);
         var posts = await _posts.GetPendingAsync(cancellationToken);
-        return posts.Select(RentalPostMapper.ToSummaryDto).ToArray();
+        return posts.Select(post => RentalPostMapper.ToSummaryDto(post)).ToArray();
     }
 
     public async Task<RentalPostDto> ApproveRentalPostAsync(Guid postId, CancellationToken cancellationToken = default)
