@@ -9,7 +9,12 @@ using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
-RemoveEnvironmentBackedConfigurationSources(builder.Configuration);
+// Local clones use only tracked appsettings files. Production retains environment
+// variables so managed hosts can inject secrets without committing them to Git.
+if (builder.Environment.IsDevelopment())
+{
+    RemoveEnvironmentBackedConfigurationSources(builder.Configuration);
+}
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
