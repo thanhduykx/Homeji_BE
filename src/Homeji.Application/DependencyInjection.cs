@@ -1,7 +1,9 @@
 using FluentValidation;
 using Homeji.Application.IServices.AI;
+using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.Services.Admin;
 using Homeji.Application.Services.AI;
+using Homeji.Application.Services.Chatbot;
 using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Moderation;
 using Homeji.Application.Services.Notifications;
@@ -39,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IAdminModerationService, AdminModerationService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IAiSearchService, AiSearchService>();
+        services.AddScoped<IChatbotService, ChatbotService>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

@@ -1,4 +1,5 @@
 using Homeji.Application.IRepositories.Moderation;
+using Homeji.Application.IRepositories.Chatbot;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.Payments;
 using Homeji.Application.IRepositories.Profiles;
@@ -9,9 +10,11 @@ using Homeji.Application.IRepositories.SavedPosts;
 using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.AI;
+using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.IServices.Emails;
 using Homeji.Application.IServices.Payments;
 using Homeji.Application.Services.AI;
+using Homeji.Application.Services.Chatbot;
 using Homeji.Application.Services.Subscriptions;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.External;
@@ -66,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IBadWordRepository, BadWordRepository>();
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
         services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
+        services.AddScoped<IChatConversationRepository, ChatConversationRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
@@ -74,10 +78,12 @@ public static class DependencyInjection
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
         services.Configure<AiSearchOptions>(configuration.GetSection(AiSearchOptions.SectionName));
         services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
+        services.Configure<ChatbotOptions>(configuration.GetSection(ChatbotOptions.SectionName));
         services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
         services.AddHttpClient<IAccountService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
+        services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>();
 
         return services;
     }
