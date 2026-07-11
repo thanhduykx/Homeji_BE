@@ -19,6 +19,16 @@ public sealed class AccountController : ControllerBase
     }
 
     [AllowAnonymous]
+    [HttpPost("check-email")]
+    [ProducesResponseType<EmailAvailabilityDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<EmailAvailabilityDto>> CheckEmail(
+        [FromBody] CheckEmailViewModel request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _accountService.CheckEmailAsync(request.Email, cancellationToken));
+    }
+
+    [AllowAnonymous]
     [HttpPost("register")]
     [ProducesResponseType<AuthSessionDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<AuthSessionDto>> Register(

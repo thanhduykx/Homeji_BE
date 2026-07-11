@@ -72,6 +72,26 @@ Khuyến nghị Supabase Auth dùng asymmetric JWT signing key. Frontend dùng S
 Authorization: Bearer <supabase-access-token>
 ```
 
+Frontend có thể kiểm tra email trước khi hiển thị form đăng ký bằng
+`POST /api/account/check-email` với body `{ "email": "user@example.com" }`.
+Backend truy vấn trực tiếp `auth.users`; frontend không được giữ database password
+hoặc Supabase `service_role` key. `POST /api/account/register` vẫn kiểm tra lại để
+không phụ thuộc vào bước kiểm tra của frontend.
+
+Email xác thực tài khoản thật do Supabase Auth gửi. Cấu hình callback mặc định của
+backend bằng `Supabase:RegistrationRedirectUrl` (production nên đặt qua biến môi
+trường `Supabase__RegistrationRedirectUrl`). Đồng thời trong Supabase Dashboard:
+
+1. Vào **Authentication → URL Configuration**.
+2. Đặt **Site URL** thành URL frontend production, không để `localhost:3000`.
+3. Thêm chính xác callback production, ví dụ
+   `https://exe101-homeji.onrender.com/auth/callback`, vào **Redirect URLs**.
+4. Giữ `http://localhost:3000/**` trong Redirect URLs chỉ để phát triển local.
+
+Frontend cũng có thể truyền `redirectTo` trong request đăng ký; URL đó phải nằm
+trong allow-list của Supabase. Nếu không truyền, backend dùng
+`Supabase:RegistrationRedirectUrl`.
+
 ## SMTP đăng ký account
 
 API gửi email xác nhận đăng ký sau khi Supabase tạo account thành công. Cấu hình tại:
@@ -136,6 +156,7 @@ http://localhost:<port>/swagger
 
 Account/Auth:
 
+- `POST /api/account/check-email`
 - `POST /api/account/register`
 - `POST /api/account/login`
 - `POST /api/account/forgot-password`

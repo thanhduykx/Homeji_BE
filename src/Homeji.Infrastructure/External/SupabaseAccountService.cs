@@ -3,6 +3,7 @@ using System.Text.Json;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Accounts;
 using Homeji.Application.DTOs.Emails;
+using Homeji.Application.IRepositories.Accounts;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.Emails;
 using Microsoft.Extensions.Options;
@@ -13,17 +14,30 @@ public sealed class SupabaseAccountService : IAccountService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IAccountEmailSender _accountEmailSender;
+    private readonly IAccountEmailRepository _accountEmailRepository;
     private readonly HttpClient _httpClient;
     private readonly SupaBaseAuthOptions _options;
 
     public SupabaseAccountService(
         HttpClient httpClient,
         IOptions<SupaBaseAuthOptions> options,
-        IAccountEmailSender accountEmailSender)
+        IAccountEmailSender accountEmailSender,
+        IAccountEmailRepository accountEmailRepository)
     {
         _httpClient = httpClient;
         _options = options.Value;
         _accountEmailSender = accountEmailSender;
+        _accountEmailRepository = accountEmailRepository;
+    }
+
+    public async Task<EmailAvailabilityDto> CheckEmailAsync(
+        string? email,
+        CancellationToken cancellationToken = default)
+    {
+        ValidateEmail(email);
+        var normalizedEmail = NormalizeEmail(email!);
+        var exists = await _accountEmailRepository.ExistsAsync(normalizedEmail, cancellationToken);
+        return new EmailAvailabilityDto(normalizedEmail, exists, !exists);
     }
 
     public async Task<AuthSessionDto> RegisterAsync(
@@ -33,14 +47,20 @@ public sealed class SupabaseAccountService : IAccountService
         ValidateEmailAndPassword(request.Email, request.Password);
         EnsureConfigured();
 
-        var redirectTo = ResolveRedirectUrl(request.RedirectTo, null);
+        var emailAvailability = await CheckEmailAsync(request.Email, cancellationToken);
+        if (emailAvailability.Exists)
+        {
+            throw new ConflictException("An account with this email already exists.");
+        }
+
+        var redirectTo = ResolveRedirectUrl(request.RedirectTo, _options.RegistrationRedirectUrl);
         var endpoint = BuildAuthUri("signup", redirectTo);
         using var httpRequest = CreateJsonRequest(
             HttpMethod.Post,
             endpoint,
             new
             {
-                email = request.Email,
+                email = emailAvailability.Email,
                 password = request.Password,
                 data = new
                 {
@@ -51,7 +71,7 @@ public sealed class SupabaseAccountService : IAccountService
         var json = await SendAsync(httpRequest, cancellationToken);
         var authSession = ParseAuthSession(json, emailConfirmationMessage: "Registration succeeded.");
         var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
-            request.Email!,
+            emailAvailability.Email,
             request.DisplayName,
             cancellationToken);
 
@@ -237,6 +257,11 @@ public sealed class SupabaseAccountService : IAccountService
         {
             throw Validation("email", "A valid email is required.");
         }
+    }
+
+    private static string NormalizeEmail(string email)
+    {
+        return email.Trim().ToLowerInvariant();
     }
 
     private static RequestValidationException Validation(string field, string message)
