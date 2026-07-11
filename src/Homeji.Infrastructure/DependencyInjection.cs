@@ -1,4 +1,5 @@
 using Homeji.Application.IRepositories.Moderation;
+using Homeji.Application.IRepositories.Accounts;
 using Homeji.Application.IRepositories.Chatbot;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.Payments;
@@ -61,6 +62,7 @@ public static class DependencyInjection
                 }));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<IAccountEmailRepository, AccountEmailRepository>();
         services.AddScoped<IRentalPostRepository, RentalPostRepository>();
         services.AddScoped<ISavedPostRepository, SavedPostRepository>();
         services.AddScoped<IRoommateInvitationRepository, RoommateInvitationRepository>();

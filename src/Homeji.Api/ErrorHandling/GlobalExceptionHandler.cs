@@ -67,6 +67,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Title = "Resource not found",
                 Detail = exception.Message,
             },
+            ConflictException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Resource conflict",
+                Detail = exception.Message,
+            },
             UnauthorizedAccessException => new ProblemDetails
             {
                 Status = StatusCodes.Status401Unauthorized,
