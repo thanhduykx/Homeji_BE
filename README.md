@@ -107,7 +107,7 @@ API gửi email xác nhận đăng ký sau khi Supabase tạo account thành cô
     "Password": "your-smtp-password-or-app-password",
     "FromEmail": "no-reply@homeji.vn",
     "FromName": "Homeji",
-    "LoginUrl": "http://localhost:3000/login"
+    "LoginUrl": "https://exe101-homeji.onrender.com/login"
   }
 }
 ```
