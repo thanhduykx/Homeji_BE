@@ -145,7 +145,7 @@ dotnet run --project src/Homeji.Api
 Swagger:
 
 ```text
-https://homeji-api-thanhduy.onrender.com/swagger
+https://homeji-be.onrender.com/swagger
 ```
 
 Local Swagger sẽ nằm tại:
@@ -200,7 +200,7 @@ Current test suites:
 Render Blueprint hiện tại:
 
 ```text
-homeji-api-thanhduy
+homeji-be
 ```
 
 Tạo service lần đầu:

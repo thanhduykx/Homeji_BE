@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: homeji-api-thanhduy
+    name: homeji-be
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
