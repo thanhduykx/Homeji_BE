@@ -30,16 +30,6 @@ public sealed class SupabaseAccountService : IAccountService
         _accountEmailRepository = accountEmailRepository;
     }
 
-    public async Task<EmailAvailabilityDto> CheckEmailAsync(
-        string? email,
-        CancellationToken cancellationToken = default)
-    {
-        ValidateEmail(email);
-        var normalizedEmail = NormalizeEmail(email!);
-        var exists = await _accountEmailRepository.ExistsAsync(normalizedEmail, cancellationToken);
-        return new EmailAvailabilityDto(normalizedEmail, exists, !exists);
-    }
-
     public async Task<AuthSessionDto> RegisterAsync(
         RegisterAccountDto request,
         CancellationToken cancellationToken = default)
@@ -47,7 +37,7 @@ public sealed class SupabaseAccountService : IAccountService
         ValidateEmailAndPassword(request.Email, request.Password);
         EnsureConfigured();
 
-        var emailAvailability = await CheckEmailAsync(request.Email, cancellationToken);
+        var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
         if (emailAvailability.Exists)
         {
             throw new ConflictException("An account with this email already exists.");
@@ -79,6 +69,17 @@ public sealed class SupabaseAccountService : IAccountService
         {
             Message = BuildRegistrationMessage(authSession, emailResult),
         };
+    }
+
+    public async Task<EmailAvailabilityDto> GetEmailAvailabilityAsync(
+        string? email,
+        CancellationToken cancellationToken = default)
+    {
+        var emailAvailability = await CheckEmailAvailabilityAsync(email, cancellationToken);
+        return new EmailAvailabilityDto(
+            emailAvailability.Email,
+            emailAvailability.Exists,
+            !emailAvailability.Exists);
     }
 
     public async Task<AuthSessionDto> LoginAsync(
@@ -146,6 +147,16 @@ public sealed class SupabaseAccountService : IAccountService
             : $"provider=google&redirect_to={Uri.EscapeDataString(callbackUrl)}";
 
         return new AuthUrlDto($"{_options.ProjectUrl.TrimEnd('/')}/auth/v1/authorize?{query}");
+    }
+
+    private async Task<(string Email, bool Exists)> CheckEmailAvailabilityAsync(
+        string? email,
+        CancellationToken cancellationToken)
+    {
+        ValidateEmail(email);
+        var normalizedEmail = NormalizeEmail(email!);
+        var exists = await _accountEmailRepository.ExistsAsync(normalizedEmail, cancellationToken);
+        return (normalizedEmail, exists);
     }
 
     private HttpRequestMessage CreateJsonRequest(HttpMethod method, Uri relativeUri, object payload)

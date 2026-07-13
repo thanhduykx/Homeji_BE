@@ -72,6 +72,13 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Status = StatusCodes.Status409Conflict,
                 Title = "Resource conflict",
                 Detail = exception.Message,
+                Extensions =
+                {
+                    ["errors"] = new Dictionary<string, string[]>
+                    {
+                        ["email"] = [exception.Message],
+                    },
+                },
             },
             UnauthorizedAccessException => new ProblemDetails
             {

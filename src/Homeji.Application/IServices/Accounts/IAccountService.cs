@@ -4,7 +4,7 @@ namespace Homeji.Application.IServices.Accounts;
 
 public interface IAccountService
 {
-    Task<EmailAvailabilityDto> CheckEmailAsync(string? email, CancellationToken cancellationToken = default);
+    Task<EmailAvailabilityDto> GetEmailAvailabilityAsync(string? email, CancellationToken cancellationToken = default);
 
     Task<AuthSessionDto> RegisterAsync(RegisterAccountDto request, CancellationToken cancellationToken = default);
 
