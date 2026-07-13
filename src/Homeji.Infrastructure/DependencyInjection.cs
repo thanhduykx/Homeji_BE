@@ -14,6 +14,7 @@ using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.IServices.Emails;
 using Homeji.Application.IServices.Payments;
+using Homeji.Application.IServices.Upload;
 using Homeji.Application.Services.AI;
 using Homeji.Application.Services.Chatbot;
 using Homeji.Application.Services.Subscriptions;
@@ -86,6 +87,9 @@ public static class DependencyInjection
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
         services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>();
+
+        services.Configure<CloudinaryOptions>(configuration.GetSection(CloudinaryOptions.SectionName));
+        services.AddHttpClient<IImageUploadService, CloudinaryImageUploadService>();
 
         return services;
     }
