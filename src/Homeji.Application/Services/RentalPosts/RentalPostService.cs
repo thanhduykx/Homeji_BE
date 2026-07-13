@@ -127,21 +127,42 @@ public sealed class RentalPostService : IRentalPostService
     {
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
-        if (post.Status != RentalPostStatus.Active && post.OwnerId != _userContext.GetRequiredUserId())
+
+        var currentUserId = _userContext.TryGetUserId();
+        var isOwner = currentUserId is { } userId && post.OwnerId == userId;
+        if (post.Status != RentalPostStatus.Active && !isOwner)
         {
             throw new NotFoundException(nameof(RentalPost), postId);
         }
 
         post.IncrementViewCount();
         await _posts.SaveChangesAsync(cancellationToken);
-        return RentalPostMapper.ToDto(post);
+
+        var dto = RentalPostMapper.ToDto(post);
+        // Guests: hide internal moderation notes (Active posts usually null anyway).
+        if (currentUserId is null)
+        {
+            return dto with { ModerationReason = null };
+        }
+
+        return dto;
     }
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> SearchAsync(
         RentalPostSearchDto request,
         CancellationToken cancellationToken = default)
     {
-        var posts = await _posts.SearchActiveAsync(request, cancellationToken);
+        var search = request;
+        if (_userContext.TryGetUserId() is null)
+        {
+            search = request with
+            {
+                Page = 1,
+                PageSize = Math.Min(Math.Max(1, request.PageSize), 3),
+            };
+        }
+
+        var posts = await _posts.SearchActiveAsync(search, cancellationToken);
         var now = _timeProvider.GetUtcNow();
         var premiumByUserId = await _subscriptions.GetActivePremiumByUserIdsAsync(
             posts.Select(post => post.OwnerId).ToArray(),

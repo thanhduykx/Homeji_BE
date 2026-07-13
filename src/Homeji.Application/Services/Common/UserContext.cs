@@ -17,11 +17,15 @@ public sealed class UserContext
         _profiles = profiles;
     }
 
+    public Guid? TryGetUserId()
+    {
+        return _currentUser.UserId is { } userId && userId != Guid.Empty ? userId : null;
+    }
+
     public Guid GetRequiredUserId()
     {
-        return _currentUser.UserId is { } userId && userId != Guid.Empty
-            ? userId
-            : throw new UnauthorizedAccessException("The authenticated token does not contain a valid subject.");
+        return TryGetUserId()
+            ?? throw new UnauthorizedAccessException("The authenticated token does not contain a valid subject.");
     }
 
     public async Task<UserProfile> GetRequiredProfileAsync(CancellationToken cancellationToken)

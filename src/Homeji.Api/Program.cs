@@ -1,10 +1,12 @@
 using Homeji.Api.Authentication;
 using Homeji.Api.ErrorHandling;
+using Homeji.Api.RateLimiting;
 using Homeji.Application;
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,6 +36,15 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSupabaseAuthentication(builder.Configuration);
+builder.Services.AddHomejiRateLimiting(builder.Configuration);
+
+// Render / reverse proxies forward the real client IP via X-Forwarded-For.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -64,6 +75,7 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 
 if (builder.Configuration.GetValue("Api:EnableOpenApi", false))
@@ -90,6 +102,7 @@ app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapHealthChecks(
         "/health/live",
