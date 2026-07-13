@@ -78,8 +78,9 @@ public sealed class RentalReviewService : IRentalReviewService
         UpsertRentalReviewDto request,
         CancellationToken cancellationToken = default)
     {
-        ValidateRequest(request);
         var reviewer = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(reviewer);
+        ValidateRequest(request);
         var post = await GetActivePostAsync(rentalPostId, cancellationToken);
         if (post.OwnerId == reviewer.Id)
         {
@@ -140,7 +141,9 @@ public sealed class RentalReviewService : IRentalReviewService
 
     public async Task DeleteMineAsync(Guid rentalPostId, CancellationToken cancellationToken = default)
     {
-        var reviewerId = _userContext.GetRequiredUserId();
+        var reviewer = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(reviewer);
+        var reviewerId = reviewer.Id;
         var review = await _reviews.GetByPostAndReviewerAsync(rentalPostId, reviewerId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalReview), rentalPostId);
         _reviews.Remove(review);

@@ -52,6 +52,8 @@ public sealed class PostConversationService : IPostConversationService
         Guid rentalPostId,
         CancellationToken cancellationToken = default)
     {
+        var renter = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(renter);
         var post = await _rentalPosts.GetByIdAsync(rentalPostId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), rentalPostId);
         if (post.Status != RentalPostStatus.Active)
@@ -80,6 +82,8 @@ public sealed class PostConversationService : IPostConversationService
         Guid wantedPostId,
         CancellationToken cancellationToken = default)
     {
+        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureLandlord(landlord);
         var post = await _wantedPosts.GetByIdAsync(wantedPostId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalWantedPost), wantedPostId);
         if (post.Status != WantedPostStatus.Active)

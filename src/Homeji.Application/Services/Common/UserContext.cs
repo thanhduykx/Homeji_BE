@@ -43,11 +43,29 @@ public sealed class UserContext
         }
     }
 
+    public static void EnsureRenter(UserProfile profile)
+    {
+        EnsureRole(profile, UserRole.Renter, "Renter role is required.");
+    }
+
+    public static void EnsureLandlord(UserProfile profile)
+    {
+        EnsureRole(profile, UserRole.Landlord, "Landlord role is required.");
+    }
+
     public static void EnsureOwner(Guid currentUserId, Guid ownerId)
     {
         if (currentUserId != ownerId)
         {
             throw new ForbiddenAccessException("You can only modify your own resource.");
+        }
+    }
+
+    private static void EnsureRole(UserProfile profile, UserRole role, string message)
+    {
+        if (profile.Role != role)
+        {
+            throw new ForbiddenAccessException(message);
         }
     }
 }

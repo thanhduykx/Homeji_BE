@@ -36,7 +36,8 @@ public sealed class SavedPostService : ISavedPostService
 
     public async Task SaveAsync(Guid postId, CancellationToken cancellationToken = default)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         var post = await GetActivePostAsync(postId, cancellationToken);
         if (await _savedPosts.ExistsAsync(userId, postId, cancellationToken))
         {
@@ -50,7 +51,8 @@ public sealed class SavedPostService : ISavedPostService
 
     public async Task UnsaveAsync(Guid postId, CancellationToken cancellationToken = default)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         var post = await GetActivePostAsync(postId, cancellationToken);
         if (await _savedPosts.RemoveAsync(userId, postId, cancellationToken))
         {
@@ -61,7 +63,8 @@ public sealed class SavedPostService : ISavedPostService
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> GetMineAsync(CancellationToken cancellationToken = default)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         var saved = await _savedPosts.GetByUserAsync(userId, cancellationToken);
         var posts = new List<RentalPostSummaryDto>();
         foreach (var item in saved)
@@ -79,6 +82,7 @@ public sealed class SavedPostService : ISavedPostService
     public async Task<IReadOnlyList<RoommateCandidateDto>> GetRoommateCandidatesAsync(Guid postId, CancellationToken cancellationToken = default)
     {
         var current = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(current);
         if (!await _savedPosts.ExistsAsync(current.Id, postId, cancellationToken))
         {
             throw new ForbiddenAccessException("Save this rental post before viewing roommate candidates.");
@@ -102,6 +106,13 @@ public sealed class SavedPostService : ISavedPostService
                 CalculateMatchScore(current, profile)))
             .OrderByDescending(candidate => candidate.MatchScore)
             .ToArray();
+    }
+
+    private async Task<UserProfile> GetRequiredRenterAsync(CancellationToken cancellationToken)
+    {
+        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(profile);
+        return profile;
     }
 
     private async Task<RentalPost> GetActivePostAsync(Guid postId, CancellationToken cancellationToken)

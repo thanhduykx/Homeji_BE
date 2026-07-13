@@ -41,7 +41,9 @@ public sealed class ViewingAppointmentService : IViewingAppointmentService
         CreateViewingAppointmentDto request,
         CancellationToken cancellationToken = default)
     {
-        var requesterId = _userContext.GetRequiredUserId();
+        var renter = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(renter);
+        var requesterId = renter.Id;
         var post = await _posts.GetByIdAsync(rentalPostId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), rentalPostId);
         if (post.Status != RentalPostStatus.Active)

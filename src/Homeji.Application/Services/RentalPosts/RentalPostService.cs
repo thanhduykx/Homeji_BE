@@ -63,8 +63,9 @@ public sealed class RentalPostService : IRentalPostService
 
     public async Task<RentalPostDto> CreateDraftAsync(CreateRentalPostDraftDto request, CancellationToken cancellationToken = default)
     {
-        var userId = _userContext.GetRequiredUserId();
-        var post = RentalPost.CreateDraft(userId, request.Type, _timeProvider.GetUtcNow());
+        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureLandlord(landlord);
+        var post = RentalPost.CreateDraft(landlord.Id, request.Type, _timeProvider.GetUtcNow());
         await _posts.AddAsync(post, cancellationToken);
         await _posts.SaveChangesAsync(cancellationToken);
         return RentalPostMapper.ToDto(post);
@@ -72,6 +73,7 @@ public sealed class RentalPostService : IRentalPostService
 
     public async Task<RentalPostDto> UpdateAsync(Guid postId, UpdateRentalPostDto request, CancellationToken cancellationToken = default)
     {
+        var post = await GetOwnedPostAsync(postId, cancellationToken);
         await ValidateAsync(_updateValidator, request, cancellationToken);
         var violations = await _moderation.ValidateAsync(request.Description ?? string.Empty, cancellationToken);
         if (violations.Count > 0)
@@ -79,7 +81,6 @@ public sealed class RentalPostService : IRentalPostService
             throw new RequestValidationException(new Dictionary<string, string[]> { ["description"] = violations.ToArray() });
         }
 
-        var post = await GetOwnedPostAsync(postId, cancellationToken);
         post.UpdateDetails(
             request.Type,
             request.Title!,
@@ -105,11 +106,10 @@ public sealed class RentalPostService : IRentalPostService
 
     public async Task<RentalPostDto> AddMediaAsync(Guid postId, AddRentalPostMediaDto request, CancellationToken cancellationToken = default)
     {
-        await ValidateAsync(_mediaValidator, request, cancellationToken);
-        var userId = _userContext.GetRequiredUserId();
         var post = await GetOwnedPostAsync(postId, cancellationToken);
+        await ValidateAsync(_mediaValidator, request, cancellationToken);
 
-        var expectedPrefix = $"rental-posts/{userId:D}/{postId:D}/";
+        var expectedPrefix = $"rental-posts/{post.OwnerId:D}/{postId:D}/";
         if (!request.Path!.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
@@ -281,7 +281,9 @@ public sealed class RentalPostService : IRentalPostService
     public async Task<RentalPostOwnerStatsDto> GetOwnerStatsAsync(
         CancellationToken cancellationToken = default)
     {
-        var ownerId = _userContext.GetRequiredUserId();
+        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureLandlord(landlord);
+        var ownerId = landlord.Id;
         var posts = await _posts.GetByOwnerAsync(ownerId, cancellationToken);
         var postIds = posts.Select(post => post.Id).ToArray();
         var contactCounts = await _conversations.CountBySubjectsAsync(
@@ -379,10 +381,11 @@ public sealed class RentalPostService : IRentalPostService
 
     private async Task<RentalPost> GetOwnedPostAsync(Guid postId, CancellationToken cancellationToken)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureLandlord(landlord);
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
-        UserContext.EnsureOwner(userId, post.OwnerId);
+        UserContext.EnsureOwner(landlord.Id, post.OwnerId);
         return post;
     }
 

@@ -39,7 +39,8 @@ public sealed class RoommateChatService : IRoommateChatService
     public async Task<IReadOnlyList<RoommateConversationDto>> GetMineAsync(
         CancellationToken cancellationToken = default)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         var conversations = await _conversations.GetForUserAsync(userId, cancellationToken);
         var otherIds = conversations
             .Select(conversation => conversation.GetOtherParticipantId(userId))
@@ -78,7 +79,8 @@ public sealed class RoommateChatService : IRoommateChatService
         SendRoommateMessageDto request,
         CancellationToken cancellationToken = default)
     {
-        var senderId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var senderId = renter.Id;
         var conversation = await GetAuthorizedConversationAsync(conversationId, cancellationToken);
         ValidateBody(request.Body);
 
@@ -106,7 +108,8 @@ public sealed class RoommateChatService : IRoommateChatService
         Guid conversationId,
         CancellationToken cancellationToken)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         var conversation = await _conversations.GetByIdAsync(conversationId, cancellationToken)
             ?? throw new NotFoundException(nameof(RoommateConversation), conversationId);
         if (!conversation.Includes(userId))
@@ -115,6 +118,13 @@ public sealed class RoommateChatService : IRoommateChatService
         }
 
         return conversation;
+    }
+
+    private async Task<UserProfile> GetRequiredRenterAsync(CancellationToken cancellationToken)
+    {
+        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(profile);
+        return profile;
     }
 
     private static void ValidateBody(string? body)

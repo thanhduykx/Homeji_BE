@@ -36,11 +36,12 @@ public sealed class RentalWantedPostService : IRentalWantedPostService
         UpsertRentalWantedPostDto request,
         CancellationToken cancellationToken = default)
     {
+        var renter = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(renter);
         await ValidateAsync(request, cancellationToken);
-        var userId = _userContext.GetRequiredUserId();
         var now = _timeProvider.GetUtcNow();
         var post = new RentalWantedPost(
-            userId,
+            renter.Id,
             request.Title!,
             request.Description!,
             request.PreferredArea!,
@@ -51,8 +52,7 @@ public sealed class RentalWantedPostService : IRentalWantedPostService
             now);
         await _posts.AddAsync(post, cancellationToken);
         await _posts.SaveChangesAsync(cancellationToken);
-        var profile = await _profiles.GetByIdAsync(userId, cancellationToken);
-        return ToDto(post, profile);
+        return ToDto(post, renter);
     }
 
     public async Task<RentalWantedPostDto> UpdateAsync(
@@ -60,8 +60,8 @@ public sealed class RentalWantedPostService : IRentalWantedPostService
         UpsertRentalWantedPostDto request,
         CancellationToken cancellationToken = default)
     {
-        await ValidateAsync(request, cancellationToken);
         var post = await GetOwnedAsync(id, cancellationToken);
+        await ValidateAsync(request, cancellationToken);
         post.Update(
             request.Title!,
             request.Description!,
@@ -118,9 +118,11 @@ public sealed class RentalWantedPostService : IRentalWantedPostService
 
     private async Task<RentalWantedPost> GetOwnedAsync(Guid id, CancellationToken cancellationToken)
     {
+        var renter = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(renter);
         var post = await _posts.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalWantedPost), id);
-        UserContext.EnsureOwner(_userContext.GetRequiredUserId(), post.RequesterId);
+        UserContext.EnsureOwner(renter.Id, post.RequesterId);
         return post;
     }
 

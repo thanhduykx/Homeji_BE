@@ -50,7 +50,9 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         CreateRoommateInvitationDto request,
         CancellationToken cancellationToken = default)
     {
-        var senderId = _userContext.GetRequiredUserId();
+        var sender = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(sender);
+        var senderId = sender.Id;
         if (senderId == request.ReceiverId)
         {
             throw new ForbiddenAccessException("Cannot invite yourself.");
@@ -94,7 +96,8 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
 
     public async Task<IReadOnlyList<RoommateInvitationDto>> GetMineAsync(CancellationToken cancellationToken = default)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         var invitations = await _invitations.GetForUserAsync(userId, cancellationToken);
         return invitations.Select(RoommateInvitationMapper.ToDto).ToArray();
     }
@@ -120,7 +123,8 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         bool cancel,
         CancellationToken cancellationToken)
     {
-        var userId = _userContext.GetRequiredUserId();
+        var renter = await GetRequiredRenterAsync(cancellationToken);
+        var userId = renter.Id;
         Notification? notification = null;
         var invitation = await _invitations.GetByIdAsync(invitationId, cancellationToken)
             ?? throw new NotFoundException(nameof(RoommateInvitation), invitationId);
@@ -168,5 +172,12 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         }
 
         return RoommateInvitationMapper.ToDto(invitation);
+    }
+
+    private async Task<UserProfile> GetRequiredRenterAsync(CancellationToken cancellationToken)
+    {
+        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        UserContext.EnsureRenter(profile);
+        return profile;
     }
 }
