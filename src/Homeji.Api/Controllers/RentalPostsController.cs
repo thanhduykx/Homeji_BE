@@ -1,6 +1,9 @@
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IServices.RentalPosts;
+using Homeji.Api.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Homeji.Api.Controllers;
 
@@ -15,8 +18,11 @@ public sealed class RentalPostsController : ControllerBase
         _rentalPostService = rentalPostService;
     }
 
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PublicSearch)]
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<RentalPostSummaryDto>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<IReadOnlyList<RentalPostSummaryDto>>> Search(
         [FromQuery] string? keyword,
         [FromQuery] decimal? minPrice,
@@ -51,9 +57,12 @@ public sealed class RentalPostsController : ControllerBase
         return Ok(result);
     }
 
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PublicRead)]
     [HttpGet("{postId:guid}")]
     [ProducesResponseType<RentalPostDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<RentalPostDto>> GetDetail(Guid postId, CancellationToken cancellationToken)
     {
         return Ok(await _rentalPostService.GetDetailAsync(postId, cancellationToken));
