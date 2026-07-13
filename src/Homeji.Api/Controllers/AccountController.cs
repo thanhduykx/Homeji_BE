@@ -19,18 +19,19 @@ public sealed class AccountController : ControllerBase
     }
 
     [AllowAnonymous]
-    [HttpPost("check-email")]
+    [HttpGet("email-availability")]
     [ProducesResponseType<EmailAvailabilityDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<EmailAvailabilityDto>> CheckEmail(
-        [FromBody] CheckEmailViewModel request,
+    public async Task<ActionResult<EmailAvailabilityDto>> GetEmailAvailability(
+        [FromQuery] string? email,
         CancellationToken cancellationToken)
     {
-        return Ok(await _accountService.CheckEmailAsync(request.Email, cancellationToken));
+        return Ok(await _accountService.GetEmailAvailabilityAsync(email, cancellationToken));
     }
 
     [AllowAnonymous]
     [HttpPost("register")]
     [ProducesResponseType<AuthSessionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
     public async Task<ActionResult<AuthSessionDto>> Register(
         [FromBody] RegisterAccountViewModel request,
         CancellationToken cancellationToken)

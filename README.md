@@ -72,11 +72,13 @@ Khuyến nghị Supabase Auth dùng asymmetric JWT signing key. Frontend dùng S
 Authorization: Bearer <supabase-access-token>
 ```
 
-Frontend có thể kiểm tra email trước khi hiển thị form đăng ký bằng
-`POST /api/account/check-email` với body `{ "email": "user@example.com" }`.
-Backend truy vấn trực tiếp `auth.users`; frontend không được giữ database password
-hoặc Supabase `service_role` key. `POST /api/account/register` vẫn kiểm tra lại để
-không phụ thuộc vào bước kiểm tra của frontend.
+Frontend có thể kiểm tra email khi người dùng nhập form đăng ký bằng
+`GET /api/account/email-availability?email=user@example.com`. API trả
+`{ "email": "user@example.com", "exists": true, "available": false }`, để FE
+báo sớm email đã được sử dụng. Khi frontend gọi `POST /api/account/register`,
+backend vẫn tự kiểm tra lại email trong `auth.users` trước khi gọi Supabase
+signup. Nếu email đã tồn tại, API trả `409 Conflict` với `detail` và
+`errors.email`.
 
 Email xác thực tài khoản thật do Supabase Auth gửi. Cấu hình callback mặc định của
 backend bằng `Supabase:RegistrationRedirectUrl` (production nên đặt qua biến môi
@@ -156,7 +158,7 @@ http://localhost:<port>/swagger
 
 Account/Auth:
 
-- `POST /api/account/check-email`
+- `GET /api/account/email-availability`
 - `POST /api/account/register`
 - `POST /api/account/login`
 - `POST /api/account/forgot-password`

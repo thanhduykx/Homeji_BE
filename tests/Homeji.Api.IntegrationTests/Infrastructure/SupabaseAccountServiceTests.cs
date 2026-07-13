@@ -12,16 +12,42 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class SupabaseAccountServiceTests
 {
     [Fact]
-    public async Task CheckEmailAsync_NormalizesEmailAndReturnsAvailability()
+    public async Task GetEmailAvailabilityAsync_NormalizesEmailAndReturnsAvailability()
     {
-        var repository = new StubAccountEmailRepository(exists: false);
+        var repository = new StubAccountEmailRepository(exists: true);
         var service = CreateService(repository);
 
-        var result = await service.CheckEmailAsync("  User@Example.COM ");
+        var result = await service.GetEmailAvailabilityAsync("  User@Example.COM ");
 
         Assert.Equal("user@example.com", result.Email);
-        Assert.False(result.Exists);
-        Assert.True(result.Available);
+        Assert.True(result.Exists);
+        Assert.False(result.Available);
+        Assert.Equal("user@example.com", repository.LastEmail);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_NormalizesEmailBeforeCheckingAvailability()
+    {
+        var repository = new StubAccountEmailRepository(exists: false);
+        var handler = new CountingHttpMessageHandler(
+            """
+            {
+              "user": {
+                "id": "c664dbea-992b-4ba7-8702-bf5740e82034",
+                "email": "user@example.com"
+              }
+            }
+            """);
+        var service = CreateService(repository, handler);
+        var request = new RegisterAccountDto(
+            "  User@Example.COM ",
+            "password123",
+            "New User",
+            null);
+
+        var result = await service.RegisterAsync(request);
+
+        Assert.Equal("user@example.com", result.Email);
         Assert.Equal("user@example.com", repository.LastEmail);
     }
 
