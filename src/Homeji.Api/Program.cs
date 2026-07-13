@@ -1,13 +1,17 @@
 using Homeji.Api.Authentication;
 using Homeji.Api.ErrorHandling;
 using Homeji.Api.RateLimiting;
+using Homeji.Api.Realtime;
+using Homeji.Api.Middlewares;
 using Homeji.Application;
 using Homeji.Application.Abstractions.Authentication;
+using Homeji.Application.Abstractions.Notifications;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
+using Microsoft.AspNetCore.SignalR;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +40,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSupabaseAuthentication(builder.Configuration);
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
+builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
 
 // Render / reverse proxies forward the real client IP via X-Forwarded-For.
@@ -102,6 +109,7 @@ app.UseHttpsRedirection();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<UserActivityMiddleware>();
 app.UseRateLimiter();
 
 app.MapHealthChecks(
@@ -120,6 +128,7 @@ app.MapGet(
     .AllowAnonymous();
 
 app.MapControllers();
+app.MapHub<NotificationHub>("/hubs/notifications");
 
 app.Run();
 

@@ -16,6 +16,14 @@ public interface IRentalPostRepository
 
     Task<IReadOnlyList<RentalPost>> GetPendingAsync(CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<RentalPost>> GetByOwnerAsync(
+        Guid ownerId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RentalPost>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(RentalPost post, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

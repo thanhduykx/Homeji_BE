@@ -1,8 +1,10 @@
+using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Roommates;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Roommates;
+using Homeji.Application.IRepositories.RoommateChats;
 using Homeji.Application.IRepositories.SavedPosts;
 using Homeji.Application.IServices.Roommates;
 using Homeji.Application.Mappers.Roommates;
@@ -19,7 +21,9 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
     private readonly ISavedPostRepository _savedPosts;
     private readonly IRentalPostRepository _posts;
     private readonly INotificationRepository _notifications;
+    private readonly IRoommateConversationRepository _conversations;
     private readonly TimeProvider _timeProvider;
+    private readonly INotificationRealtimePublisher _realtimePublisher;
 
     public RoommateInvitationService(
         UserContext userContext,
@@ -27,14 +31,18 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         ISavedPostRepository savedPosts,
         IRentalPostRepository posts,
         INotificationRepository notifications,
-        TimeProvider timeProvider)
+        IRoommateConversationRepository conversations,
+        TimeProvider timeProvider,
+        INotificationRealtimePublisher realtimePublisher)
     {
         _userContext = userContext;
         _invitations = invitations;
         _savedPosts = savedPosts;
         _posts = posts;
         _notifications = notifications;
+        _conversations = conversations;
         _timeProvider = timeProvider;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<RoommateInvitationDto> CreateAsync(
@@ -71,14 +79,16 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
 
         var invitation = new RoommateInvitation(postId, senderId, request.ReceiverId, _timeProvider.GetUtcNow());
         await _invitations.AddAsync(invitation, cancellationToken);
-        await _notifications.AddAsync(new Notification(
+        var notification = new Notification(
             request.ReceiverId,
             NotificationType.RoommateInvitationReceived,
             "Lời mời ở ghép mới",
             "Có người cũng quan tâm phòng này muốn ở ghép với bạn.",
             invitation.Id,
-            _timeProvider.GetUtcNow()), cancellationToken);
+            _timeProvider.GetUtcNow());
+        await _notifications.AddAsync(notification, cancellationToken);
         await _invitations.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
         return RoommateInvitationMapper.ToDto(invitation);
     }
 
@@ -111,6 +121,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         CancellationToken cancellationToken)
     {
         var userId = _userContext.GetRequiredUserId();
+        Notification? notification = null;
         var invitation = await _invitations.GetByIdAsync(invitationId, cancellationToken)
             ?? throw new NotFoundException(nameof(RoommateInvitation), invitationId);
 
@@ -125,13 +136,24 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
             if (accept)
             {
                 invitation.Accept(_timeProvider.GetUtcNow());
-                await _notifications.AddAsync(new Notification(
+                if (await _conversations.GetByInvitationIdAsync(invitation.Id, cancellationToken) is null)
+                {
+                    await _conversations.AddConversationAsync(new RoommateConversation(
+                        invitation.Id,
+                        invitation.RentalPostId,
+                        invitation.SenderId,
+                        invitation.ReceiverId,
+                        _timeProvider.GetUtcNow()), cancellationToken);
+                }
+
+                notification = new Notification(
                     invitation.SenderId,
                     NotificationType.RoommateInvitationAccepted,
                     "Lời mời ở ghép được chấp nhận",
                     "Người bạn mời đã đồng ý ở ghép.",
                     invitation.Id,
-                    _timeProvider.GetUtcNow()), cancellationToken);
+                    _timeProvider.GetUtcNow());
+                await _notifications.AddAsync(notification, cancellationToken);
             }
             else
             {
@@ -140,6 +162,11 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         }
 
         await _invitations.SaveChangesAsync(cancellationToken);
+        if (notification is not null)
+        {
+            await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        }
+
         return RoommateInvitationMapper.ToDto(invitation);
     }
 }

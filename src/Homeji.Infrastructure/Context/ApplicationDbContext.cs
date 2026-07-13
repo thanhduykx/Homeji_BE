@@ -14,8 +14,13 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<RentalPost> RentalPosts => Set<RentalPost>();
     public DbSet<RentalPostMedia> RentalPostMedia => Set<RentalPostMedia>();
     public DbSet<RentalPostAmenity> RentalPostAmenities => Set<RentalPostAmenity>();
+    public DbSet<RentalReview> RentalReviews => Set<RentalReview>();
+    public DbSet<MarketplacePost> MarketplacePosts => Set<MarketplacePost>();
+    public DbSet<MarketplacePostMedia> MarketplacePostMedia => Set<MarketplacePostMedia>();
     public DbSet<SavedPost> SavedPosts => Set<SavedPost>();
     public DbSet<RoommateInvitation> RoommateInvitations => Set<RoommateInvitation>();
+    public DbSet<RoommateConversation> RoommateConversations => Set<RoommateConversation>();
+    public DbSet<RoommateMessage> RoommateMessages => Set<RoommateMessage>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<BadWord> BadWords => Set<BadWord>();
@@ -23,6 +28,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();
     public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
+    public DbSet<LandlordVerificationRequest> LandlordVerificationRequests => Set<LandlordVerificationRequest>();
+    public DbSet<UserActivity> UserActivities => Set<UserActivity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -125,6 +125,40 @@ public sealed class UserProfile
         UpdatedAt = updatedAt;
     }
 
+    public void SubmitLandlordVerification(DateTimeOffset updatedAt)
+    {
+        if (Role != UserRole.Landlord)
+        {
+            throw new DomainException("Only landlord profiles can submit verification.");
+        }
+
+        if (LandlordVerificationStatus == LandlordVerificationStatus.Pending)
+        {
+            throw new DomainException("A landlord verification request is already pending.");
+        }
+
+        if (LandlordVerificationStatus == LandlordVerificationStatus.Verified)
+        {
+            throw new DomainException("This landlord profile is already verified.");
+        }
+
+        LandlordVerificationStatus = LandlordVerificationStatus.Pending;
+        UpdatedAt = updatedAt;
+    }
+
+    public void CompleteLandlordVerification(bool approved, DateTimeOffset updatedAt)
+    {
+        if (LandlordVerificationStatus != LandlordVerificationStatus.Pending)
+        {
+            throw new DomainException("Only pending landlord verification can be reviewed.");
+        }
+
+        LandlordVerificationStatus = approved
+            ? LandlordVerificationStatus.Verified
+            : LandlordVerificationStatus.Rejected;
+        UpdatedAt = updatedAt;
+    }
+
     private static string NormalizeDisplayName(string displayName)
     {
         var normalized = displayName?.Trim();

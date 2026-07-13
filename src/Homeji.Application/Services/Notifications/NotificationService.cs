@@ -1,4 +1,5 @@
 using Homeji.Application.Common.Exceptions;
+using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.DTOs.Notifications;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IServices.Notifications;
@@ -13,21 +14,25 @@ public sealed class NotificationService : INotificationService
     private readonly UserContext _userContext;
     private readonly INotificationRepository _notifications;
     private readonly TimeProvider _timeProvider;
+    private readonly INotificationRealtimePublisher _realtimePublisher;
 
     public NotificationService(
         UserContext userContext,
         INotificationRepository notifications,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        INotificationRealtimePublisher realtimePublisher)
     {
         _userContext = userContext;
         _notifications = notifications;
         _timeProvider = timeProvider;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task NotifyAsync(Notification notification, CancellationToken cancellationToken = default)
     {
         await _notifications.AddAsync(notification, cancellationToken);
         await _notifications.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
     }
 
     public async Task<IReadOnlyList<NotificationDto>> GetMineAsync(bool unreadOnly, CancellationToken cancellationToken = default)

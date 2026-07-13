@@ -78,6 +78,13 @@ public sealed class RentalPostsController : ControllerBase
         return CreatedAtAction(nameof(GetDetail), new { postId = post.Id }, post);
     }
 
+    [HttpGet("mine/stats")]
+    [ProducesResponseType<RentalPostOwnerStatsDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<RentalPostOwnerStatsDto>> GetOwnerStats(CancellationToken cancellationToken)
+    {
+        return Ok(await _rentalPostService.GetOwnerStatsAsync(cancellationToken));
+    }
+
     [HttpPut("{postId:guid}")]
     [ProducesResponseType<RentalPostDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RentalPostDto>> Update(

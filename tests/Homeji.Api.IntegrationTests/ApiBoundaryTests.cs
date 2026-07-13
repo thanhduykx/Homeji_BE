@@ -40,6 +40,16 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     }
 
     [Fact]
+    public async Task NotificationHub_WithoutAccessToken_ReturnsUnauthorized()
+    {
+        var response = await _client.PostAsync(
+            new Uri("/hubs/notifications/negotiate?negotiateVersion=1", UriKind.Relative),
+            content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
     public async Task RegisterEndpoint_WhenEmailAlreadyExists_ReturnsConflict()
     {
         using var factory = new HomejiApiFactory()

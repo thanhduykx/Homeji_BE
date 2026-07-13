@@ -116,6 +116,32 @@ public sealed class RentalPostRepository : IRentalPostRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RentalPost>> GetByOwnerAsync(
+        Guid ownerId,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.RentalPosts
+            .AsNoTracking()
+            .Where(post => post.OwnerId == ownerId)
+            .OrderByDescending(post => post.UpdatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<RentalPost>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.RentalPosts
+            .AsNoTracking()
+            .Where(post => ids.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddAsync(RentalPost post, CancellationToken cancellationToken = default)
     {
         await _dbContext.RentalPosts.AddAsync(post, cancellationToken);

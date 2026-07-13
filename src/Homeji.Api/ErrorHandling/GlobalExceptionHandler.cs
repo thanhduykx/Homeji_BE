@@ -94,6 +94,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Title = "Unauthorized",
                 Detail = exception.Message,
             },
+            ForbiddenAccessException => new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Forbidden",
+                Detail = exception.Message,
+            },
             DomainException => new ProblemDetails
             {
                 Status = StatusCodes.Status422UnprocessableEntity,

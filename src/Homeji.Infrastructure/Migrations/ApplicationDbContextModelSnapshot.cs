@@ -114,6 +114,174 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("chat_messages", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.LandlordVerificationRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ApplicantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ApplicantNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DocumentUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicantId", "CreatedAt");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("landlord_verification_requests", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("category");
+
+                    b.Property<string>("Condition")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)")
+                        .HasColumnName("condition");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(3000)
+                        .HasColumnType("character varying(3000)")
+                        .HasColumnName("description");
+
+                    b.Property<decimal>("Latitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("latitude");
+
+                    b.Property<Guid?>("LinkedRentalPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("linked_rental_post_id");
+
+                    b.Property<decimal>("Longitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)")
+                        .HasColumnName("longitude");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("price");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("seller_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_marketplace_posts");
+
+                    b.HasIndex("LinkedRentalPostId")
+                        .HasDatabaseName("ix_marketplace_posts_linked_rental_post_id");
+
+                    b.HasIndex("SellerId")
+                        .HasDatabaseName("ix_marketplace_posts_seller_id");
+
+                    b.HasIndex("Status", "UpdatedAt")
+                        .HasDatabaseName("ix_marketplace_posts_status_updated");
+
+                    b.HasIndex("Status", "Latitude", "Longitude")
+                        .HasDatabaseName("ix_marketplace_posts_map_search");
+
+                    b.ToTable("marketplace_posts", "homeji", t =>
+                        {
+                            t.HasCheckConstraint("ck_marketplace_posts_price", "price > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePostMedia", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("MarketplacePostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("marketplace_post_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("url");
+
+                    b.HasKey("Id")
+                        .HasName("pk_marketplace_post_media");
+
+                    b.HasIndex("MarketplacePostId", "SortOrder")
+                        .HasDatabaseName("ix_marketplace_post_media_post_sort");
+
+                    b.HasIndex("MarketplacePostId", "Url")
+                        .IsUnique()
+                        .HasDatabaseName("ux_marketplace_post_media_post_url");
+
+                    b.ToTable("marketplace_post_media", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -450,6 +618,56 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("rental_post_media", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.RentalReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("comment");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer")
+                        .HasColumnName("rating");
+
+                    b.Property<Guid>("RentalPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rental_post_id");
+
+                    b.Property<Guid>("ReviewerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewer_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_rental_reviews");
+
+                    b.HasIndex("ReviewerId")
+                        .HasDatabaseName("ix_rental_reviews_reviewer_id");
+
+                    b.HasIndex("RentalPostId", "ReviewerId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_rental_reviews_post_reviewer");
+
+                    b.HasIndex("RentalPostId", "UpdatedAt")
+                        .HasDatabaseName("ix_rental_reviews_post_updated");
+
+                    b.ToTable("rental_reviews", "homeji", t =>
+                        {
+                            t.HasCheckConstraint("ck_rental_reviews_rating", "rating >= 1 AND rating <= 5");
+                        });
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.Report", b =>
                 {
                     b.Property<Guid>("Id")
@@ -508,6 +726,58 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("reports", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.RoommateConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("FirstParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("first_participant_id");
+
+                    b.Property<Guid>("InvitationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("invitation_id");
+
+                    b.Property<Guid>("RentalPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rental_post_id");
+
+                    b.Property<Guid>("SecondParticipantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("second_participant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roommate_conversations");
+
+                    b.HasIndex("InvitationId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_roommate_conversations_invitation_id");
+
+                    b.HasIndex("RentalPostId")
+                        .HasDatabaseName("ix_roommate_conversations_rental_post_id");
+
+                    b.HasIndex("FirstParticipantId", "UpdatedAt")
+                        .HasDatabaseName("ix_roommate_conversations_first_updated");
+
+                    b.HasIndex("SecondParticipantId", "UpdatedAt")
+                        .HasDatabaseName("ix_roommate_conversations_second_updated");
+
+                    b.ToTable("roommate_conversations", "homeji", t =>
+                        {
+                            t.HasCheckConstraint("ck_roommate_conversations_distinct_participants", "first_participant_id <> second_participant_id");
+                        });
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.RoommateInvitation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -554,6 +824,42 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("roommate_invitations", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.RoommateMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("body");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("sender_id");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("sent_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roommate_messages");
+
+                    b.HasIndex("SenderId")
+                        .HasDatabaseName("ix_roommate_messages_sender_id");
+
+                    b.HasIndex("ConversationId", "SentAt")
+                        .HasDatabaseName("ix_roommate_messages_conversation_sent");
+
+                    b.ToTable("roommate_messages", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.SavedPost", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -575,6 +881,43 @@ namespace Homeji.Infrastructure.Migrations
                         .HasDatabaseName("ix_saved_posts_rental_post_id");
 
                     b.ToTable("saved_posts", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.UserActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("HttpMethod")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ResourcePath")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ResponseStatusCode")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "OccurredAt");
+
+                    b.ToTable("user_activities", "homeji");
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.UserProfile", b =>
@@ -719,11 +1062,87 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("user_subscriptions", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.ViewingAppointment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RentalPostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequesterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("RequesterId", "CreatedAt");
+
+                    b.HasIndex("RentalPostId", "RequesterId", "Status");
+
+                    b.ToTable("viewing_appointments", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.ChatMessage", b =>
                 {
                     b.HasOne("Homeji.Domain.Entities.ChatConversation", null)
                         .WithMany("Messages")
                         .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.LandlordVerificationRequest", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePost", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.RentalPost", null)
+                        .WithMany()
+                        .HasForeignKey("LinkedRentalPostId")
+                        .OnDelete(DeleteBehavior.SetNull)
+                        .HasConstraintName("fk_marketplace_posts_linked_rental_posts");
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("SellerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_marketplace_posts_sellers");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePostMedia", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.MarketplacePost", null)
+                        .WithMany("Media")
+                        .HasForeignKey("MarketplacePostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -746,9 +1165,97 @@ namespace Homeji.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.RentalReview", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.RentalPost", null)
+                        .WithMany()
+                        .HasForeignKey("RentalPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rental_reviews_rental_posts");
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_rental_reviews_user_profiles");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.RoommateConversation", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("FirstParticipantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_roommate_conversations_first_participant");
+
+                    b.HasOne("Homeji.Domain.Entities.RoommateInvitation", null)
+                        .WithOne()
+                        .HasForeignKey("Homeji.Domain.Entities.RoommateConversation", "InvitationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_roommate_conversations_invitations");
+
+                    b.HasOne("Homeji.Domain.Entities.RentalPost", null)
+                        .WithMany()
+                        .HasForeignKey("RentalPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_roommate_conversations_rental_posts");
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("SecondParticipantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_roommate_conversations_second_participant");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.RoommateMessage", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.RoommateConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_roommate_messages_conversations");
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_roommate_messages_senders");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.UserActivity", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ViewingAppointment", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.RentalPost", null)
+                        .WithMany()
+                        .HasForeignKey("RentalPostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.ChatConversation", b =>
                 {
                     b.Navigation("Messages");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePost", b =>
+                {
+                    b.Navigation("Media");
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.RentalPost", b =>

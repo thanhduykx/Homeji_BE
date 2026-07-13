@@ -7,4 +7,8 @@ public enum NotificationType
     RoommateInvitationReceived = 3,
     RoommateInvitationAccepted = 4,
     ReportResolved = 5,
+    NewMessage = 6,
+    ViewingAppointmentRequested = 7,
+    ViewingAppointmentUpdated = 8,
+    LandlordVerificationUpdated = 9,
 }

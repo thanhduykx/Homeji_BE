@@ -19,4 +19,6 @@ public interface IRentalPostService
     Task<RentalPostDto> GetDetailAsync(Guid postId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RentalPostSummaryDto>> SearchAsync(RentalPostSearchDto request, CancellationToken cancellationToken = default);
+
+    Task<RentalPostOwnerStatsDto> GetOwnerStatsAsync(CancellationToken cancellationToken = default);
 }

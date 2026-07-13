@@ -1,0 +1,96 @@
+using Homeji.Domain.Enums;
+using Homeji.Domain.Exceptions;
+
+namespace Homeji.Domain.Entities;
+
+public sealed class ViewingAppointment
+{
+    public const int MaxNoteLength = 500;
+
+    private ViewingAppointment()
+    {
+    }
+
+    public ViewingAppointment(
+        Guid rentalPostId,
+        Guid requesterId,
+        Guid ownerId,
+        DateTimeOffset scheduledAt,
+        string? note,
+        DateTimeOffset createdAt)
+    {
+        if (scheduledAt <= createdAt)
+        {
+            throw new DomainException("The viewing time must be in the future.");
+        }
+
+        Id = Guid.NewGuid();
+        RentalPostId = rentalPostId;
+        RequesterId = requesterId;
+        OwnerId = ownerId;
+        ScheduledAt = scheduledAt;
+        Note = NormalizeOptional(note, MaxNoteLength, nameof(Note));
+        Status = ViewingAppointmentStatus.Pending;
+        CreatedAt = createdAt;
+        UpdatedAt = createdAt;
+    }
+
+    public Guid Id { get; private set; }
+    public Guid RentalPostId { get; private set; }
+    public Guid RequesterId { get; private set; }
+    public Guid OwnerId { get; private set; }
+    public DateTimeOffset ScheduledAt { get; private set; }
+    public string? Note { get; private set; }
+    public ViewingAppointmentStatus Status { get; private set; }
+    public DateTimeOffset CreatedAt { get; private set; }
+    public DateTimeOffset UpdatedAt { get; private set; }
+
+    public void Confirm(DateTimeOffset updatedAt)
+    {
+        EnsurePending();
+        Status = ViewingAppointmentStatus.Confirmed;
+        UpdatedAt = updatedAt;
+    }
+
+    public void Reject(DateTimeOffset updatedAt)
+    {
+        EnsurePending();
+        Status = ViewingAppointmentStatus.Rejected;
+        UpdatedAt = updatedAt;
+    }
+
+    public void Cancel(DateTimeOffset updatedAt)
+    {
+        if (Status is ViewingAppointmentStatus.Rejected or ViewingAppointmentStatus.Cancelled)
+        {
+            throw new DomainException("This viewing appointment can no longer be cancelled.");
+        }
+
+        Status = ViewingAppointmentStatus.Cancelled;
+        UpdatedAt = updatedAt;
+    }
+
+    private void EnsurePending()
+    {
+        if (Status != ViewingAppointmentStatus.Pending)
+        {
+            throw new DomainException("Only pending viewing appointments can be updated by the owner.");
+        }
+    }
+
+    private static string? NormalizeOptional(string? value, int maxLength, string fieldName)
+    {
+        var normalized = value?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        if (normalized.Length > maxLength)
+        {
+            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+        }
+
+        return normalized;
+    }
+}

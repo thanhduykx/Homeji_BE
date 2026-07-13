@@ -2,6 +2,7 @@ using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.AI;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IRepositories.RentalPosts;
+using Homeji.Application.IRepositories.Reviews;
 using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.Mappers.RentalPosts;
@@ -33,6 +34,7 @@ public sealed class AiSearchService : IAiSearchService
     private readonly IAiSearchTextParser _parser;
     private readonly IRentalPostRepository _posts;
     private readonly IUserSubscriptionRepository _subscriptions;
+    private readonly IRentalReviewRepository _reviews;
     private readonly AiSearchOptions _options;
     private readonly TimeProvider _timeProvider;
 
@@ -40,12 +42,14 @@ public sealed class AiSearchService : IAiSearchService
         IAiSearchTextParser parser,
         IRentalPostRepository posts,
         IUserSubscriptionRepository subscriptions,
+        IRentalReviewRepository reviews,
         IOptions<AiSearchOptions> options,
         TimeProvider timeProvider)
     {
         _parser = parser;
         _posts = posts;
         _subscriptions = subscriptions;
+        _reviews = reviews;
         _options = options.Value;
         _timeProvider = timeProvider;
     }
@@ -91,12 +95,19 @@ public sealed class AiSearchService : IAiSearchService
             posts.Select(post => post.OwnerId).ToArray(),
             now,
             cancellationToken);
+        var reviewItems = await _reviews.GetByPostIdsAsync(
+            posts.Select(post => post.Id).ToArray(),
+            cancellationToken);
+        var reviewsByPostId = reviewItems
+            .GroupBy(review => review.RentalPostId)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<RentalReview>)group.ToArray());
 
         var rankedPosts = posts
             .Select(post =>
             {
                 var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
-                var score = CalculateAiScore(post, parsed, isPremium, now, out var reasons);
+                var postReviews = reviewsByPostId.GetValueOrDefault(post.Id) ?? [];
+                var score = CalculateAiScore(post, postReviews, parsed, isPremium, now, out var reasons);
                 var summary = RentalPostMapper.ToSummaryDto(
                     post,
                     isPremium,
@@ -173,6 +184,7 @@ public sealed class AiSearchService : IAiSearchService
 
     private static decimal CalculateAiScore(
         RentalPost post,
+        IReadOnlyCollection<RentalReview> reviews,
         AiParsedSearchCriteriaDto criteria,
         bool isPremium,
         DateTimeOffset now,
@@ -206,10 +218,12 @@ public sealed class AiSearchService : IAiSearchService
 
         foreach (var criterion in criteria.Criteria)
         {
-            if (MatchesCriterion(post, criterion))
+            if (MatchesCriterion(post, reviews, criterion, out var matchedFromReview))
             {
                 score += 12;
-                resultReasons.Add($"Khớp tiêu chí: {criterion}.");
+                resultReasons.Add(matchedFromReview
+                    ? $"Đánh giá cộng đồng xác nhận tiêu chí: {criterion}."
+                    : $"Khớp tiêu chí: {criterion}.");
             }
         }
 
@@ -243,17 +257,31 @@ public sealed class AiSearchService : IAiSearchService
         return Math.Round(premiumScore + engagementScore + recencyScore, 2);
     }
 
-    private static bool MatchesCriterion(RentalPost post, string criterion)
+    private static bool MatchesCriterion(
+        RentalPost post,
+        IReadOnlyCollection<RentalReview> reviews,
+        string criterion,
+        out bool matchedFromReview)
     {
         var terms = CriterionSynonyms.TryGetValue(criterion, out var synonyms)
             ? synonyms
             : [criterion];
 
-        return terms.Any(term =>
+        var matchedFromPost = terms.Any(term =>
             post.Amenities.Any(amenity => amenity.Code.Equals(term, StringComparison.OrdinalIgnoreCase))
             || ContainsNormalized(post.Title, term)
             || ContainsNormalized(post.Description, term)
             || ContainsNormalized(post.Address, term));
+        if (matchedFromPost)
+        {
+            matchedFromReview = false;
+            return true;
+        }
+
+        matchedFromReview = reviews.Any(review =>
+            review.Comment is not null
+            && terms.Any(term => ContainsNormalized(review.Comment, term)));
+        return matchedFromReview;
     }
 
     private static bool ContainsNormalized(string source, string value)

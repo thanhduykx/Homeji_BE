@@ -1,3 +1,4 @@
+using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Admin;
 using Homeji.Application.DTOs.RentalPosts;
@@ -21,19 +22,22 @@ public sealed class AdminModerationService : IAdminModerationService
     private readonly IReportRepository _reports;
     private readonly INotificationRepository _notifications;
     private readonly TimeProvider _timeProvider;
+    private readonly INotificationRealtimePublisher _realtimePublisher;
 
     public AdminModerationService(
         UserContext userContext,
         IRentalPostRepository posts,
         IReportRepository reports,
         INotificationRepository notifications,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        INotificationRealtimePublisher realtimePublisher)
     {
         _userContext = userContext;
         _posts = posts;
         _reports = reports;
         _notifications = notifications;
         _timeProvider = timeProvider;
+        _realtimePublisher = realtimePublisher;
     }
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default)
@@ -49,14 +53,16 @@ public sealed class AdminModerationService : IAdminModerationService
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
         post.Approve(_timeProvider.GetUtcNow());
-        await _notifications.AddAsync(new Notification(
+        var notification = new Notification(
             post.OwnerId,
             NotificationType.PostApproved,
             "Bài đăng đã được duyệt",
             $"Bài đăng '{post.Title}' đã được hiển thị công khai.",
             post.Id,
-            _timeProvider.GetUtcNow()), cancellationToken);
+            _timeProvider.GetUtcNow());
+        await _notifications.AddAsync(notification, cancellationToken);
         await _posts.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
         return RentalPostMapper.ToDto(post);
     }
 
@@ -70,14 +76,16 @@ public sealed class AdminModerationService : IAdminModerationService
             ?? throw new NotFoundException(nameof(RentalPost), postId);
         var reason = string.IsNullOrWhiteSpace(request.Reason) ? "Bài đăng chưa đạt yêu cầu kiểm duyệt." : request.Reason!;
         post.Reject(reason, _timeProvider.GetUtcNow());
-        await _notifications.AddAsync(new Notification(
+        var notification = new Notification(
             post.OwnerId,
             NotificationType.PostRejected,
             "Bài đăng bị từ chối",
             reason,
             post.Id,
-            _timeProvider.GetUtcNow()), cancellationToken);
+            _timeProvider.GetUtcNow());
+        await _notifications.AddAsync(notification, cancellationToken);
         await _posts.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
         return RentalPostMapper.ToDto(post);
     }
 
@@ -99,14 +107,16 @@ public sealed class AdminModerationService : IAdminModerationService
         var report = await _reports.GetByIdAsync(reportId, cancellationToken)
             ?? throw new NotFoundException(nameof(Report), reportId);
         report.Resolve(request.Note, _timeProvider.GetUtcNow());
-        await _notifications.AddAsync(new Notification(
+        var notification = new Notification(
             report.ReporterId,
             NotificationType.ReportResolved,
             "Báo cáo đã được xử lý",
             "Cảm ơn bạn đã gửi báo cáo. Đội ngũ Homeji đã xử lý báo cáo này.",
             report.Id,
-            _timeProvider.GetUtcNow()), cancellationToken);
+            _timeProvider.GetUtcNow());
+        await _notifications.AddAsync(notification, cancellationToken);
         await _reports.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
         return ReportMapper.ToDto(report);
     }
 

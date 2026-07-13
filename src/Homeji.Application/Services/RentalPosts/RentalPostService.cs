@@ -194,6 +194,26 @@ public sealed class RentalPostService : IRentalPostService
             .ToArray();
     }
 
+    public async Task<RentalPostOwnerStatsDto> GetOwnerStatsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var ownerId = _userContext.GetRequiredUserId();
+        var posts = await _posts.GetByOwnerAsync(ownerId, cancellationToken);
+        var items = posts.Select(post => new RentalPostOwnerStatsItemDto(
+            post.Id,
+            post.Title,
+            post.Status,
+            post.ViewCount,
+            post.SaveCount,
+            post.UpdatedAt)).ToArray();
+
+        return new RentalPostOwnerStatsDto(
+            items.Length,
+            items.Sum(item => item.ViewCount),
+            items.Sum(item => item.SaveCount),
+            items);
+    }
+
     private static decimal CalculateBoostScore(RentalPost post, bool isPremium, DateTimeOffset now)
     {
         var recencyDays = Math.Max(0, (now - post.UpdatedAt).TotalDays);
