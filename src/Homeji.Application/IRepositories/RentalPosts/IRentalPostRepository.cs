@@ -24,6 +24,10 @@ public interface IRentalPostRepository
         IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<RentalPost>> GetByIdsWithMediaAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(RentalPost post, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

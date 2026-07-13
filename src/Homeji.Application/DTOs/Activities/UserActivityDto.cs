@@ -1,3 +1,5 @@
+using Homeji.Domain.Enums;
+
 namespace Homeji.Application.DTOs.Activities;
 
 public sealed record UserActivityDto(
@@ -6,4 +8,7 @@ public sealed record UserActivityDto(
     string ResourcePath,
     string HttpMethod,
     int ResponseStatusCode,
+    UserActivityType Type,
+    Guid? RelatedEntityId,
+    string? Details,
     DateTimeOffset OccurredAt);

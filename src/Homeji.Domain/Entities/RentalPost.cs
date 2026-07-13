@@ -10,6 +10,7 @@ public sealed class RentalPost
     public const int MaxAddressLength = 500;
     public const int MaxModerationReasonLength = 500;
     public const int MaxAmenityCodeLength = 60;
+    public const int MaxHouseRulesLength = 2_000;
     public const int MinimumImageCountForSubmit = 3;
 
     private readonly List<RentalPostMedia> _media = [];
@@ -52,6 +53,13 @@ public sealed class RentalPost
     public decimal Deposit { get; private set; }
 
     public decimal Area { get; private set; }
+    public decimal ElectricityPrice { get; private set; }
+    public decimal WaterPrice { get; private set; }
+    public decimal InternetPrice { get; private set; }
+    public int MaxOccupants { get; private set; } = 1;
+    public int AvailableSlots { get; private set; } = 1;
+    public string? HouseRules { get; private set; }
+    public DateOnly? AvailableFrom { get; private set; }
 
     public string Address { get; private set; }
 
@@ -99,15 +107,35 @@ public sealed class RentalPost
         decimal latitude,
         decimal longitude,
         IEnumerable<string> amenityCodes,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        decimal electricityPrice = 0,
+        decimal waterPrice = 0,
+        decimal internetPrice = 0,
+        int maxOccupants = 1,
+        int availableSlots = 1,
+        string? houseRules = null,
+        DateOnly? availableFrom = null)
     {
         EnsureEditable();
+        var wasActive = Status == RentalPostStatus.Active;
         Type = type;
         Title = NormalizeRequired(title, MaxTitleLength, nameof(Title));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
         Price = RequirePositive(price, nameof(Price));
         Deposit = deposit < 0 ? throw new DomainException("Deposit must not be negative.") : deposit;
         Area = RequirePositive(area, nameof(Area));
+        ElectricityPrice = RequireNonNegative(electricityPrice, nameof(ElectricityPrice));
+        WaterPrice = RequireNonNegative(waterPrice, nameof(WaterPrice));
+        InternetPrice = RequireNonNegative(internetPrice, nameof(InternetPrice));
+        if (maxOccupants <= 0 || availableSlots <= 0 || availableSlots > maxOccupants)
+        {
+            throw new DomainException("Available slots must be between 1 and the maximum occupants.");
+        }
+
+        MaxOccupants = maxOccupants;
+        AvailableSlots = availableSlots;
+        HouseRules = NormalizeOptional(houseRules, MaxHouseRulesLength, nameof(HouseRules));
+        AvailableFrom = availableFrom;
         Address = NormalizeRequired(address, MaxAddressLength, nameof(Address));
         Latitude = ValidateCoordinate(latitude, -90, 90, nameof(Latitude));
         Longitude = ValidateCoordinate(longitude, -180, 180, nameof(Longitude));
@@ -119,6 +147,11 @@ public sealed class RentalPost
         }
 
         UpdatedAt = updatedAt;
+        if (wasActive)
+        {
+            Status = RentalPostStatus.Pending;
+            ModerationReason = null;
+        }
     }
 
     public RentalPostMedia AddMedia(
@@ -130,15 +163,22 @@ public sealed class RentalPost
         DateTimeOffset createdAt)
     {
         EnsureEditable();
+        var wasActive = Status == RentalPostStatus.Active;
         var media = RentalPostMedia.Create(Id, mediaType, bucket, path, isThumbnail, sortOrder, createdAt);
         _media.Add(media);
         UpdatedAt = createdAt;
+        if (wasActive)
+        {
+            Status = RentalPostStatus.Pending;
+        }
+
         return media;
     }
 
     public void RemoveMedia(Guid mediaId, DateTimeOffset updatedAt)
     {
         EnsureEditable();
+        var wasActive = Status == RentalPostStatus.Active;
         var media = _media.SingleOrDefault(item => item.Id == mediaId);
         if (media is null)
         {
@@ -147,6 +187,10 @@ public sealed class RentalPost
 
         _media.Remove(media);
         UpdatedAt = updatedAt;
+        if (wasActive)
+        {
+            Status = RentalPostStatus.Pending;
+        }
     }
 
     public void Submit(DateTimeOffset submittedAt)
@@ -202,6 +246,17 @@ public sealed class RentalPost
         UpdatedAt = archivedAt;
     }
 
+    public void MarkRented(DateTimeOffset rentedAt)
+    {
+        if (Status != RentalPostStatus.Active)
+        {
+            throw new DomainException("Only active rental posts can be marked as rented.");
+        }
+
+        Status = RentalPostStatus.Rented;
+        UpdatedAt = rentedAt;
+    }
+
     public void IncrementViewCount() => ViewCount++;
 
     public void ApplySaveDelta(int delta)
@@ -211,7 +266,7 @@ public sealed class RentalPost
 
     private void EnsureEditable()
     {
-        if (Status is RentalPostStatus.Active or RentalPostStatus.Archived or RentalPostStatus.Rented)
+        if (Status is RentalPostStatus.Archived or RentalPostStatus.Rented)
         {
             throw new DomainException("Rental post is not editable in its current status.");
         }
@@ -241,6 +296,24 @@ public sealed class RentalPost
     private static decimal RequirePositive(decimal value, string fieldName)
     {
         return value <= 0 ? throw new DomainException($"{fieldName} must be greater than zero.") : value;
+    }
+
+    private static decimal RequireNonNegative(decimal value, string fieldName)
+    {
+        return value < 0 ? throw new DomainException($"{fieldName} must not be negative.") : value;
+    }
+
+    private static string? NormalizeOptional(string? value, int maxLength, string fieldName)
+    {
+        var normalized = value?.Trim();
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            return null;
+        }
+
+        return normalized.Length <= maxLength
+            ? normalized
+            : throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
     }
 
     private static decimal ValidateCoordinate(decimal value, decimal min, decimal max, string fieldName)

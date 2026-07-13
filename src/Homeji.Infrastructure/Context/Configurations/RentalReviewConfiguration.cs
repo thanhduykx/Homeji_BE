@@ -15,6 +15,13 @@ public sealed class RentalReviewConfiguration : IEntityTypeConfiguration<RentalR
         builder.Property(review => review.ReviewerId).HasColumnName("reviewer_id").IsRequired();
         builder.Property(review => review.Rating).HasColumnName("rating").IsRequired();
         builder.Property(review => review.Comment).HasColumnName("comment").HasMaxLength(RentalReview.MaxCommentLength);
+        builder.Property(review => review.LocationRating).HasColumnName("location_rating");
+        builder.Property(review => review.ValueRating).HasColumnName("value_rating");
+        builder.Property(review => review.AmenitiesRating).HasColumnName("amenities_rating");
+        builder.Property(review => review.SecurityRating).HasColumnName("security_rating");
+        builder.Property(review => review.CleanlinessRating).HasColumnName("cleanliness_rating");
+        builder.Property(review => review.AccuracyRating).HasColumnName("accuracy_rating");
+        builder.Property(review => review.LandlordRating).HasColumnName("landlord_rating");
         builder.Property(review => review.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(review => review.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(review => new { review.RentalPostId, review.UpdatedAt })

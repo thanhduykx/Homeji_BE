@@ -10,6 +10,8 @@ public sealed class UserProfile
     public const int MaxSchoolLength = 150;
     public const int MaxAreaLength = 150;
     public const int MaxAvatarPathLength = 500;
+    public const int MaxContactAddressLength = 500;
+    public const int MaxRentalNeedLength = 1_000;
 
     private UserProfile()
     {
@@ -41,6 +43,8 @@ public sealed class UserProfile
     public string? School { get; private set; }
 
     public string? PreferredArea { get; private set; }
+    public string? ContactAddress { get; private set; }
+    public string? RentalNeed { get; private set; }
 
     public SleepHabit SleepHabit { get; private set; }
 
@@ -80,6 +84,8 @@ public sealed class UserProfile
         string? avatarPath,
         string? school,
         string? preferredArea,
+        string? contactAddress,
+        string? rentalNeed,
         DateTimeOffset updatedAt)
     {
         DisplayName = NormalizeDisplayName(displayName);
@@ -87,6 +93,8 @@ public sealed class UserProfile
         AvatarPath = NormalizeOptional(avatarPath, MaxAvatarPathLength, nameof(AvatarPath));
         School = NormalizeOptional(school, MaxSchoolLength, nameof(School));
         PreferredArea = NormalizeOptional(preferredArea, MaxAreaLength, nameof(PreferredArea));
+        ContactAddress = NormalizeOptional(contactAddress, MaxContactAddressLength, nameof(ContactAddress));
+        RentalNeed = NormalizeOptional(rentalNeed, MaxRentalNeedLength, nameof(RentalNeed));
         UpdatedAt = updatedAt;
     }
 

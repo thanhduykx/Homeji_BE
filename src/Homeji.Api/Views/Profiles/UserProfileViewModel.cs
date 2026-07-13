@@ -8,6 +8,8 @@ public sealed record UserProfileViewModel(
     string? AvatarPath,
     string? School,
     string? PreferredArea,
+    string? ContactAddress,
+    string? RentalNeed,
     Homeji.Domain.Enums.SleepHabit SleepHabit,
     Homeji.Domain.Enums.PetPreference PetPreference,
     Homeji.Domain.Enums.SmokingPreference SmokingPreference,

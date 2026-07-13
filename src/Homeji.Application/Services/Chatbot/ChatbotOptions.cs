@@ -12,6 +12,8 @@ public sealed class ChatbotOptions
 
     public int MaxHistoryMessages { get; set; } = 12;
 
+    public int SearchResultLimit { get; set; } = 5;
+
     public string[] SuggestedPrompts { get; set; } =
     [
         "Tìm phòng gần Đại học FPT dưới 2 triệu",

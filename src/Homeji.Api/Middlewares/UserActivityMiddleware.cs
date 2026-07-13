@@ -45,7 +45,7 @@ public sealed class UserActivityMiddleware
                 context.Request.Path.Value ?? "/",
                 context.Request.Method,
                 context.Response.StatusCode,
-                CancellationToken.None);
+                cancellationToken: CancellationToken.None);
         }
         catch (Exception exception)
         {

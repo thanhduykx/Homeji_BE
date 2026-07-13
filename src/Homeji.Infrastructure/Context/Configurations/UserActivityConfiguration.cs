@@ -13,7 +13,10 @@ public sealed class UserActivityConfiguration : IEntityTypeConfiguration<UserAct
         builder.Property(activity => activity.Action).HasMaxLength(UserActivity.MaxActionLength).IsRequired();
         builder.Property(activity => activity.ResourcePath).HasMaxLength(UserActivity.MaxPathLength).IsRequired();
         builder.Property(activity => activity.HttpMethod).HasMaxLength(UserActivity.MaxMethodLength).IsRequired();
+        builder.Property(activity => activity.Type).HasConversion<int>();
+        builder.Property(activity => activity.Details).HasMaxLength(UserActivity.MaxDetailsLength);
         builder.HasIndex(activity => new { activity.UserId, activity.OccurredAt });
+        builder.HasIndex(activity => new { activity.UserId, activity.Type, activity.OccurredAt });
         builder.HasOne<UserProfile>()
             .WithMany()
             .HasForeignKey(activity => activity.UserId)

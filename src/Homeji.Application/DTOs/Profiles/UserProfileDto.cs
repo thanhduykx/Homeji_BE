@@ -10,6 +10,8 @@ public sealed record UserProfileDto(
     string? AvatarPath,
     string? School,
     string? PreferredArea,
+    string? ContactAddress,
+    string? RentalNeed,
     SleepHabit SleepHabit,
     PetPreference PetPreference,
     SmokingPreference SmokingPreference,

@@ -1,7 +1,9 @@
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Chatbot;
+using Homeji.Application.DTOs.AI;
 using Homeji.Application.IRepositories.Chatbot;
 using Homeji.Application.IServices.Chatbot;
+using Homeji.Application.IServices.AI;
 using Homeji.Application.Mappers.Chatbot;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
@@ -17,6 +19,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly UserContext _userContext;
     private readonly IChatConversationRepository _conversations;
     private readonly IChatbotAiClient _aiClient;
+    private readonly IAiSearchService _aiSearch;
     private readonly ChatbotOptions _options;
     private readonly TimeProvider _timeProvider;
 
@@ -24,12 +27,14 @@ public sealed class ChatbotService : IChatbotService
         UserContext userContext,
         IChatConversationRepository conversations,
         IChatbotAiClient aiClient,
+        IAiSearchService aiSearch,
         IOptions<ChatbotOptions> options,
         TimeProvider timeProvider)
     {
         _userContext = userContext;
         _conversations = conversations;
         _aiClient = aiClient;
+        _aiSearch = aiSearch;
         _options = options.Value;
         _timeProvider = timeProvider;
     }
@@ -104,12 +109,59 @@ public sealed class ChatbotService : IChatbotService
         var assistantReply = await _aiClient.GenerateReplyAsync(history, message, cancellationToken);
         var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
 
+        var searchUpdate = await BuildSearchUpdateAsync(conversation, cancellationToken);
+
         await _conversations.SaveChangesAsync(cancellationToken);
 
         return new ChatbotReplyDto(
             conversation.Id,
             ChatbotMapper.ToMessageDto(userMessage),
-            ChatbotMapper.ToMessageDto(assistantMessage));
+            ChatbotMapper.ToMessageDto(assistantMessage),
+            searchUpdate);
+    }
+
+    private async Task<AiHighlightResponseDto?> BuildSearchUpdateAsync(
+        ChatConversation conversation,
+        CancellationToken cancellationToken)
+    {
+        var userMessages = conversation.Messages
+            .Where(message => message.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
+            .OrderBy(message => message.CreatedAt)
+            .TakeLast(Math.Clamp(_options.MaxHistoryMessages, 2, 30))
+            .Select(message => message.Content)
+            .ToArray();
+        var contextualQuery = string.Join(Environment.NewLine, userMessages);
+        if (!LooksLikeRentalSearch(contextualQuery))
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _aiSearch.HighlightRentalPostsAsync(
+                new AiHighlightRequestDto(contextualQuery, _options.SearchResultLimit),
+                cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // The conversational answer remains usable when the optional map update fails.
+            return null;
+        }
+    }
+
+    private static bool LooksLikeRentalSearch(string text)
+    {
+        string[] searchTerms =
+        [
+            "phòng", "trọ", "thuê", "ở ghép", "ngân sách", "giá", "khu vực",
+            "gần", "diện tích", "wifi", "bãi xe", "giờ giấc", "toilet", "wc",
+        ];
+
+        return searchTerms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
     }
 
     private async Task<ChatConversation> GetOwnedConversationAsync(

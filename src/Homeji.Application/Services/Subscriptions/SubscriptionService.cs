@@ -47,7 +47,7 @@ public sealed class SubscriptionService : ISubscriptionService
 
     public Task<IReadOnlyList<SubscriptionPackageDto>> GetPackagesAsync(CancellationToken cancellationToken = default)
     {
-        var packages = new SubscriptionPackageDto[]
+        var packages = new List<SubscriptionPackageDto>
         {
             new(
                 "BASIC",
@@ -57,15 +57,16 @@ public sealed class SubscriptionService : ISubscriptionService
                 0,
                 "Basic",
                 BasicBenefits),
-            new(
-                NormalizePackageCode(_options.Code),
-                NormalizePackageName(_options.Name),
-                SubscriptionTier.Premium,
-                RequirePositivePrice(_options.Price),
-                RequirePositiveDuration(_options.DurationDays),
-                "Premium",
-                PremiumBenefits),
         };
+
+        packages.AddRange(_options.GetPlans().Select(plan => new SubscriptionPackageDto(
+            NormalizePackageCode(plan.Code),
+            NormalizePackageName(plan.Name),
+            SubscriptionTier.Premium,
+            RequirePositivePrice(plan.Price),
+            RequirePositiveDuration(plan.DurationDays),
+            "Premium",
+            PremiumBenefits)));
 
         return Task.FromResult<IReadOnlyList<SubscriptionPackageDto>>(packages);
     }
@@ -95,14 +96,18 @@ public sealed class SubscriptionService : ISubscriptionService
                 premium.ExpiresAt);
     }
 
-    public Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(CancellationToken cancellationToken = default)
+    public Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
+        string packageCode,
+        CancellationToken cancellationToken = default)
     {
-        return _payments.CreatePremiumMomoPaymentAsync(cancellationToken);
+        return _payments.CreatePremiumMomoPaymentAsync(packageCode, cancellationToken);
     }
 
-    public Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(CancellationToken cancellationToken = default)
+    public Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(
+        string packageCode,
+        CancellationToken cancellationToken = default)
     {
-        return _payments.CreatePremiumPayOsPaymentAsync(cancellationToken);
+        return _payments.CreatePremiumPayOsPaymentAsync(packageCode, cancellationToken);
     }
 
     private static string NormalizePackageCode(string? value)

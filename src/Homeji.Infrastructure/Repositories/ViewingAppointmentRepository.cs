@@ -49,6 +49,29 @@ public sealed class ViewingAppointmentRepository : IViewingAppointmentRepository
             cancellationToken);
     }
 
+    public Task<bool> HasCompletedAsync(
+        Guid rentalPostId,
+        Guid requesterId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ViewingAppointments.AnyAsync(
+            item => item.RentalPostId == rentalPostId
+                && item.RequesterId == requesterId
+                && item.Status == ViewingAppointmentStatus.Completed,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountByPostIdsAsync(
+        IReadOnlyCollection<Guid> rentalPostIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (rentalPostIds.Count == 0) return new Dictionary<Guid, int>();
+        return await _dbContext.ViewingAppointments.AsNoTracking()
+            .Where(appointment => rentalPostIds.Contains(appointment.RentalPostId))
+            .GroupBy(appointment => appointment.RentalPostId)
+            .ToDictionaryAsync(group => group.Key, group => group.Count(), cancellationToken);
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);

@@ -33,4 +33,38 @@ public sealed class RentalReviewTests
         Assert.Equal("excellent", review.Comment);
         Assert.Equal(updatedAt, review.UpdatedAt);
     }
+
+    [Fact]
+    public void Constructor_WithCriteriaRatings_PreservesScores()
+    {
+        var review = new RentalReview(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            4,
+            "Good",
+            DateTimeOffset.UtcNow,
+            locationRating: 5,
+            valueRating: 4,
+            amenitiesRating: 3,
+            securityRating: 5,
+            cleanlinessRating: 4,
+            accuracyRating: 4,
+            landlordRating: 5);
+
+        Assert.Equal(5, review.LocationRating);
+        Assert.Equal(3, review.AmenitiesRating);
+        Assert.Equal(5, review.LandlordRating);
+    }
+
+    [Fact]
+    public void Constructor_WithCriteriaRatingOutsideRange_ThrowsDomainException()
+    {
+        Assert.Throws<DomainException>(() => new RentalReview(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            4,
+            null,
+            DateTimeOffset.UtcNow,
+            locationRating: 6));
+    }
 }

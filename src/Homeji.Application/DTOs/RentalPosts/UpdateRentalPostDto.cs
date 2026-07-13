@@ -12,4 +12,11 @@ public sealed record UpdateRentalPostDto(
     string? Address,
     decimal Latitude,
     decimal Longitude,
-    IReadOnlyCollection<string> Amenities);
+    IReadOnlyCollection<string> Amenities,
+    decimal ElectricityPrice = 0,
+    decimal WaterPrice = 0,
+    decimal InternetPrice = 0,
+    int MaxOccupants = 1,
+    int AvailableSlots = 1,
+    string? HouseRules = null,
+    DateOnly? AvailableFrom = null);

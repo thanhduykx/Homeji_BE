@@ -50,4 +50,19 @@ public sealed class ViewingAppointmentsController : ControllerBase
     {
         return Ok(await _appointments.CancelAsync(id, cancellationToken));
     }
+
+    [HttpPost("{id:guid}/reschedule")]
+    public async Task<ActionResult<ViewingAppointmentDto>> Reschedule(
+        Guid id,
+        [FromBody] RescheduleViewingAppointmentDto request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _appointments.RescheduleAsync(id, request, cancellationToken));
+    }
+
+    [HttpPost("{id:guid}/complete")]
+    public async Task<ActionResult<ViewingAppointmentDto>> Complete(Guid id, CancellationToken cancellationToken)
+    {
+        return Ok(await _appointments.CompleteAsync(id, cancellationToken));
+    }
 }

@@ -80,6 +80,8 @@ public sealed class UserProfileService : IUserProfileService
             request.AvatarPath,
             request.School,
             request.PreferredArea,
+            request.ContactAddress,
+            request.RentalNeed,
             now);
 
         var persistedProfile = await _repository.UpsertAsync(profile, cancellationToken);

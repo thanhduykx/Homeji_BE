@@ -31,6 +31,10 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
     public DbSet<LandlordVerificationRequest> LandlordVerificationRequests => Set<LandlordVerificationRequest>();
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
+    public DbSet<PostConversation> PostConversations => Set<PostConversation>();
+    public DbSet<PostMessage> PostMessages => Set<PostMessage>();
+    public DbSet<RentalWantedPost> RentalWantedPosts => Set<RentalWantedPost>();
+    public DbSet<MarketplaceOrder> MarketplaceOrders => Set<MarketplaceOrder>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

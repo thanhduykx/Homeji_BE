@@ -9,7 +9,7 @@ public interface ISubscriptionService
 
     Task<MySubscriptionDto> GetMySubscriptionAsync(CancellationToken cancellationToken = default);
 
-    Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(CancellationToken cancellationToken = default);
+    Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(string packageCode, CancellationToken cancellationToken = default);
 
-    Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(CancellationToken cancellationToken = default);
+    Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(string packageCode, CancellationToken cancellationToken = default);
 }

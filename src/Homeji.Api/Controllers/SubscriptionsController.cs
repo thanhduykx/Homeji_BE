@@ -35,21 +35,23 @@ public sealed class SubscriptionsController : ControllerBase
         return Ok(await _subscriptions.GetMySubscriptionAsync(cancellationToken));
     }
 
-    [HttpPost("premium/momo/create")]
+    [HttpPost("premium/{packageCode}/momo/create")]
     [ProducesResponseType<MomoPaymentResponseDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<MomoPaymentResponseDto>> CreatePremiumMomoPayment(
+        string packageCode,
         CancellationToken cancellationToken)
     {
-        return Ok(await _subscriptions.CreatePremiumMomoPaymentAsync(cancellationToken));
+        return Ok(await _subscriptions.CreatePremiumMomoPaymentAsync(packageCode, cancellationToken));
     }
 
-    [HttpPost("premium/payos/create")]
+    [HttpPost("premium/{packageCode}/payos/create")]
     [ProducesResponseType<PayOsPaymentResponseDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<PayOsPaymentResponseDto>> CreatePremiumPayOsPayment(
+        string packageCode,
         CancellationToken cancellationToken)
     {
-        return Ok(await _subscriptions.CreatePremiumPayOsPaymentAsync(cancellationToken));
+        return Ok(await _subscriptions.CreatePremiumPayOsPaymentAsync(packageCode, cancellationToken));
     }
 }

@@ -12,4 +12,7 @@ public sealed record RentalPostSearchDto(
     decimal? MaxLongitude,
     IReadOnlyCollection<string> Amenities,
     int Page = 1,
-    int PageSize = 20);
+    int PageSize = 20,
+    decimal? MaxDeposit = null,
+    int? MinAvailableSlots = null,
+    DateOnly? AvailableFromBefore = null);

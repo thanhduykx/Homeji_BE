@@ -61,12 +61,40 @@ public sealed class ViewingAppointment
 
     public void Cancel(DateTimeOffset updatedAt)
     {
-        if (Status is ViewingAppointmentStatus.Rejected or ViewingAppointmentStatus.Cancelled)
+        if (Status is ViewingAppointmentStatus.Rejected or ViewingAppointmentStatus.Cancelled or ViewingAppointmentStatus.Completed)
         {
             throw new DomainException("This viewing appointment can no longer be cancelled.");
         }
 
         Status = ViewingAppointmentStatus.Cancelled;
+        UpdatedAt = updatedAt;
+    }
+
+    public void Reschedule(DateTimeOffset scheduledAt, DateTimeOffset updatedAt)
+    {
+        if (Status is ViewingAppointmentStatus.Rejected or ViewingAppointmentStatus.Cancelled or ViewingAppointmentStatus.Completed)
+        {
+            throw new DomainException("This viewing appointment can no longer be rescheduled.");
+        }
+
+        if (scheduledAt <= updatedAt)
+        {
+            throw new DomainException("The viewing time must be in the future.");
+        }
+
+        ScheduledAt = scheduledAt;
+        Status = ViewingAppointmentStatus.Pending;
+        UpdatedAt = updatedAt;
+    }
+
+    public void Complete(DateTimeOffset updatedAt)
+    {
+        if (Status != ViewingAppointmentStatus.Confirmed)
+        {
+            throw new DomainException("Only confirmed viewing appointments can be completed.");
+        }
+
+        Status = ViewingAppointmentStatus.Completed;
         UpdatedAt = updatedAt;
     }
 

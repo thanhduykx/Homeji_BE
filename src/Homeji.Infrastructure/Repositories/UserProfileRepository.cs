@@ -2,6 +2,7 @@ using Homeji.Application.IRepositories.Profiles;
 using Homeji.Domain.Entities;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Infrastructure.Repositories;
 
@@ -68,5 +69,28 @@ public sealed class UserProfileRepository : IUserProfileRepository
             .AsNoTracking()
             .Where(profile => userIds.Contains(profile.Id))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
+        string address,
+        decimal price,
+        Guid excludedUserId,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var candidates = await _dbContext.UserProfiles
+            .AsNoTracking()
+            .Where(profile => profile.Id != excludedUserId
+                && profile.Role == UserRole.Renter
+                && (profile.MaxBudget == null || profile.MaxBudget >= price))
+            .OrderByDescending(profile => profile.UpdatedAt)
+            .Take(Math.Max(take, 500))
+            .ToListAsync(cancellationToken);
+
+        return candidates
+            .Where(profile => string.IsNullOrWhiteSpace(profile.PreferredArea)
+                || address.Contains(profile.PreferredArea, StringComparison.OrdinalIgnoreCase))
+            .Take(take)
+            .ToArray();
     }
 }

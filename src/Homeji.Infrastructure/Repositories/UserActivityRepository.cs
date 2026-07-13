@@ -1,5 +1,6 @@
 using Homeji.Application.IRepositories.Activities;
 using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,12 +22,19 @@ public sealed class UserActivityRepository : IUserActivityRepository
 
     public async Task<IReadOnlyList<UserActivity>> GetForUserAsync(
         Guid userId,
+        UserActivityType? type,
         int take,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.UserActivities
+        var query = _dbContext.UserActivities
             .AsNoTracking()
-            .Where(activity => activity.UserId == userId)
+            .Where(activity => activity.UserId == userId);
+        if (type.HasValue)
+        {
+            query = query.Where(activity => activity.Type == type.Value);
+        }
+
+        return await query
             .OrderByDescending(activity => activity.OccurredAt)
             .Take(take)
             .ToListAsync(cancellationToken);

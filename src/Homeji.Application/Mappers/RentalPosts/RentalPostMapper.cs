@@ -25,6 +25,13 @@ public static class RentalPostMapper
             post.Media.OrderBy(media => media.SortOrder).Select(ToDto).ToArray(),
             post.ViewCount,
             post.SaveCount,
+            post.ElectricityPrice,
+            post.WaterPrice,
+            post.InternetPrice,
+            post.MaxOccupants,
+            post.AvailableSlots,
+            post.HouseRules,
+            post.AvailableFrom,
             post.ModerationReason,
             post.CreatedAt,
             post.UpdatedAt);

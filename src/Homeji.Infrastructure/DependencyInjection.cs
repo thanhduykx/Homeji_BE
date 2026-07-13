@@ -15,6 +15,9 @@ using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IRepositories.Appointments;
 using Homeji.Application.IRepositories.Verifications;
 using Homeji.Application.IRepositories.Activities;
+using Homeji.Application.IRepositories.Conversations;
+using Homeji.Application.IRepositories.WantedPosts;
+using Homeji.Application.IRepositories.MarketplaceOrders;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Chatbot;
@@ -85,6 +88,9 @@ public static class DependencyInjection
         services.AddScoped<IViewingAppointmentRepository, ViewingAppointmentRepository>();
         services.AddScoped<ILandlordVerificationRepository, LandlordVerificationRepository>();
         services.AddScoped<IUserActivityRepository, UserActivityRepository>();
+        services.AddScoped<IPostConversationRepository, PostConversationRepository>();
+        services.AddScoped<IRentalWantedPostRepository, RentalWantedPostRepository>();
+        services.AddScoped<IMarketplaceOrderRepository, MarketplaceOrderRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));

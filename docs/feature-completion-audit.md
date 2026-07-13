@@ -1,43 +1,47 @@
 # Homeji backend feature completion audit
 
-Audit date: 2026-07-14. Source of truth: the original Homeji feature document and the current API implementation.
+Audit date: 2026-07-14. Source of truth: all tabs in the Homeji requirements document, including the renter and landlord tables, not only the copied summary tab.
 
-## Backend-complete flows
+## Implemented backend flows
 
-| Area | Backend capability | Primary API |
+| Area | Capability | Primary API |
 |---|---|---|
-| Authentication | Register, email confirmation, login support through Supabase, forgot/reset password, Google OAuth callback support | `/api/account/*` |
-| Profile | Personal profile, renter/landlord lifestyle onboarding | `/api/profile/*` |
-| Rental map/search | Active-post search, text/range/amenity/bounding-box filters, detail and map coordinates | `/api/rental-posts` |
-| Rental management | Create, update, archive, moderation, media metadata | `/api/rental-posts/*`, `/api/admin/moderation/*` |
-| Reviews | One review per user/post, rating summary, community comments used by AI ranking | `/api/rental-posts/{id}/reviews` |
-| Saved posts | Save/remove/list and roommate candidate unlock | `/api/saved-posts/*` |
-| Roommates | Invitation lifecycle; accepting creates a private two-person conversation | `/api/roommate-invitations/*`, `/api/roommate-chats/*` |
-| Viewing appointments | Renter request/cancel; post owner confirm/reject; persistent notifications | `/api/viewing-appointments/*` |
-| Marketplace | Create/update/sold/archive; location, radius and rental-post-context discovery | `/api/marketplace-posts/*` |
-| Trust and safety | Reports, rule-based moderation, admin approve/reject | `/api/reports`, `/api/admin/moderation/*` |
-| Landlord verification | Landlord submission; admin queue and approve/reject; verified profile tag state | `/api/landlord-verifications/*`, `/api/admin/landlord-verifications/*` |
-| Notifications | REST inbox/read state plus authenticated SignalR push | `/api/notifications`, `/hubs/notifications` |
-| Activity history | Privacy-safe history for successful authenticated mutations; request bodies are not stored | `/api/activities` |
-| Premium and promotion | Premium subscription/tag, promotion eligibility and ranking | `/api/subscriptions/*` |
-| Payments | MoMo and PayOS initiation/callback/webhook flows | `/api/payments/*` |
-| AI search | Gemini NLP parsing into allow-listed filters, validated DB query, review-aware scoring and highlight reasons | `/api/ai/*` |
-| AI chatbot | Persistent popup conversations backed by Gemini | `/api/chatbot/*` |
-| Owner statistics | Per-owner post/view/save totals | `/api/rental-posts/mine/stats` |
+| Account and access | Email registration/confirmation, duplicate-email check, login, forgot/reset password, Google OAuth hand-off, Supabase JWT and role policies | `/api/account/*` |
+| Profile | Renter and landlord profile, contact address, rental need, lifestyle and roommate preferences, verified and Premium badges | `/api/profile/*` |
+| Rental discovery | Keyword, price, deposit, vacancy, move-in date, amenity and map-bound filters; enriched detail; 2–4 room comparison | `/api/rental-posts`, `/api/rental-posts/compare` |
+| Rental management | Draft, media, edit with re-moderation, submit, archive, mark rented, owner statistics and admin approval/rejection | `/api/rental-posts/*`, `/api/admin/moderation/*` |
+| Wanted rooms | Renters publish, search, update and close room-wanted posts; landlords can start a direct conversation | `/api/rental-wanted-posts/*` |
+| Saved rooms and roommates | Save/remove/list, compatible roommate candidates, invitation lifecycle and private roommate chat | `/api/saved-posts/*`, `/api/roommate-invitations/*`, `/api/roommate-chats/*` |
+| Direct messaging | Renter-landlord, buyer-seller and wanted-post conversations with persistent messages and notifications | `/api/conversations/*` |
+| Viewing appointments | Request, confirm, reject, cancel, reschedule and complete | `/api/viewing-appointments/*` |
+| Reviews | Review after a completed viewing, one review per user/post, seven optional criteria, aggregate scores and report support | `/api/rental-posts/{id}/reviews`, `/api/reports` |
+| Marketplace | Create/search/update/sold/archive listings; purchase request, pickup acceptance/rejection/cancellation/completion; completion marks item sold | `/api/marketplace-posts/*`, `/api/marketplace-orders/*` |
+| Trust and safety | Report users, rental posts, marketplace posts, wanted posts, reviews and roommate invitations; content moderation and landlord verification | `/api/reports`, `/api/admin/*`, `/api/landlord-verifications/*` |
+| Notifications | REST inbox/read state and authenticated SignalR push for messages, appointments, moderation, saved-post changes, new matching rooms and marketplace orders | `/api/notifications`, `/hubs/notifications` |
+| Activity history | Categorized views, searches, messages, payments, reviews and successful authenticated mutations without storing request bodies | `/api/activities` |
+| Premium | Basic entitlement, Premium badge and ranking boost; monthly, quarterly and yearly plans | `/api/subscriptions/*` |
+| Payments | MoMo and PayOS creation/callback/webhook, idempotent Premium activation and user payment history | `/api/payments/*`, `/api/subscriptions/*` |
+| AI search | Gemini NLP parsing into allow-listed filters, database search, review-aware ranking and structured highlighted results | `/api/ai/*` |
+| AI chatbot | Persistent conversations; multi-turn rental intent combines recent messages and returns a structured `searchUpdate` for map/filter synchronization | `/api/chatbot/*` |
 
-## Frontend or provider responsibilities
+## Frontend and provider responsibilities
 
-These items do not require another backend business module:
+- GPS permission, map movement, pins, clustering and the visual “AI bảo thế đó” effect are implemented by the frontend/map SDK. The API returns coordinates, filters and ranked highlights.
+- Voice capture and speech playback are device/speech-provider features. Transcribed text can be sent to AI search or chatbot endpoints.
+- Google sign-in starts in Supabase OAuth; the backend validates the resulting Supabase access token.
+- Chatbot popup layout, optimistic message states and filter-panel synchronization are frontend responsibilities; the backend persists messages and returns `searchUpdate`.
+- Media bytes are uploaded to the configured storage/CDN; the backend validates and stores HTTPS media metadata.
 
-- GPS permission, map movement, pin rendering and the `AI bảo thế đó` visual effect are frontend/map-SDK behavior. The API already returns coordinates and AI-ranked results.
-- Voice capture and speech playback are frontend/device or speech-provider integrations. Text produced by speech-to-text can be sent to the existing AI search/chatbot endpoints.
-- Google sign-in UI starts with Supabase OAuth; the API validates the resulting Supabase JWT.
-- Chatbot popup placement, loading/error states and filter-panel synchronization are frontend behavior.
-- Upload bytes go directly to the configured media provider; the API stores validated HTTPS media metadata.
+## Conditional product decisions
+
+The source document marks marketplace deposit/holding/refund as conditional (“if the system supports it”). Homeji currently implements pickup confirmation without holding customer funds. Adding escrow requires a written cancellation/refund policy, provider merchant approval and webhook reconciliation rules; it must not be inferred in code.
+
+Search-by-travel-time and route distance require choosing and funding a geocoding/directions provider. Current APIs support text, coordinates and bounding-box filtering without locking the product to one provider.
 
 ## Operational verification
 
-- EF Core model has no pending changes after migration `CompleteFeatureAudit`.
-- Swagger exposes the REST surface without URL version prefixes.
-- `/health/ready` checks the Supabase PostgreSQL connection.
-- SignalR clients connect to `/hubs/notifications` with the Supabase access token through `accessTokenFactory` and listen for `notificationReceived`.
+- Migration `CompleteFullFeatureAudit` creates the new conversation, marketplace-order and wanted-post tables and adds the audited profile, activity, rental-detail and review fields.
+- EF Core reports no pending model changes after the migration.
+- Swagger uses unversioned `/api/...` routes.
+- `/health/ready` verifies the Supabase PostgreSQL connection.
+- SignalR clients connect to `/hubs/notifications` with a Supabase access token and listen for `notificationReceived`.

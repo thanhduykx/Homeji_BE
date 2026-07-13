@@ -157,6 +157,57 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("landlord_verification_requests", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplaceOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AgreedPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BuyerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("MarketplacePostId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PickupAddress")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("PickupAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SellerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BuyerId", "CreatedAt");
+
+                    b.HasIndex("SellerId", "CreatedAt");
+
+                    b.HasIndex("MarketplacePostId", "BuyerId", "Status");
+
+                    b.ToTable("marketplace_orders", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -447,6 +498,69 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("payment_transactions", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.PostConversation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ParticipantAId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParticipantBId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SubjectType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParticipantAId", "UpdatedAt");
+
+                    b.HasIndex("ParticipantBId", "UpdatedAt");
+
+                    b.HasIndex("SubjectType", "SubjectId", "ParticipantAId", "ParticipantBId")
+                        .IsUnique();
+
+                    b.ToTable("post_conversations", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.PostMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId", "SentAt");
+
+                    b.ToTable("post_messages", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.RentalPost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -464,6 +578,14 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("numeric(10,2)")
                         .HasColumnName("area");
 
+                    b.Property<DateOnly?>("AvailableFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("available_from");
+
+                    b.Property<int>("AvailableSlots")
+                        .HasColumnType("integer")
+                        .HasColumnName("available_slots");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -479,6 +601,21 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(4000)")
                         .HasColumnName("description");
 
+                    b.Property<decimal>("ElectricityPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("electricity_price");
+
+                    b.Property<string>("HouseRules")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("house_rules");
+
+                    b.Property<decimal>("InternetPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("internet_price");
+
                     b.Property<decimal>("Latitude")
                         .HasPrecision(10, 7)
                         .HasColumnType("numeric(10,7)")
@@ -488,6 +625,10 @@ namespace Homeji.Infrastructure.Migrations
                         .HasPrecision(10, 7)
                         .HasColumnType("numeric(10,7)")
                         .HasColumnName("longitude");
+
+                    b.Property<int>("MaxOccupants")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_occupants");
 
                     b.Property<string>("ModerationReason")
                         .HasMaxLength(500)
@@ -528,6 +669,11 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<int>("ViewCount")
                         .HasColumnType("integer")
                         .HasColumnName("view_count");
+
+                    b.Property<decimal>("WaterPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("water_price");
 
                     b.HasKey("Id")
                         .HasName("pk_rental_posts");
@@ -624,6 +770,18 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int?>("AccuracyRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("accuracy_rating");
+
+                    b.Property<int?>("AmenitiesRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("amenities_rating");
+
+                    b.Property<int?>("CleanlinessRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("cleanliness_rating");
+
                     b.Property<string>("Comment")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -632,6 +790,14 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<int?>("LandlordRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("landlord_rating");
+
+                    b.Property<int?>("LocationRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("location_rating");
 
                     b.Property<int>("Rating")
                         .HasColumnType("integer")
@@ -645,9 +811,17 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("reviewer_id");
 
+                    b.Property<int?>("SecurityRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("security_rating");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<int?>("ValueRating")
+                        .HasColumnType("integer")
+                        .HasColumnName("value_rating");
 
                     b.HasKey("Id")
                         .HasName("pk_rental_reviews");
@@ -666,6 +840,62 @@ namespace Homeji.Infrastructure.Migrations
                         {
                             t.HasCheckConstraint("ck_rental_reviews_rating", "rating >= 1 AND rating <= 5");
                         });
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.RentalWantedPost", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<string[]>("AmenityCodes")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateOnly>("DesiredMoveInDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("MaxBudget")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<int>("OccupantCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PreferredArea")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid>("RequesterId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequesterId", "CreatedAt");
+
+                    b.HasIndex("Status", "PreferredArea", "MaxBudget");
+
+                    b.ToTable("rental_wanted_posts", "homeji");
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.Report", b =>
@@ -894,6 +1124,10 @@ namespace Homeji.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<string>("Details")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<string>("HttpMethod")
                         .IsRequired()
                         .HasMaxLength(10)
@@ -901,6 +1135,9 @@ namespace Homeji.Infrastructure.Migrations
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RelatedEntityId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("ResourcePath")
                         .IsRequired()
@@ -910,12 +1147,17 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<int>("ResponseStatusCode")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("UserId", "OccurredAt");
+
+                    b.HasIndex("UserId", "Type", "OccurredAt");
 
                     b.ToTable("user_activities", "homeji");
                 });
@@ -930,6 +1172,11 @@ namespace Homeji.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)")
                         .HasColumnName("avatar_path");
+
+                    b.Property<string>("ContactAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("contact_address");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -967,6 +1214,11 @@ namespace Homeji.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)")
                         .HasColumnName("preferred_area");
+
+                    b.Property<string>("RentalNeed")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("rental_need");
 
                     b.Property<int>("Role")
                         .HasColumnType("integer")
@@ -1122,6 +1374,15 @@ namespace Homeji.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.MarketplaceOrder", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.MarketplacePost", null)
+                        .WithMany()
+                        .HasForeignKey("MarketplacePostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.MarketplacePost", b =>
                 {
                     b.HasOne("Homeji.Domain.Entities.RentalPost", null)
@@ -1143,6 +1404,15 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasOne("Homeji.Domain.Entities.MarketplacePost", null)
                         .WithMany("Media")
                         .HasForeignKey("MarketplacePostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.PostMessage", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.PostConversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -1180,6 +1450,15 @@ namespace Homeji.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_rental_reviews_user_profiles");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.RentalWantedPost", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("RequesterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.RoommateConversation", b =>

@@ -16,9 +16,15 @@ public interface IRentalPostService
 
     Task ArchiveAsync(Guid postId, CancellationToken cancellationToken = default);
 
+    Task MarkRentedAsync(Guid postId, CancellationToken cancellationToken = default);
+
     Task<RentalPostDto> GetDetailAsync(Guid postId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RentalPostSummaryDto>> SearchAsync(RentalPostSearchDto request, CancellationToken cancellationToken = default);
 
     Task<RentalPostOwnerStatsDto> GetOwnerStatsAsync(CancellationToken cancellationToken = default);
+
+    Task<RentalPostComparisonDto> CompareAsync(
+        CompareRentalPostsDto request,
+        CancellationToken cancellationToken = default);
 }

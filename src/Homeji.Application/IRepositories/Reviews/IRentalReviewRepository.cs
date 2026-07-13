@@ -4,6 +4,8 @@ namespace Homeji.Application.IRepositories.Reviews;
 
 public interface IRentalReviewRepository
 {
+    Task<RentalReview?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task<RentalReview?> GetByPostAndReviewerAsync(
         Guid rentalPostId,
         Guid reviewerId,

@@ -1,6 +1,7 @@
 using Homeji.Application.DTOs.Activities;
 using Homeji.Application.IServices.Activities;
 using Microsoft.AspNetCore.Mvc;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Api.Controllers;
 
@@ -18,9 +19,10 @@ public sealed class ActivitiesController : ControllerBase
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<UserActivityDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<UserActivityDto>>> GetMine(
+        [FromQuery] UserActivityType? type = null,
         [FromQuery] int take = 50,
         CancellationToken cancellationToken = default)
     {
-        return Ok(await _activities.GetMineAsync(take, cancellationToken));
+        return Ok(await _activities.GetMineAsync(type, take, cancellationToken));
     }
 }

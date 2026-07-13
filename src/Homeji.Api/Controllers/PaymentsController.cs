@@ -4,6 +4,7 @@ using Homeji.Application.DTOs.Payments;
 using Homeji.Application.IServices.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Api.Controllers;
 
@@ -16,6 +17,16 @@ public sealed class PaymentsController : ControllerBase
     public PaymentsController(IPaymentService paymentService)
     {
         _paymentService = paymentService;
+    }
+
+    [HttpGet]
+    [ProducesResponseType<IReadOnlyList<PaymentDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<PaymentDto>>> GetHistory(
+        [FromQuery] PaymentStatus? status = null,
+        [FromQuery] int take = 50,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await _paymentService.GetMyPaymentHistoryAsync(status, take, cancellationToken));
     }
 
     [HttpGet("{paymentId:guid}")]

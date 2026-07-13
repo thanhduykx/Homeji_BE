@@ -14,7 +14,9 @@ public static class UserProfileViewMapper
             viewModel.Phone,
             viewModel.AvatarPath,
             viewModel.School,
-            viewModel.PreferredArea);
+            viewModel.PreferredArea,
+            viewModel.ContactAddress,
+            viewModel.RentalNeed);
     }
 
     public static UpdateLifestyleDto ToDto(UpdateLifestyleViewModel viewModel)
@@ -42,6 +44,8 @@ public static class UserProfileViewMapper
             dto.AvatarPath,
             dto.School,
             dto.PreferredArea,
+            dto.ContactAddress,
+            dto.RentalNeed,
             dto.SleepHabit,
             dto.PetPreference,
             dto.SmokingPreference,

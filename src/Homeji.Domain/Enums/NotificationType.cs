@@ -11,4 +11,8 @@ public enum NotificationType
     ViewingAppointmentRequested = 7,
     ViewingAppointmentUpdated = 8,
     LandlordVerificationUpdated = 9,
+    DirectMessage = 10,
+    SavedPostChanged = 11,
+    NewMatchingRentalPost = 12,
+    MarketplaceOrderUpdated = 13,
 }

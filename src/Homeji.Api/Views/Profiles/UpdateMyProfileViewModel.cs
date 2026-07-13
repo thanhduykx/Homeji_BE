@@ -5,4 +5,6 @@ public sealed record UpdateMyProfileViewModel(
     string? Phone,
     string? AvatarPath,
     string? School,
-    string? PreferredArea);
+    string? PreferredArea,
+    string? ContactAddress,
+    string? RentalNeed);

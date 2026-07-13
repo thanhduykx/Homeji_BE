@@ -20,6 +20,13 @@ public sealed class RentalPostConfiguration : IEntityTypeConfiguration<RentalPos
         builder.Property(post => post.Price).HasColumnName("price").HasPrecision(18, 2).IsRequired();
         builder.Property(post => post.Deposit).HasColumnName("deposit").HasPrecision(18, 2).IsRequired();
         builder.Property(post => post.Area).HasColumnName("area").HasPrecision(10, 2).IsRequired();
+        builder.Property(post => post.ElectricityPrice).HasColumnName("electricity_price").HasPrecision(18, 2).IsRequired();
+        builder.Property(post => post.WaterPrice).HasColumnName("water_price").HasPrecision(18, 2).IsRequired();
+        builder.Property(post => post.InternetPrice).HasColumnName("internet_price").HasPrecision(18, 2).IsRequired();
+        builder.Property(post => post.MaxOccupants).HasColumnName("max_occupants").IsRequired();
+        builder.Property(post => post.AvailableSlots).HasColumnName("available_slots").IsRequired();
+        builder.Property(post => post.HouseRules).HasColumnName("house_rules").HasMaxLength(RentalPost.MaxHouseRulesLength);
+        builder.Property(post => post.AvailableFrom).HasColumnName("available_from");
         builder.Property(post => post.Address).HasColumnName("address").HasMaxLength(RentalPost.MaxAddressLength).IsRequired();
         builder.Property(post => post.Latitude).HasColumnName("latitude").HasPrecision(10, 7).IsRequired();
         builder.Property(post => post.Longitude).HasColumnName("longitude").HasPrecision(10, 7).IsRequired();

@@ -20,6 +20,8 @@ public static class UserProfileMapper
             profile.AvatarPath,
             profile.School,
             profile.PreferredArea,
+            profile.ContactAddress,
+            profile.RentalNeed,
             profile.SleepHabit,
             profile.PetPreference,
             profile.SmokingPreference,

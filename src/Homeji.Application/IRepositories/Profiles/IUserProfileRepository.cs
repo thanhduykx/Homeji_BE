@@ -13,4 +13,11 @@ public interface IUserProfileRepository
     Task<IReadOnlyList<UserProfile>> GetByIdsAsync(
         IReadOnlyCollection<Guid> userIds,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
+        string address,
+        decimal price,
+        Guid excludedUserId,
+        int take,
+        CancellationToken cancellationToken = default);
 }

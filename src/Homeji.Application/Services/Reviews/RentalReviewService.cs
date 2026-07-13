@@ -1,6 +1,7 @@
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Reviews;
 using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IRepositories.Appointments;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Reviews;
 using Homeji.Application.IServices.Reviews;
@@ -19,12 +20,14 @@ public sealed class RentalReviewService : IRentalReviewService
     private readonly IUserProfileRepository _profiles;
     private readonly ContentModerationService _moderation;
     private readonly TimeProvider _timeProvider;
+    private readonly IViewingAppointmentRepository _appointments;
 
     public RentalReviewService(
         UserContext userContext,
         IRentalPostRepository rentalPosts,
         IRentalReviewRepository reviews,
         IUserProfileRepository profiles,
+        IViewingAppointmentRepository appointments,
         ContentModerationService moderation,
         TimeProvider timeProvider)
     {
@@ -32,6 +35,7 @@ public sealed class RentalReviewService : IRentalReviewService
         _rentalPosts = rentalPosts;
         _reviews = reviews;
         _profiles = profiles;
+        _appointments = appointments;
         _moderation = moderation;
         _timeProvider = timeProvider;
     }
@@ -54,7 +58,19 @@ public sealed class RentalReviewService : IRentalReviewService
             ? 0
             : Math.Round(items.Average(item => (decimal)item.Rating), 2);
 
-        return new RentalReviewCollectionDto(rentalPostId, average, items.Length, items);
+        return new RentalReviewCollectionDto(
+            rentalPostId,
+            average,
+            items.Length,
+            new RentalReviewRatingSummaryDto(
+                Average(items.Select(item => item.LocationRating)),
+                Average(items.Select(item => item.ValueRating)),
+                Average(items.Select(item => item.AmenitiesRating)),
+                Average(items.Select(item => item.SecurityRating)),
+                Average(items.Select(item => item.CleanlinessRating)),
+                Average(items.Select(item => item.AccuracyRating)),
+                Average(items.Select(item => item.LandlordRating))),
+            items);
     }
 
     public async Task<RentalReviewDto> UpsertAsync(
@@ -83,12 +99,39 @@ public sealed class RentalReviewService : IRentalReviewService
         var review = await _reviews.GetByPostAndReviewerAsync(rentalPostId, reviewer.Id, cancellationToken);
         if (review is null)
         {
-            review = new RentalReview(rentalPostId, reviewer.Id, request.Rating, request.Comment, now);
+            if (!await _appointments.HasCompletedAsync(rentalPostId, reviewer.Id, cancellationToken))
+            {
+                throw new ForbiddenAccessException("Complete a viewing appointment before reviewing this rental post.");
+            }
+
+            review = new RentalReview(
+                rentalPostId,
+                reviewer.Id,
+                request.Rating,
+                request.Comment,
+                now,
+                request.LocationRating,
+                request.ValueRating,
+                request.AmenitiesRating,
+                request.SecurityRating,
+                request.CleanlinessRating,
+                request.AccuracyRating,
+                request.LandlordRating);
             await _reviews.AddAsync(review, cancellationToken);
         }
         else
         {
-            review.Update(request.Rating, request.Comment, now);
+            review.Update(
+                request.Rating,
+                request.Comment,
+                now,
+                request.LocationRating,
+                request.ValueRating,
+                request.AmenitiesRating,
+                request.SecurityRating,
+                request.CleanlinessRating,
+                request.AccuracyRating,
+                request.LandlordRating);
         }
 
         await _reviews.SaveChangesAsync(cancellationToken);
@@ -126,6 +169,14 @@ public sealed class RentalReviewService : IRentalReviewService
             errors["comment"] = [$"Comment must not exceed {RentalReview.MaxCommentLength} characters."];
         }
 
+        ValidateOptionalRating(request.LocationRating, "locationRating", errors);
+        ValidateOptionalRating(request.ValueRating, "valueRating", errors);
+        ValidateOptionalRating(request.AmenitiesRating, "amenitiesRating", errors);
+        ValidateOptionalRating(request.SecurityRating, "securityRating", errors);
+        ValidateOptionalRating(request.CleanlinessRating, "cleanlinessRating", errors);
+        ValidateOptionalRating(request.AccuracyRating, "accuracyRating", errors);
+        ValidateOptionalRating(request.LandlordRating, "landlordRating", errors);
+
         if (errors.Count > 0)
         {
             throw new RequestValidationException(errors);
@@ -142,7 +193,28 @@ public sealed class RentalReviewService : IRentalReviewService
             reviewer?.AvatarPath,
             review.Rating,
             review.Comment,
+            review.LocationRating,
+            review.ValueRating,
+            review.AmenitiesRating,
+            review.SecurityRating,
+            review.CleanlinessRating,
+            review.AccuracyRating,
+            review.LandlordRating,
             review.CreatedAt,
             review.UpdatedAt);
+    }
+
+    private static void ValidateOptionalRating(int? value, string field, Dictionary<string, string[]> errors)
+    {
+        if (value is not null and (< 1 or > 5))
+        {
+            errors[field] = ["Rating must be between 1 and 5."];
+        }
+    }
+
+    private static decimal? Average(IEnumerable<int?> ratings)
+    {
+        var values = ratings.Where(value => value.HasValue).Select(value => value!.Value).ToArray();
+        return values.Length == 0 ? null : Math.Round(values.Average(value => (decimal)value), 2);
     }
 }

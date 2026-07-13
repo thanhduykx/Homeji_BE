@@ -69,6 +69,21 @@ public sealed class RentalPostRepository : IRentalPostRepository
             query = query.Where(post => post.Area <= search.MaxArea.Value);
         }
 
+        if (search.MaxDeposit.HasValue)
+        {
+            query = query.Where(post => post.Deposit <= search.MaxDeposit.Value);
+        }
+
+        if (search.MinAvailableSlots.HasValue)
+        {
+            query = query.Where(post => post.AvailableSlots >= search.MinAvailableSlots.Value);
+        }
+
+        if (search.AvailableFromBefore.HasValue)
+        {
+            query = query.Where(post => post.AvailableFrom == null || post.AvailableFrom <= search.AvailableFromBefore.Value);
+        }
+
         if (search.MinLatitude.HasValue)
         {
             query = query.Where(post => post.Latitude >= search.MinLatitude.Value);
@@ -139,6 +154,24 @@ public sealed class RentalPostRepository : IRentalPostRepository
         return await _dbContext.RentalPosts
             .AsNoTracking()
             .Where(post => ids.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<RentalPost>> GetByIdsWithMediaAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        return await _dbContext.RentalPosts
+            .AsNoTracking()
+            .Include(post => post.Media)
+            .Include(post => post.Amenities)
+            .Where(post => ids.Contains(post.Id))
+            .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
 

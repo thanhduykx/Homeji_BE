@@ -23,5 +23,11 @@ public sealed class UpdateMyProfileDtoValidator : AbstractValidator<UpdateMyProf
 
         RuleFor(request => request.PreferredArea)
             .MaximumLength(UserProfile.MaxAreaLength);
+
+        RuleFor(request => request.ContactAddress)
+            .MaximumLength(UserProfile.MaxContactAddressLength);
+
+        RuleFor(request => request.RentalNeed)
+            .MaximumLength(UserProfile.MaxRentalNeedLength);
     }
 }

@@ -34,5 +34,15 @@ public sealed class UpdateRentalPostDtoValidator : AbstractValidator<UpdateRenta
 
         RuleFor(request => request.Longitude)
             .InclusiveBetween(-180, 180);
+
+        RuleFor(request => request.ElectricityPrice).GreaterThanOrEqualTo(0);
+        RuleFor(request => request.WaterPrice).GreaterThanOrEqualTo(0);
+        RuleFor(request => request.InternetPrice).GreaterThanOrEqualTo(0);
+        RuleFor(request => request.MaxOccupants).GreaterThan(0);
+        RuleFor(request => request.AvailableSlots)
+            .GreaterThan(0)
+            .LessThanOrEqualTo(request => request.MaxOccupants);
+        RuleFor(request => request.HouseRules)
+            .MaximumLength(RentalPost.MaxHouseRulesLength);
     }
 }

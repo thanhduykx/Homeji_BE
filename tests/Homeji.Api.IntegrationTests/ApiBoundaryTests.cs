@@ -39,6 +39,18 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData("/api/conversations")]
+    [InlineData("/api/marketplace-orders")]
+    [InlineData("/api/payments")]
+    [InlineData("/api/activities")]
+    public async Task NewPrivateEndpoints_WithoutAccessToken_ReturnUnauthorized(string path)
+    {
+        var response = await _client.GetAsync(new Uri(path, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     [Fact]
     public async Task NotificationHub_WithoutAccessToken_ReturnsUnauthorized()
     {

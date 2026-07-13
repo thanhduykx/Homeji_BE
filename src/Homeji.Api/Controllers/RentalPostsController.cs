@@ -34,6 +34,9 @@ public sealed class RentalPostsController : ControllerBase
         [FromQuery] decimal? minLongitude,
         [FromQuery] decimal? maxLongitude,
         [FromQuery] string[]? amenities,
+        [FromQuery] decimal? maxDeposit = null,
+        [FromQuery] int? minAvailableSlots = null,
+        [FromQuery] DateOnly? availableFromBefore = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -51,7 +54,10 @@ public sealed class RentalPostsController : ControllerBase
                 maxLongitude,
                 amenities ?? [],
                 page,
-                pageSize),
+                pageSize,
+                maxDeposit,
+                minAvailableSlots,
+                availableFromBefore),
             cancellationToken);
 
         return Ok(result);
@@ -66,6 +72,15 @@ public sealed class RentalPostsController : ControllerBase
     public async Task<ActionResult<RentalPostDto>> GetDetail(Guid postId, CancellationToken cancellationToken)
     {
         return Ok(await _rentalPostService.GetDetailAsync(postId, cancellationToken));
+    }
+
+    [HttpPost("compare")]
+    [ProducesResponseType<RentalPostComparisonDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<RentalPostComparisonDto>> Compare(
+        [FromBody] CompareRentalPostsDto request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _rentalPostService.CompareAsync(request, cancellationToken));
     }
 
     [HttpPost("drafts")]
@@ -125,6 +140,14 @@ public sealed class RentalPostsController : ControllerBase
     public async Task<IActionResult> Archive(Guid postId, CancellationToken cancellationToken)
     {
         await _rentalPostService.ArchiveAsync(postId, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPost("{postId:guid}/mark-rented")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> MarkRented(Guid postId, CancellationToken cancellationToken)
+    {
+        await _rentalPostService.MarkRentedAsync(postId, cancellationToken);
         return NoContent();
     }
 }

@@ -42,6 +42,12 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
         builder.Property(profile => profile.PreferredArea)
             .HasColumnName("preferred_area")
             .HasMaxLength(UserProfile.MaxAreaLength);
+        builder.Property(profile => profile.ContactAddress)
+            .HasColumnName("contact_address")
+            .HasMaxLength(UserProfile.MaxContactAddressLength);
+        builder.Property(profile => profile.RentalNeed)
+            .HasColumnName("rental_need")
+            .HasMaxLength(UserProfile.MaxRentalNeedLength);
 
         builder.Property(profile => profile.SleepHabit)
             .HasColumnName("sleep_habit")

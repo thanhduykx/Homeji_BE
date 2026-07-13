@@ -78,6 +78,16 @@ public sealed class PaymentService : IPaymentService
         return PaymentMapper.ToDto(payment);
     }
 
+    public async Task<IReadOnlyList<PaymentDto>> GetMyPaymentHistoryAsync(
+        PaymentStatus? status,
+        int take,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        var payments = await _payments.GetForUserAsync(userId, status, Math.Clamp(take, 1, 100), cancellationToken);
+        return payments.Select(PaymentMapper.ToDto).ToArray();
+    }
+
     public async Task<MomoPaymentResponseDto> CreateMomoPaymentAsync(
         CreateMomoPaymentDto request,
         CancellationToken cancellationToken = default)
@@ -91,15 +101,16 @@ public sealed class PaymentService : IPaymentService
     }
 
     public async Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
+        string packageCode,
         CancellationToken cancellationToken = default)
     {
-        EnsurePremiumConfigured();
+        var plan = GetPremiumPlan(packageCode);
 
         return await CreateMomoPaymentInternalAsync(
-            _premiumOptions.Price,
-            BuildPremiumDescription(),
+            plan.Price,
+            BuildPremiumDescription(plan),
             PaymentPurpose.PremiumSubscription,
-            _premiumOptions.Code,
+            plan.Code,
             cancellationToken);
     }
 
@@ -241,15 +252,16 @@ public sealed class PaymentService : IPaymentService
     }
 
     public async Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(
+        string packageCode,
         CancellationToken cancellationToken = default)
     {
-        EnsurePremiumConfigured();
+        var plan = GetPremiumPlan(packageCode);
 
         return await CreatePayOsPaymentInternalAsync(
-            _premiumOptions.Price,
-            BuildPremiumDescription(),
+            plan.Price,
+            BuildPremiumDescription(plan),
             PaymentPurpose.PremiumSubscription,
-            _premiumOptions.Code,
+            plan.Code,
             cancellationToken);
     }
 
@@ -384,7 +396,7 @@ public sealed class PaymentService : IPaymentService
             return;
         }
 
-        EnsurePremiumConfigured();
+        var plan = GetPremiumPlan(payment.PackageCode);
 
         var existingSubscription = await _subscriptions.GetByPaymentTransactionIdAsync(payment.Id, cancellationToken);
         if (existingSubscription is not null)
@@ -399,11 +411,11 @@ public sealed class PaymentService : IPaymentService
 
         var subscription = UserSubscription.CreatePremium(
             payment.UserId,
-            payment.PackageCode ?? _premiumOptions.Code,
-            _premiumOptions.Name,
+            plan.Code,
+            plan.Name,
             payment.Id,
             startsAt,
-            _premiumOptions.DurationDays,
+            plan.DurationDays,
             paidAt);
 
         await _subscriptions.AddAsync(subscription, cancellationToken);
@@ -461,25 +473,38 @@ public sealed class PaymentService : IPaymentService
             : normalized[..PaymentTransaction.MaxDescriptionLength];
     }
 
-    private string BuildPremiumDescription()
+    private static string BuildPremiumDescription(PremiumPlanOptions plan)
     {
-        var packageName = string.IsNullOrWhiteSpace(_premiumOptions.Name)
-            ? "Premium"
-            : _premiumOptions.Name.Trim();
+        var packageName = plan.Name.Trim();
 
-        return $"Homeji {packageName} {_premiumOptions.DurationDays} ngay";
+        return $"Homeji {packageName} {plan.DurationDays} ngay";
     }
 
-    private void EnsurePremiumConfigured()
+    private PremiumPlanOptions GetPremiumPlan(string? packageCode)
     {
-        if (string.IsNullOrWhiteSpace(_premiumOptions.Code)
-            || string.IsNullOrWhiteSpace(_premiumOptions.Name)
-            || _premiumOptions.Price <= 0
-            || decimal.Truncate(_premiumOptions.Price) != _premiumOptions.Price
-            || _premiumOptions.DurationDays <= 0)
+        if (string.IsNullOrWhiteSpace(packageCode))
+        {
+            throw Validation("packageCode", "Premium package code is required.");
+        }
+
+        var plan = _premiumOptions.GetPlans().SingleOrDefault(candidate =>
+            string.Equals(candidate.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        if (plan is null)
+        {
+            throw Validation("packageCode", "Premium package was not found.");
+        }
+
+        if (string.IsNullOrWhiteSpace(plan.Code)
+            || string.IsNullOrWhiteSpace(plan.Name)
+            || plan.Price <= 0
+            || decimal.Truncate(plan.Price) != plan.Price
+            || plan.DurationDays <= 0)
         {
             throw new InvalidOperationException("Premium subscription settings are not configured.");
         }
+
+        return plan;
     }
 
     private void EnsureMomoConfigured()

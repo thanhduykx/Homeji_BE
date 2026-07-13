@@ -114,6 +114,16 @@ public sealed class UserProfileServiceTests
 
             return Task.FromResult(profiles);
         }
+
+        public Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
+            string address,
+            decimal price,
+            Guid excludedUserId,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult<IReadOnlyList<UserProfile>>([]);
+        }
     }
 
     private sealed class EmptyUserSubscriptionRepository : IUserSubscriptionRepository

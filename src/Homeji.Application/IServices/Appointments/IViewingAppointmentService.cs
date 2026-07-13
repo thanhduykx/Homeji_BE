@@ -9,4 +9,6 @@ public interface IViewingAppointmentService
     Task<ViewingAppointmentDto> ConfirmAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ViewingAppointmentDto> RejectAsync(Guid id, CancellationToken cancellationToken = default);
     Task<ViewingAppointmentDto> CancelAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<ViewingAppointmentDto> RescheduleAsync(Guid id, RescheduleViewingAppointmentDto request, CancellationToken cancellationToken = default);
+    Task<ViewingAppointmentDto> CompleteAsync(Guid id, CancellationToken cancellationToken = default);
 }
