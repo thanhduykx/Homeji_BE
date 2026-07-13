@@ -164,10 +164,21 @@ public sealed class RentalPostService : IRentalPostService
 
         var posts = await _posts.SearchActiveAsync(search, cancellationToken);
         var now = _timeProvider.GetUtcNow();
-        var premiumByUserId = await _subscriptions.GetActivePremiumByUserIdsAsync(
-            posts.Select(post => post.OwnerId).ToArray(),
-            now,
-            cancellationToken);
+
+        // Premium boost is best-effort: search must still work if subscriptions
+        // schema/migration is missing or the lookup fails.
+        IReadOnlyDictionary<Guid, UserSubscription> premiumByUserId;
+        try
+        {
+            premiumByUserId = await _subscriptions.GetActivePremiumByUserIdsAsync(
+                posts.Select(post => post.OwnerId).ToArray(),
+                now,
+                cancellationToken);
+        }
+        catch (Exception)
+        {
+            premiumByUserId = new Dictionary<Guid, UserSubscription>();
+        }
 
         return posts
             .Select(post =>

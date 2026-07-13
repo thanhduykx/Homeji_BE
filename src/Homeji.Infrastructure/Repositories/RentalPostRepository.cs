@@ -98,6 +98,7 @@ public sealed class RentalPostRepository : IRentalPostRepository
         var pageSize = Math.Clamp(search.PageSize, 1, MaxPageSize);
 
         return await query
+            .AsSplitQuery()
             .OrderByDescending(post => post.UpdatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
