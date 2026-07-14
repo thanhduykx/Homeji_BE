@@ -27,7 +27,7 @@ public sealed class PremiumSubscriptionOptions
 public sealed class PremiumPlanOptions
 {
     public string Code { get; set; } = "PREMIUM_MONTHLY";
-    public string Name { get; set; } = "Premium Monthly";
+    public string Name { get; set; } = "Gói Trải Nghiệm";
     public decimal Price { get; set; } = 99_000;
     public int DurationDays { get; set; } = 30;
 }

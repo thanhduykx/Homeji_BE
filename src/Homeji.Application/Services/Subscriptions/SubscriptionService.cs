@@ -20,7 +20,7 @@ public sealed class SubscriptionService : ISubscriptionService
 
     private static readonly string[] PremiumBenefits =
     [
-        "Có badge Premium trên bài đăng",
+        "Có badge Cao cấp trên bài đăng",
         "Bài đăng được ưu tiên hiển thị theo điểm boost",
         "Tăng khả năng xuất hiện trong đề xuất AI",
     ];
@@ -51,11 +51,11 @@ public sealed class SubscriptionService : ISubscriptionService
         {
             new(
                 "BASIC",
-                "Basic",
+                "Standard",
                 SubscriptionTier.Basic,
                 0,
                 0,
-                "Basic",
+                "Standard",
                 BasicBenefits),
         };
 
@@ -81,7 +81,7 @@ public sealed class SubscriptionService : ISubscriptionService
             ? new MySubscriptionDto(
                 SubscriptionTier.Basic,
                 false,
-                "Basic",
+                "Standard",
                 null,
                 null,
                 null,
@@ -117,7 +117,7 @@ public sealed class SubscriptionService : ISubscriptionService
 
     private static string NormalizePackageName(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) ? "Premium" : value.Trim();
+        return string.IsNullOrWhiteSpace(value) ? "Gói Trải Nghiệm" : value.Trim();
     }
 
     private static decimal RequirePositivePrice(decimal price)
