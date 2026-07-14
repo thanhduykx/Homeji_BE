@@ -40,6 +40,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
     {
         var problemDetails = CreateProblemDetails(httpContext, exception);
 
+        if (exception is ExternalServiceUnavailableException { RetryAfter: { } retryAfter })
+        {
+            httpContext.Response.Headers.RetryAfter = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds))
+                .ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         if (problemDetails.Status >= StatusCodes.Status500InternalServerError)
         {
             LogUnhandledException(
@@ -99,6 +105,16 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Status = StatusCodes.Status403Forbidden,
                 Title = "Forbidden",
                 Detail = exception.Message,
+            },
+            ExternalServiceUnavailableException serviceException => new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "External service unavailable",
+                Detail = serviceException.Message,
+                Extensions =
+                {
+                    ["service"] = serviceException.ServiceName,
+                },
             },
             DomainException => new ProblemDetails
             {

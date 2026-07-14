@@ -13,7 +13,10 @@ public sealed class SmtpAccountEmailSenderTests
             Options.Create(new SmtpOptions { Enabled = false }),
             NullLogger<SmtpAccountEmailSender>.Instance);
 
-        var result = await sender.SendRegistrationConfirmationAsync("user@example.com", "Homeji User");
+        var result = await sender.SendRegistrationConfirmationAsync(
+            "user@example.com",
+            "Homeji User",
+            "https://project.supabase.co/auth/v1/verify?token=test&type=signup");
 
         Assert.False(result.Sent);
         Assert.Contains("disabled", result.Message, StringComparison.OrdinalIgnoreCase);
@@ -31,7 +34,10 @@ public sealed class SmtpAccountEmailSenderTests
             }),
             NullLogger<SmtpAccountEmailSender>.Instance);
 
-        var result = await sender.SendRegistrationConfirmationAsync("user@example.com", "Homeji User");
+        var result = await sender.SendRegistrationConfirmationAsync(
+            "user@example.com",
+            "Homeji User",
+            "https://project.supabase.co/auth/v1/verify?token=test&type=signup");
 
         Assert.False(result.Sent);
         Assert.Contains("could not be sent", result.Message, StringComparison.OrdinalIgnoreCase);

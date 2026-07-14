@@ -6,6 +6,8 @@ public sealed class SupaBaseAuthOptions
 
     public string ApiKey { get; set; } = string.Empty;
 
+    public string ServiceRoleKey { get; set; } = string.Empty;
+
     public string RegistrationRedirectUrl { get; set; } = string.Empty;
 
     public string PasswordResetRedirectUrl { get; set; } = string.Empty;

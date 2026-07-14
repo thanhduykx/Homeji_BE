@@ -35,6 +35,7 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
     public async Task<EmailSendResultDto> SendRegistrationConfirmationAsync(
         string email,
         string? displayName,
+        string confirmationUrl,
         CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
@@ -44,9 +45,9 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
 
         try
         {
-            ValidateOptions();
+            ValidateOptions(confirmationUrl);
             var recipientName = NormalizeDisplayName(displayName);
-            using var mailMessage = CreateRegistrationMessage(email, recipientName);
+            using var mailMessage = CreateRegistrationMessage(email, recipientName, confirmationUrl);
             using var smtpClient = CreateClient();
 
             await smtpClient.SendMailAsync(mailMessage, cancellationToken);
@@ -69,24 +70,22 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         }
     }
 
-    private MailMessage CreateRegistrationMessage(string email, string recipientName)
+    private MailMessage CreateRegistrationMessage(string email, string recipientName, string confirmationUrl)
     {
         var from = new MailAddress(_options.FromEmail, _options.FromName);
         var to = new MailAddress(email, recipientName);
-        var plainTextBody = BuildPlainTextBody(recipientName);
-        var htmlBody = BuildHtmlBody(recipientName);
 
         return new MailMessage(from, to)
         {
             Subject = _options.RegistrationSubject,
-            Body = htmlBody,
+            Body = BuildHtmlBody(recipientName, confirmationUrl),
             IsBodyHtml = true,
             BodyEncoding = System.Text.Encoding.UTF8,
             SubjectEncoding = System.Text.Encoding.UTF8,
             AlternateViews =
             {
                 AlternateView.CreateAlternateViewFromString(
-                    plainTextBody,
+                    BuildPlainTextBody(recipientName, confirmationUrl),
                     System.Text.Encoding.UTF8,
                     "text/plain"),
             },
@@ -96,31 +95,25 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
     private SmtpClient CreateClient()
     {
         var timeoutMilliseconds = Math.Clamp(_options.TimeoutSeconds, 5, 120) * 1_000;
-        var client = new SmtpClient(_options.Host, _options.Port)
+        return new SmtpClient(_options.Host, _options.Port)
         {
             EnableSsl = _options.EnableSsl,
             DeliveryMethod = SmtpDeliveryMethod.Network,
             Timeout = timeoutMilliseconds,
             UseDefaultCredentials = false,
+            Credentials = string.IsNullOrWhiteSpace(_options.Username)
+                ? null
+                : new NetworkCredential(_options.Username, _options.Password),
         };
-
-        if (!string.IsNullOrWhiteSpace(_options.Username))
-        {
-            client.Credentials = new NetworkCredential(_options.Username, _options.Password);
-        }
-
-        return client;
     }
 
-    private string BuildPlainTextBody(string recipientName)
+    private static string BuildPlainTextBody(string recipientName, string confirmationUrl)
     {
         return $"""
             Chào {recipientName},
 
-            Homeji xác nhận tài khoản của bạn đã được đăng ký thành công.
-
-            Nếu hệ thống yêu cầu xác thực email, hãy hoàn tất bước xác thực từ email Supabase Auth. Sau đó bạn có thể đăng nhập tại:
-            {_options.LoginUrl}
+            Vui lòng xác nhận email để hoàn tất đăng ký tài khoản Homeji:
+            {confirmationUrl}
 
             Nếu bạn không thực hiện đăng ký này, vui lòng bỏ qua email.
 
@@ -128,20 +121,21 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             """;
     }
 
-    private string BuildHtmlBody(string recipientName)
+    private static string BuildHtmlBody(string recipientName, string confirmationUrl)
     {
         var safeName = WebUtility.HtmlEncode(recipientName);
-        var safeLoginUrl = WebUtility.HtmlEncode(_options.LoginUrl);
+        var safeConfirmationUrl = WebUtility.HtmlEncode(confirmationUrl);
 
         return $$"""
             <!doctype html>
             <html lang="vi">
             <body style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
-              <h2>Homeji xác nhận đăng ký tài khoản</h2>
+              <h2>Xác nhận đăng ký tài khoản Homeji</h2>
               <p>Chào {{safeName}},</p>
-              <p>Tài khoản Homeji của bạn đã được đăng ký thành công.</p>
-              <p>Nếu hệ thống yêu cầu xác thực email, hãy hoàn tất bước xác thực từ email Supabase Auth. Sau đó bạn có thể đăng nhập tại:</p>
-              <p><a href="{{safeLoginUrl}}">{{safeLoginUrl}}</a></p>
+              <p>Vui lòng xác nhận email để hoàn tất đăng ký tài khoản.</p>
+              <p><a href="{{safeConfirmationUrl}}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px">Xác nhận email</a></p>
+              <p>Nếu nút không hoạt động, hãy mở liên kết sau:</p>
+              <p>{{safeConfirmationUrl}}</p>
               <p>Nếu bạn không thực hiện đăng ký này, vui lòng bỏ qua email.</p>
               <p>Homeji</p>
             </body>
@@ -149,7 +143,7 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             """;
     }
 
-    private void ValidateOptions()
+    private void ValidateOptions(string confirmationUrl)
     {
         if (string.IsNullOrWhiteSpace(_options.Host))
         {
@@ -167,12 +161,15 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         }
 
         _ = new MailAddress(_options.FromEmail);
+        if (!Uri.TryCreate(confirmationUrl, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            throw new InvalidOperationException("A valid confirmation URL must be provided.");
+        }
     }
 
     private static string NormalizeDisplayName(string? displayName)
     {
-        return string.IsNullOrWhiteSpace(displayName)
-            ? "bạn"
-            : displayName.Trim();
+        return string.IsNullOrWhiteSpace(displayName) ? "bạn" : displayName.Trim();
     }
 }

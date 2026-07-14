@@ -18,8 +18,6 @@ public sealed class SmtpOptions
 
     public string FromName { get; set; } = "Homeji";
 
-    public string LoginUrl { get; set; } = "https://exe101-homeji.onrender.com/login";
-
     public string RegistrationSubject { get; set; } = "Xác nhận đăng ký tài khoản Homeji";
 
     public int TimeoutSeconds { get; set; } = 30;

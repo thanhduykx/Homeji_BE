@@ -2,10 +2,10 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Accounts;
-using Homeji.Application.DTOs.Emails;
 using Homeji.Application.IRepositories.Accounts;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.Emails;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Homeji.Infrastructure.External;
@@ -13,21 +13,30 @@ namespace Homeji.Infrastructure.External;
 public sealed class SupabaseAccountService : IAccountService
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly Action<ILogger, Guid, Exception?> FailedToRemoveUnconfirmedUser =
+        LoggerMessage.Define<Guid>(
+            LogLevel.Error,
+            new EventId(1101, nameof(FailedToRemoveUnconfirmedUser)),
+            "Failed to remove unconfirmed Supabase user {UserId} after registration email failure.");
+
     private readonly IAccountEmailSender _accountEmailSender;
     private readonly IAccountEmailRepository _accountEmailRepository;
     private readonly HttpClient _httpClient;
+    private readonly ILogger<SupabaseAccountService> _logger;
     private readonly SupaBaseAuthOptions _options;
 
     public SupabaseAccountService(
         HttpClient httpClient,
         IOptions<SupaBaseAuthOptions> options,
         IAccountEmailSender accountEmailSender,
-        IAccountEmailRepository accountEmailRepository)
+        IAccountEmailRepository accountEmailRepository,
+        ILogger<SupabaseAccountService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
         _accountEmailSender = accountEmailSender;
         _accountEmailRepository = accountEmailRepository;
+        _logger = logger;
     }
 
     public async Task<AuthSessionDto> RegisterAsync(
@@ -36,6 +45,7 @@ public sealed class SupabaseAccountService : IAccountService
     {
         ValidateEmailAndPassword(request.Email, request.Password);
         EnsureConfigured();
+        EnsureRegistrationConfigured();
 
         var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
         if (emailAvailability.Exists)
@@ -44,31 +54,54 @@ public sealed class SupabaseAccountService : IAccountService
         }
 
         var redirectTo = ResolveRedirectUrl(request.RedirectTo, _options.RegistrationRedirectUrl);
-        var endpoint = BuildAuthUri("signup", redirectTo);
-        using var httpRequest = CreateJsonRequest(
+        using var httpRequest = CreateAdminJsonRequest(
             HttpMethod.Post,
-            endpoint,
+            new Uri("auth/v1/admin/generate_link", UriKind.Relative),
             new
             {
+                type = "signup",
                 email = emailAvailability.Email,
                 password = request.Password,
                 data = new
                 {
                     display_name = request.DisplayName,
                 },
+                redirect_to = redirectTo,
             });
 
         var json = await SendAsync(httpRequest, cancellationToken);
-        var authSession = ParseAuthSession(json, emailConfirmationMessage: "Registration succeeded.");
-        var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
-            emailAvailability.Email,
-            request.DisplayName,
-            cancellationToken);
-
-        return authSession with
+        var generatedLink = ParseGeneratedSignupLink(json);
+        try
         {
-            Message = BuildRegistrationMessage(authSession, emailResult),
-        };
+            var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
+                emailAvailability.Email,
+                request.DisplayName,
+                generatedLink.ActionLink,
+                cancellationToken);
+
+            if (!emailResult.Sent)
+            {
+                await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
+                throw new ExternalServiceUnavailableException(
+                    "SMTP",
+                    "The confirmation email could not be sent. Please try registering again.");
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
+            throw;
+        }
+
+        return new AuthSessionDto(
+            null,
+            null,
+            null,
+            null,
+            generatedLink.UserId,
+            generatedLink.Email ?? emailAvailability.Email,
+            true,
+            "Registration succeeded. Check your email to confirm your account before signing in.");
     }
 
     public async Task<EmailAvailabilityDto> GetEmailAvailabilityAsync(
@@ -171,6 +204,20 @@ public sealed class SupabaseAccountService : IAccountService
         return request;
     }
 
+    private HttpRequestMessage CreateAdminJsonRequest(HttpMethod method, Uri relativeUri, object payload)
+    {
+        var request = new HttpRequestMessage(method, relativeUri)
+        {
+            Content = JsonContent.Create(payload, options: JsonOptions),
+        };
+
+        request.Headers.Add("apikey", _options.ServiceRoleKey);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
+            "Bearer",
+            _options.ServiceRoleKey);
+        return request;
+    }
+
     private async Task<JsonDocument> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken,
@@ -224,13 +271,48 @@ public sealed class SupabaseAccountService : IAccountService
         return new Uri(relative, UriKind.Relative);
     }
 
-    private static string BuildRegistrationMessage(AuthSessionDto authSession, EmailSendResultDto emailResult)
+    private static (string ActionLink, Guid? UserId, string? Email) ParseGeneratedSignupLink(JsonDocument document)
     {
-        var authMessage = authSession.EmailConfirmationRequired
-            ? "Registration succeeded. Email confirmation may be required before login."
-            : "Registration succeeded.";
+        var root = document.RootElement;
+        var properties = root.TryGetProperty("properties", out var propertiesElement)
+            ? propertiesElement
+            : root;
+        var actionLink = GetString(properties, "action_link") ?? GetString(root, "action_link");
+        if (string.IsNullOrWhiteSpace(actionLink))
+        {
+            throw new ExternalServiceUnavailableException(
+                "Supabase Auth",
+                "Supabase did not return an email confirmation link.");
+        }
 
-        return $"{authMessage} {emailResult.Message}";
+        var user = root.TryGetProperty("user", out var userElement) ? userElement : default;
+        var userIdText = GetString(user, "id");
+        return (
+            actionLink,
+            Guid.TryParse(userIdText, out var userId) ? userId : null,
+            GetString(user, "email"));
+    }
+
+    private async Task TryRemoveUnconfirmedUserAsync(Guid? userId)
+    {
+        if (userId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var request = CreateAdminJsonRequest(
+                HttpMethod.Delete,
+                new Uri($"auth/v1/admin/users/{userId.Value:D}", UriKind.Relative),
+                new { });
+            request.Content = null;
+            _ = await SendAsync(request, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            FailedToRemoveUnconfirmedUser(_logger, userId.Value, exception);
+        }
     }
 
     private void EnsureConfigured()
@@ -243,6 +325,15 @@ public sealed class SupabaseAccountService : IAccountService
         if (_httpClient.BaseAddress is null)
         {
             _httpClient.BaseAddress = new Uri(_options.ProjectUrl.TrimEnd('/') + "/");
+        }
+    }
+
+    private void EnsureRegistrationConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(_options.ServiceRoleKey))
+        {
+            throw new InvalidOperationException(
+                "Supabase ServiceRoleKey must be configured to generate registration confirmation links.");
         }
     }
 

@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Globalization;
@@ -15,11 +16,11 @@ namespace Homeji.Infrastructure.External;
 public sealed class GeminiChatbotClient : IChatbotAiClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private static readonly Action<ILogger, int, Exception?> LogGeminiChatFailed =
-        LoggerMessage.Define<int>(
+    private static readonly Action<ILogger, int, int, int, Exception?> LogGeminiChatFailed =
+        LoggerMessage.Define<int, int, int>(
             LogLevel.Warning,
             new EventId(2002, nameof(LogGeminiChatFailed)),
-            "Gemini chatbot request failed with status {StatusCode}.");
+            "Gemini chatbot request failed with status {StatusCode} on attempt {Attempt}/{MaxAttempts}.");
 
     private readonly HttpClient _httpClient;
     private readonly GeminiOptions _options;
@@ -64,21 +65,110 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             },
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
+        var maxAttempts = Math.Clamp(_options.MaxRetryAttempts + 1, 1, 4);
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            Content = JsonContent.Create(payload, options: JsonOptions),
-        };
-        request.Headers.Add("X-goog-api-key", _options.ApiKey);
+            using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions),
+            };
+            request.Headers.Add("X-goog-api-key", _options.ApiKey);
 
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
-            LogGeminiChatFailed(_logger, (int)response.StatusCode, null);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                return NormalizeReply(ExtractModelText(responseText));
+            }
+
+            LogGeminiChatFailed(_logger, (int)response.StatusCode, attempt, maxAttempts, null);
+            var retryAfter = GetRetryDelay(response, responseText, attempt);
+            if (IsRetryable(response.StatusCode) && attempt < maxAttempts)
+            {
+                if (retryAfter > TimeSpan.Zero)
+                {
+                    await Task.Delay(retryAfter, cancellationToken);
+                }
+
+                continue;
+            }
+
+            if (IsRetryable(response.StatusCode))
+            {
+                throw new ExternalServiceUnavailableException(
+                    "Gemini",
+                    response.StatusCode == HttpStatusCode.TooManyRequests
+                        ? "Chatbot AI quota is temporarily exhausted. Please try again later."
+                        : "Chatbot AI is temporarily unavailable. Please try again later.",
+                    retryAfter);
+            }
+
             throw Validation("chatbot", "Chatbot is temporarily unavailable.");
         }
 
-        return NormalizeReply(ExtractModelText(responseText));
+        throw new InvalidOperationException("Gemini retry loop completed unexpectedly.");
+    }
+
+    private TimeSpan GetRetryDelay(
+        HttpResponseMessage response,
+        string responseText,
+        int attempt)
+    {
+        var requestedDelay = response.Headers.RetryAfter?.Delta
+            ?? ParseRetryDelay(responseText)
+            ?? TimeSpan.FromMilliseconds(
+                Math.Clamp(_options.RetryBaseDelayMilliseconds, 0, 10_000)
+                * Math.Pow(2, attempt - 1));
+        var maximumDelay = TimeSpan.FromSeconds(Math.Clamp(_options.MaxRetryDelaySeconds, 0, 30));
+
+        return requestedDelay <= maximumDelay ? requestedDelay : maximumDelay;
+    }
+
+    private static TimeSpan? ParseRetryDelay(string responseText)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(responseText);
+            if (!document.RootElement.TryGetProperty("error", out var error)
+                || !error.TryGetProperty("details", out var details)
+                || details.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            foreach (var detail in details.EnumerateArray())
+            {
+                if (!detail.TryGetProperty("retryDelay", out var retryDelayElement))
+                {
+                    continue;
+                }
+
+                var retryDelay = retryDelayElement.GetString();
+                if (retryDelay is not null
+                    && retryDelay.EndsWith('s')
+                    && double.TryParse(
+                        retryDelay[..^1],
+                        NumberStyles.AllowDecimalPoint,
+                        CultureInfo.InvariantCulture,
+                        out var seconds)
+                    && seconds >= 0)
+                {
+                    return TimeSpan.FromSeconds(seconds);
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+
+        return null;
+    }
+
+    private static bool IsRetryable(HttpStatusCode statusCode)
+    {
+        return statusCode is HttpStatusCode.TooManyRequests
+            or HttpStatusCode.ServiceUnavailable;
     }
 
     private static string BuildPrompt(

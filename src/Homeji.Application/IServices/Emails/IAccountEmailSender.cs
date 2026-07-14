@@ -7,5 +7,6 @@ public interface IAccountEmailSender
     Task<EmailSendResultDto> SendRegistrationConfirmationAsync(
         string email,
         string? displayName,
+        string confirmationUrl,
         CancellationToken cancellationToken = default);
 }
