@@ -33,6 +33,8 @@ public sealed class PostConversation
         ParticipantBId = participantBId;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
+        ParticipantALastReadAt = createdAt;
+        ParticipantBLastReadAt = createdAt;
     }
 
     public Guid Id { get; private set; }
@@ -42,6 +44,8 @@ public sealed class PostConversation
     public Guid ParticipantBId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public DateTimeOffset? ParticipantALastReadAt { get; private set; }
+    public DateTimeOffset? ParticipantBLastReadAt { get; private set; }
 
     public bool Includes(Guid userId) => ParticipantAId == userId || ParticipantBId == userId;
 
@@ -52,6 +56,30 @@ public sealed class PostConversation
             : ParticipantBId == userId
                 ? ParticipantAId
                 : throw new DomainException("User is not a participant in this conversation.");
+    }
+
+    public DateTimeOffset? GetLastReadAt(Guid userId)
+    {
+        if (userId == ParticipantAId) return ParticipantALastReadAt;
+        if (userId == ParticipantBId) return ParticipantBLastReadAt;
+        throw new DomainException("User is not a participant in this conversation.");
+    }
+
+    public void MarkRead(Guid userId, DateTimeOffset readAt)
+    {
+        if (userId == ParticipantAId)
+        {
+            ParticipantALastReadAt = readAt;
+            return;
+        }
+
+        if (userId == ParticipantBId)
+        {
+            ParticipantBLastReadAt = readAt;
+            return;
+        }
+
+        throw new DomainException("User is not a participant in this conversation.");
     }
 
     public void Touch(DateTimeOffset updatedAt)

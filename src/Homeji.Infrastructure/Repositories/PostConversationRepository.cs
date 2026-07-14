@@ -1,3 +1,4 @@
+using Homeji.Application.DTOs.Conversations;
 using Homeji.Application.IRepositories.Conversations;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
@@ -55,6 +56,65 @@ public sealed class PostConversationRepository : IPostConversationRepository
             .Where(message => message.ConversationId == conversationId)
             .OrderBy(message => message.SentAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, ConversationLastMessageDto>> GetLatestByConversationIdsAsync(
+        IReadOnlyCollection<Guid> conversationIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (conversationIds.Count == 0)
+        {
+            return new Dictionary<Guid, ConversationLastMessageDto>();
+        }
+
+        var latest = await _dbContext.PostMessages
+            .AsNoTracking()
+            .Where(message => conversationIds.Contains(message.ConversationId))
+            .GroupBy(message => message.ConversationId)
+            .Select(group => group.OrderByDescending(message => message.SentAt).First())
+            .ToListAsync(cancellationToken);
+
+        return latest.ToDictionary(
+            message => message.ConversationId,
+            message => new ConversationLastMessageDto(
+                message.ConversationId,
+                message.Body,
+                message.SenderId,
+                message.SentAt));
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountUnreadByConversationIdsAsync(
+        Guid userId,
+        IReadOnlyCollection<PostConversation> conversations,
+        CancellationToken cancellationToken = default)
+    {
+        if (conversations.Count == 0)
+        {
+            return new Dictionary<Guid, int>();
+        }
+
+        var conversationIds = conversations.Select(conversation => conversation.Id).ToArray();
+        var incoming = await _dbContext.PostMessages
+            .AsNoTracking()
+            .Where(message =>
+                conversationIds.Contains(message.ConversationId)
+                && message.SenderId != userId)
+            .Select(message => new { message.ConversationId, message.SentAt })
+            .ToListAsync(cancellationToken);
+
+        var lastReadByConversation = conversations.ToDictionary(
+            conversation => conversation.Id,
+            conversation => conversation.GetLastReadAt(userId) ?? DateTimeOffset.MinValue);
+
+        return incoming
+            .GroupBy(message => message.ConversationId)
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var cutoff = lastReadByConversation.GetValueOrDefault(group.Key, DateTimeOffset.MinValue);
+                    return group.Count(message => message.SentAt > cutoff);
+                });
     }
 
     public async Task<IReadOnlyDictionary<Guid, int>> CountBySubjectsAsync(

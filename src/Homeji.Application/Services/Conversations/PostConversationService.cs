@@ -101,17 +101,32 @@ public sealed class PostConversationService : IPostConversationService
         var otherIds = conversations.Select(conversation => conversation.GetOtherParticipantId(userId)).Distinct().ToArray();
         var profiles = await _profiles.GetByIdsAsync(otherIds, cancellationToken);
         var profileMap = profiles.ToDictionary(profile => profile.Id);
-        return conversations.Select(conversation => ToDto(
-            conversation,
-            userId,
-            profileMap.GetValueOrDefault(conversation.GetOtherParticipantId(userId)))).ToArray();
+        var conversationIds = conversations.Select(conversation => conversation.Id).ToArray();
+        var lastMessages = await _conversations.GetLatestByConversationIdsAsync(conversationIds, cancellationToken);
+        var unreadCounts = await _conversations.CountUnreadByConversationIdsAsync(userId, conversations, cancellationToken);
+        return conversations.Select(conversation =>
+        {
+            lastMessages.TryGetValue(conversation.Id, out var lastMessage);
+            return ToDto(
+                conversation,
+                userId,
+                profileMap.GetValueOrDefault(conversation.GetOtherParticipantId(userId)),
+                lastMessage,
+                unreadCounts.GetValueOrDefault(conversation.Id));
+        }).ToArray();
     }
 
     public async Task<IReadOnlyList<PostMessageDto>> GetMessagesAsync(
         Guid conversationId,
         CancellationToken cancellationToken = default)
     {
+        var userId = _userContext.GetRequiredUserId();
         var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        var now = _timeProvider.GetUtcNow();
+        conversation.MarkRead(userId, now);
+        await _notifications.MarkDirectMessagesReadAsync(userId, conversation.Id, now, cancellationToken);
+        await _conversations.SaveChangesAsync(cancellationToken);
+
         var messages = await _conversations.GetMessagesAsync(conversation.Id, cancellationToken);
         return messages.Select(ToDto).ToArray();
     }
@@ -127,6 +142,7 @@ public sealed class PostConversationService : IPostConversationService
         var now = _timeProvider.GetUtcNow();
         var message = new PostMessage(conversation.Id, senderId, request.Body!, now);
         conversation.Touch(now);
+        conversation.MarkRead(senderId, now);
         await _conversations.AddMessageAsync(message, cancellationToken);
 
         var recipientId = conversation.GetOtherParticipantId(senderId);
@@ -191,7 +207,12 @@ public sealed class PostConversationService : IPostConversationService
         }
     }
 
-    private static PostConversationDto ToDto(PostConversation conversation, Guid currentUserId, UserProfile? otherProfile)
+    private static PostConversationDto ToDto(
+        PostConversation conversation,
+        Guid currentUserId,
+        UserProfile? otherProfile,
+        ConversationLastMessageDto? lastMessage = null,
+        int unreadCount = 0)
     {
         var otherId = conversation.GetOtherParticipantId(currentUserId);
         return new PostConversationDto(
@@ -202,7 +223,10 @@ public sealed class PostConversationService : IPostConversationService
             otherProfile?.DisplayName ?? "Homeji user",
             otherProfile?.AvatarPath,
             conversation.CreatedAt,
-            conversation.UpdatedAt);
+            conversation.UpdatedAt,
+            lastMessage?.Body,
+            lastMessage?.SenderId,
+            unreadCount);
     }
 
     private static PostMessageDto ToDto(PostMessage message)

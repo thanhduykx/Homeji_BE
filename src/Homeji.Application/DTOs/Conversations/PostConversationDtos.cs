@@ -10,7 +10,10 @@ public sealed record PostConversationDto(
     string OtherParticipantName,
     string? OtherParticipantAvatarPath,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? LastMessage = null,
+    Guid? LastMessageSenderId = null,
+    int UnreadCount = 0);
 
 public sealed record PostMessageDto(
     Guid Id,
@@ -20,3 +23,9 @@ public sealed record PostMessageDto(
     DateTimeOffset SentAt);
 
 public sealed record SendPostMessageDto(string? Body);
+
+public sealed record ConversationLastMessageDto(
+    Guid ConversationId,
+    string Body,
+    Guid SenderId,
+    DateTimeOffset SentAt);

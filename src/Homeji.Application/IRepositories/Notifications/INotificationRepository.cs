@@ -15,5 +15,11 @@ public interface INotificationRepository
 
     Task AddRangeAsync(IEnumerable<Notification> notifications, CancellationToken cancellationToken = default);
 
+    Task MarkDirectMessagesReadAsync(
+        Guid userId,
+        Guid conversationId,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
