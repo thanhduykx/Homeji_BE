@@ -29,7 +29,7 @@ public static class UserProfileMapper
             profile.OnboardingCompleted,
             profile.LandlordVerificationStatus,
             isPremium,
-            isPremium ? "Premium" : "Basic",
+            isPremium ? "Premium" : "Standard",
             premiumExpiresAt,
             profile.CreatedAt,
             profile.UpdatedAt);
