@@ -19,6 +19,9 @@ namespace Homeji.Infrastructure.External;
 
 public sealed class PaymentService : IPaymentService
 {
+    // payOS documents that transfer descriptions can be limited to 9 characters
+    // when the receiving bank account is not linked through payOS.
+    private const int PayOsDescriptionMaxLength = 9;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly HttpClient _httpClient;
     private readonly UserContext _userContext;
@@ -159,19 +162,33 @@ public sealed class PaymentService : IPaymentService
             lang = _momoOptions.Lang,
         };
 
-        using var response = await _httpClient.PostAsJsonAsync(_momoOptions.Endpoint, payload, JsonOptions, cancellationToken);
+        using var response = await SendAsync(
+            () => _httpClient.PostAsJsonAsync(_momoOptions.Endpoint, payload, JsonOptions, cancellationToken),
+            "MoMo",
+            cancellationToken);
         var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw Validation("momo", responseText);
+            throw ProviderFailure("MoMo", responseText);
         }
 
-        using var document = JsonDocument.Parse(responseText);
+        using var document = ParseProviderResponse("MoMo", responseText);
         var root = document.RootElement;
+        if (!TryGetInt32(root, "resultCode", out var resultCode) || resultCode != 0)
+        {
+            throw ProviderFailure("MoMo", GetString(root, "message") ?? "Payment request was rejected.");
+        }
+
+        var payUrl = GetString(root, "payUrl");
+        if (!IsAbsoluteHttpsUrl(payUrl))
+        {
+            throw ProviderFailure("MoMo", "Successful response did not contain a valid payment URL.");
+        }
+
         var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
         payment.AttachMomoPayment(
             requestId,
-            GetString(root, "payUrl"),
+            payUrl,
             GetString(root, "deeplink"),
             GetString(root, "qrCodeUrl"),
             GetString(root, "message"),
@@ -223,6 +240,27 @@ public sealed class PaymentService : IPaymentService
 
         var payment = await _payments.GetByOrderCodeAsync(request.OrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(PaymentTransaction), request.OrderId);
+        if (payment.Method != PaymentMethod.Momo)
+        {
+            throw Validation("orderId", "The matching transaction is not a MoMo payment.");
+        }
+
+        if (!string.Equals(request.PartnerCode, _momoOptions.PartnerCode, StringComparison.Ordinal)
+            || !string.Equals(request.RequestId, payment.RequestId, StringComparison.Ordinal))
+        {
+            throw Validation("requestId", "MoMo callback does not match the payment request.");
+        }
+
+        if (request.Amount != payment.Amount)
+        {
+            throw Validation("amount", "MoMo callback amount does not match the payment transaction.");
+        }
+
+        if (payment.Status == PaymentStatus.Paid)
+        {
+            return PaymentMapper.ToDto(payment);
+        }
+
         var rawPayload = JsonSerializer.Serialize(request, JsonOptions);
         var now = _timeProvider.GetUtcNow();
         if (request.ResultCode == 0)
@@ -277,13 +315,14 @@ public sealed class PaymentService : IPaymentService
         var amount = ToWholeVnd(requestedAmount);
         var description = NormalizeDescription(requestedDescription);
         var orderCode = GeneratePayOsOrderCode();
+        var providerDescription = BuildPayOsDescription(orderCode);
         var now = _timeProvider.GetUtcNow();
 
         var rawSignature = string.Join(
             "&",
             $"amount={amount}",
             $"cancelUrl={_payOsOptions.CancelUrl}",
-            $"description={description}",
+            $"description={providerDescription}",
             $"orderCode={orderCode}",
             $"returnUrl={_payOsOptions.ReturnUrl}");
 
@@ -291,7 +330,7 @@ public sealed class PaymentService : IPaymentService
         {
             orderCode,
             amount,
-            description,
+            description = providerDescription,
             cancelUrl = _payOsOptions.CancelUrl,
             returnUrl = _payOsOptions.ReturnUrl,
             signature = Sign(rawSignature, _payOsOptions.ChecksumKey),
@@ -304,16 +343,43 @@ public sealed class PaymentService : IPaymentService
         httpRequest.Headers.Add("x-client-id", _payOsOptions.ClientId);
         httpRequest.Headers.Add("x-api-key", _payOsOptions.ApiKey);
 
-        using var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        using var response = await SendAsync(
+            () => _httpClient.SendAsync(httpRequest, cancellationToken),
+            "PayOS",
+            cancellationToken);
         var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw Validation("payos", responseText);
+            throw ProviderFailure("PayOS", responseText);
         }
 
-        using var document = JsonDocument.Parse(responseText);
+        using var document = ParseProviderResponse("PayOS", responseText);
         var root = document.RootElement;
-        var data = root.TryGetProperty("data", out var dataElement) ? dataElement : root;
+        var providerCode = GetString(root, "code");
+        var providerMessage = GetString(root, "desc");
+        if (!string.Equals(providerCode, "00", StringComparison.Ordinal)
+            || !root.TryGetProperty("data", out var data)
+            || data.ValueKind != JsonValueKind.Object)
+        {
+            throw ProviderFailure(
+                "PayOS",
+                $"Payment link request was rejected (code {providerCode ?? "unknown"}): {providerMessage ?? "No details returned."}");
+        }
+
+        var checkoutUrl = GetString(data, "checkoutUrl");
+        var qrCode = GetString(data, "qrCode");
+        var providerStatus = GetString(data, "status");
+        if (!TryGetInt64(data, "orderCode", out var responseOrderCode)
+            || responseOrderCode != orderCode
+            || !TryGetInt64(data, "amount", out var responseAmount)
+            || responseAmount != amount
+            || !string.Equals(providerStatus, "PENDING", StringComparison.OrdinalIgnoreCase)
+            || !IsAbsoluteHttpsUrl(checkoutUrl)
+            || string.IsNullOrWhiteSpace(qrCode))
+        {
+            throw ProviderFailure("PayOS", "Successful response contained invalid payment link data.");
+        }
+
         var payment = new PaymentTransaction(
             userId,
             PaymentMethod.PayOs,
@@ -324,16 +390,16 @@ public sealed class PaymentService : IPaymentService
             purpose,
             packageCode);
         payment.AttachPayOsQrPayment(
-            GetString(data, "qrCode"),
+            qrCode,
             null,
             responseText,
             now);
         payment.AttachMomoPayment(
             orderCode.ToString(CultureInfo.InvariantCulture),
-            GetString(data, "checkoutUrl"),
+            checkoutUrl,
             null,
             null,
-            GetString(root, "desc"),
+            providerMessage,
             responseText,
             now);
 
@@ -368,6 +434,26 @@ public sealed class PaymentService : IPaymentService
         if (payment is null)
         {
             return null;
+        }
+
+        if (payment.Method != PaymentMethod.PayOs)
+        {
+            throw Validation("orderCode", "The matching transaction is not a PayOS payment.");
+        }
+
+        if (request.Data.Amount != payment.Amount)
+        {
+            throw Validation("amount", "PayOS webhook amount does not match the payment transaction.");
+        }
+
+        if (!string.Equals(request.Data.Currency, "VND", StringComparison.OrdinalIgnoreCase))
+        {
+            throw Validation("currency", "PayOS webhook currency must be VND.");
+        }
+
+        if (payment.Status == PaymentStatus.Paid)
+        {
+            return PaymentMapper.ToDto(payment);
         }
 
         var rawPayload = JsonSerializer.Serialize(request, JsonOptions);
@@ -480,6 +566,16 @@ public sealed class PaymentService : IPaymentService
         return $"Homeji {packageName} {plan.DurationDays} ngay";
     }
 
+    private static string BuildPayOsDescription(long orderCode)
+    {
+        var suffix = orderCode.ToString(CultureInfo.InvariantCulture);
+        suffix = suffix.Length <= PayOsDescriptionMaxLength - 2
+            ? suffix
+            : suffix[^(PayOsDescriptionMaxLength - 2)..];
+
+        return $"HJ{suffix}";
+    }
+
     private PremiumPlanOptions GetPremiumPlan(string? packageCode)
     {
         if (string.IsNullOrWhiteSpace(packageCode))
@@ -555,6 +651,72 @@ public sealed class PaymentService : IPaymentService
             && property.ValueKind != JsonValueKind.Null
             ? property.GetString()
             : null;
+    }
+
+    private static bool TryGetInt32(JsonElement element, string propertyName, out int value)
+    {
+        value = default;
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.TryGetInt32(out value);
+    }
+
+    private static bool TryGetInt64(JsonElement element, string propertyName, out long value)
+    {
+        value = default;
+        return element.ValueKind == JsonValueKind.Object
+            && element.TryGetProperty(propertyName, out var property)
+            && property.TryGetInt64(out value);
+    }
+
+    private static bool IsAbsoluteHttpsUrl(string? value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            && uri.Scheme == Uri.UriSchemeHttps;
+    }
+
+    private static JsonDocument ParseProviderResponse(string provider, string responseText)
+    {
+        try
+        {
+            return JsonDocument.Parse(responseText);
+        }
+        catch (JsonException exception)
+        {
+            throw new ExternalDependencyException($"{provider} returned an invalid response.", exception);
+        }
+    }
+
+    private static async Task<HttpResponseMessage> SendAsync(
+        Func<Task<HttpResponseMessage>> send,
+        string provider,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await send();
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new ExternalServiceUnavailableException(provider, $"{provider} payment request timed out.", TimeSpan.FromSeconds(5));
+        }
+        catch (HttpRequestException exception)
+        {
+            throw new ExternalDependencyException($"Unable to communicate with {provider}.", exception);
+        }
+    }
+
+    private static ExternalDependencyException ProviderFailure(string provider, string details)
+    {
+        var normalizedDetails = string.IsNullOrWhiteSpace(details)
+            ? "No details returned."
+            : details.Trim();
+        if (normalizedDetails.Length > PaymentTransaction.MaxProviderMessageLength)
+        {
+            normalizedDetails = normalizedDetails[..PaymentTransaction.MaxProviderMessageLength];
+        }
+
+        return new ExternalDependencyException($"{provider} payment request failed: {normalizedDetails}");
     }
 
     private static RequestValidationException Validation(string field, string message)

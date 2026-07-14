@@ -137,6 +137,11 @@ public sealed class PaymentTransaction
         string? rawProviderPayload,
         DateTimeOffset paidAt)
     {
+        if (Status == PaymentStatus.Paid)
+        {
+            return;
+        }
+
         Status = PaymentStatus.Paid;
         ExternalTransactionId = NormalizeOptional(externalTransactionId, MaxExternalTransactionIdLength, nameof(externalTransactionId));
         ProviderMessage = NormalizeOptional(providerMessage, MaxProviderMessageLength, nameof(providerMessage));
@@ -150,6 +155,11 @@ public sealed class PaymentTransaction
         string? rawProviderPayload,
         DateTimeOffset failedAt)
     {
+        if (Status == PaymentStatus.Paid)
+        {
+            return;
+        }
+
         Status = PaymentStatus.Failed;
         ProviderMessage = NormalizeOptional(providerMessage, MaxProviderMessageLength, nameof(providerMessage));
         RawProviderPayload = rawProviderPayload;
