@@ -82,8 +82,7 @@ public sealed class PostConversationService : IPostConversationService
         Guid wantedPostId,
         CancellationToken cancellationToken = default)
     {
-        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        UserContext.EnsureLandlord(landlord);
+        _userContext.GetRequiredUserId();
         var post = await _wantedPosts.GetByIdAsync(wantedPostId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalWantedPost), wantedPostId);
         if (post.Status != WantedPostStatus.Active)
