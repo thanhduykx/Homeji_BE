@@ -217,6 +217,10 @@ Trước khi deploy, đặt secret Gemini trong phần **Environment** của ser
 Ai__Gemini__ApiKey = <Gemini API key>
 ```
 
+API key Gemini không được lưu trong `appsettings.json`. Trong môi trường
+Production, ASP.NET Core tự động ánh xạ `Ai__Gemini__ApiKey` thành
+`Ai:Gemini:ApiKey` và sử dụng secret do Render cung cấp.
+
 ## Quy ước phát triển
 
 - Không expose EF entities trực tiếp qua API.
