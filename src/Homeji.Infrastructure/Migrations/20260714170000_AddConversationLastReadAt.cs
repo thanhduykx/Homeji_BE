@@ -1,4 +1,6 @@
 using System;
+using Homeji.Infrastructure.Context;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -7,6 +9,7 @@ namespace Homeji.Infrastructure.Migrations;
 
 /// <inheritdoc />
 [Migration("20260714170000_AddConversationLastReadAt")]
+[DbContext(typeof(ApplicationDbContext))]
 public class AddConversationLastReadAt : Migration
 {
     /// <inheritdoc />
