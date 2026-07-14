@@ -510,8 +510,14 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<Guid>("ParticipantAId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ParticipantALastReadAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("ParticipantBId")
                         .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ParticipantBLastReadAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("SubjectId")
                         .HasColumnType("uuid");

@@ -42,6 +42,27 @@ public sealed class NotificationRepository : INotificationRepository
         await _dbContext.Notifications.AddRangeAsync(notifications, cancellationToken);
     }
 
+    public async Task MarkDirectMessagesReadAsync(
+        Guid userId,
+        Guid conversationId,
+        DateTimeOffset readAt,
+        CancellationToken cancellationToken = default)
+    {
+        var notifications = await _dbContext.Notifications
+            .Where(notification =>
+                notification.RecipientId == userId
+                && !notification.IsRead
+                && notification.RelatedEntityId == conversationId
+                && (notification.Type == Domain.Enums.NotificationType.DirectMessage
+                    || notification.Type == Domain.Enums.NotificationType.NewMessage))
+            .ToListAsync(cancellationToken);
+
+        foreach (var notification in notifications)
+        {
+            notification.MarkRead(readAt);
+        }
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
