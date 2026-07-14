@@ -5,6 +5,7 @@ namespace Homeji.Application.DTOs.RentalPosts;
 public sealed record RentalPostOwnerStatsItemDto(
     Guid Id,
     string Title,
+    RentalPostType Type,
     RentalPostStatus Status,
     int ViewCount,
     int SaveCount,

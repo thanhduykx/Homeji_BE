@@ -75,7 +75,7 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
         if (!response.IsSuccessStatusCode)
         {
             LogGeminiParsingFailed(_logger, (int)response.StatusCode, null);
-            throw Validation("ai", "AI parser is temporarily unavailable.");
+            throw new ExternalDependencyException("AI parser is temporarily unavailable.");
         }
 
         var modelText = ExtractModelText(responseText);
@@ -116,7 +116,7 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
         var candidates = document.RootElement.GetProperty("candidates");
         if (candidates.ValueKind != JsonValueKind.Array || candidates.GetArrayLength() == 0)
         {
-            throw Validation("ai", "AI parser returned no candidates.");
+            throw new ExternalDependencyException("AI parser returned no candidates.");
         }
 
         var parts = candidates[0]
@@ -125,13 +125,13 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
 
         if (parts.ValueKind != JsonValueKind.Array || parts.GetArrayLength() == 0)
         {
-            throw Validation("ai", "AI parser returned no content.");
+            throw new ExternalDependencyException("AI parser returned no content.");
         }
 
         var text = parts[0].GetProperty("text").GetString();
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw Validation("ai", "AI parser returned empty content.");
+            throw new ExternalDependencyException("AI parser returned empty content.");
         }
 
         return StripCodeFence(text.Trim());
@@ -226,15 +226,7 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
             || string.IsNullOrWhiteSpace(_options.ApiKey)
             || _options.ApiKey.Equals("REPLACE_WITH_GEMINI_API_KEY", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Gemini AI settings are not configured.");
+            throw new ExternalDependencyException("Gemini AI settings are not configured.");
         }
-    }
-
-    private static RequestValidationException Validation(string field, string message)
-    {
-        return new RequestValidationException(new Dictionary<string, string[]>
-        {
-            [field] = [message],
-        });
     }
 }

@@ -75,6 +75,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Status = StatusCodes.Status400BadRequest,
                 Title = "Validation failed",
             },
+            ExternalDependencyException => new ProblemDetails
+            {
+                Status = StatusCodes.Status503ServiceUnavailable,
+                Title = "Dependency unavailable",
+                Detail = exception.Message,
+            },
             NotFoundException => new ProblemDetails
             {
                 Status = StatusCodes.Status404NotFound,

@@ -297,6 +297,7 @@ public sealed class RentalPostService : IRentalPostService
         var items = posts.Select(post => new RentalPostOwnerStatsItemDto(
             post.Id,
             post.Title,
+            post.Type,
             post.Status,
             post.ViewCount,
             post.SaveCount,
