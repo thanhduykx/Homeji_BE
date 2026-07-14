@@ -31,6 +31,26 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    [Theory]
+    [InlineData(
+        "/api/payments/momo/return?orderId=MOMO123&resultCode=0&message=Successful",
+        "https://exe101-homeji.onrender.com/payments?resultCode=0&message=Successful&provider=momo&orderCode=MOMO123")]
+    [InlineData(
+        "/api/payments/payos/return?code=00&id=link-123&cancel=false&status=PAID&orderCode=3059852975",
+        "https://exe101-homeji.onrender.com/payments?code=00&paymentLinkId=link-123&cancel=false&providerStatus=PAID&provider=payos&orderCode=3059852975")]
+    [InlineData(
+        "/api/payments/payos/cancel?code=00&id=link-123&cancel=true&status=CANCELLED&orderCode=3059852975",
+        "https://exe101-homeji.onrender.com/payments?code=00&paymentLinkId=link-123&cancel=true&providerStatus=CANCELLED&provider=payos&orderCode=3059852975")]
+    public async Task PaymentProviderReturn_RedirectsToFrontendPayments(
+        string callbackUrl,
+        string expectedFrontendUrl)
+    {
+        var response = await _client.GetAsync(new Uri(callbackUrl, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
+        Assert.Equal(expectedFrontendUrl, response.Headers.Location?.AbsoluteUri);
+    }
+
     [Fact]
     public async Task ProfileEndpoint_WithoutAccessToken_ReturnsUnauthorized()
     {

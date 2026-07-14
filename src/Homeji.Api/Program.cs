@@ -1,4 +1,5 @@
 using Homeji.Api.Authentication;
+using Homeji.Api.Controllers;
 using Homeji.Api.ErrorHandling;
 using Homeji.Api.RateLimiting;
 using Homeji.Api.Realtime;
@@ -33,6 +34,10 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddOptions<PaymentRedirectOptions>()
+    .BindConfiguration(PaymentRedirectOptions.SectionName)
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);

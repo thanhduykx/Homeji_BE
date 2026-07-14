@@ -1,5 +1,6 @@
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Common.Exceptions;
+using Homeji.Application.DTOs.Conversations;
 using Homeji.Application.IRepositories.Conversations;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IRepositories.WantedPosts;
@@ -197,6 +198,21 @@ public sealed class PostConversationServiceTests
 
         public Task<IReadOnlyList<PostMessage>> GetMessagesAsync(
             Guid conversationId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<IReadOnlyDictionary<Guid, ConversationLastMessageDto>> GetLatestByConversationIdsAsync(
+            IReadOnlyCollection<Guid> conversationIds,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountUnreadByConversationIdsAsync(
+            Guid userId,
+            IReadOnlyCollection<PostConversation> conversations,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

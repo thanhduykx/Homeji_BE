@@ -4,6 +4,8 @@ using Homeji.Application.DTOs.Payments;
 using Homeji.Application.IServices.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.Extensions.Options;
 using Homeji.Domain.Enums;
 
 namespace Homeji.Api.Controllers;
@@ -13,10 +15,14 @@ namespace Homeji.Api.Controllers;
 public sealed class PaymentsController : ControllerBase
 {
     private readonly IPaymentService _paymentService;
+    private readonly PaymentRedirectOptions _redirectOptions;
 
-    public PaymentsController(IPaymentService paymentService)
+    public PaymentsController(
+        IPaymentService paymentService,
+        IOptions<PaymentRedirectOptions> redirectOptions)
     {
         _paymentService = paymentService;
+        _redirectOptions = redirectOptions.Value;
     }
 
     [HttpGet]
@@ -70,9 +76,19 @@ public sealed class PaymentsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("momo/return")]
-    public IActionResult MomoReturn()
+    public IActionResult MomoReturn(
+        [FromQuery] string? orderId,
+        [FromQuery] int? resultCode,
+        [FromQuery] string? message)
     {
-        return Ok(new { message = "MoMo returned to Homeji API. Frontend should query order status." });
+        return RedirectToFrontend(
+            "momo",
+            orderId,
+            new Dictionary<string, string?>
+            {
+                ["resultCode"] = resultCode?.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["message"] = message,
+            });
     }
 
     [HttpPost("payos/create")]
@@ -99,15 +115,60 @@ public sealed class PaymentsController : ControllerBase
 
     [AllowAnonymous]
     [HttpGet("payos/return")]
-    public IActionResult PayOsReturn()
+    public IActionResult PayOsReturn(
+        [FromQuery] string? code,
+        [FromQuery] string? id,
+        [FromQuery] bool? cancel,
+        [FromQuery] string? status,
+        [FromQuery] string? orderCode)
     {
-        return Ok(new { message = "PayOS returned to Homeji API. Frontend should query order status." });
+        return RedirectToFrontend(
+            "payos",
+            orderCode,
+            new Dictionary<string, string?>
+            {
+                ["code"] = code,
+                ["paymentLinkId"] = id,
+                ["cancel"] = cancel?.ToString().ToLowerInvariant(),
+                ["providerStatus"] = status,
+            });
     }
 
     [AllowAnonymous]
     [HttpGet("payos/cancel")]
-    public IActionResult PayOsCancel()
+    public IActionResult PayOsCancel(
+        [FromQuery] string? code,
+        [FromQuery] string? id,
+        [FromQuery] bool? cancel,
+        [FromQuery] string? status,
+        [FromQuery] string? orderCode)
     {
-        return Ok(new { message = "PayOS payment was cancelled." });
+        return RedirectToFrontend(
+            "payos",
+            orderCode,
+            new Dictionary<string, string?>
+            {
+                ["code"] = code,
+                ["paymentLinkId"] = id,
+                ["cancel"] = (cancel ?? true).ToString().ToLowerInvariant(),
+                ["providerStatus"] = status ?? "CANCELLED",
+            });
+    }
+
+    private RedirectResult RedirectToFrontend(
+        string provider,
+        string? orderCode,
+        IReadOnlyDictionary<string, string?> providerParameters)
+    {
+        var parameters = new Dictionary<string, string?>(providerParameters, StringComparer.Ordinal)
+        {
+            ["provider"] = provider,
+            ["orderCode"] = orderCode,
+        };
+        var populatedParameters = parameters
+            .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Value))
+            .ToDictionary(parameter => parameter.Key, parameter => parameter.Value, StringComparer.Ordinal);
+
+        return Redirect(QueryHelpers.AddQueryString(_redirectOptions.FrontendPaymentUrl, populatedParameters));
     }
 }
