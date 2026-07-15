@@ -64,6 +64,10 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [InlineData("/api/marketplace-orders")]
     [InlineData("/api/payments")]
     [InlineData("/api/activities")]
+    [InlineData("/api/wallet")]
+    [InlineData("/api/wallet/transactions")]
+    [InlineData("/api/marketplace-seller-plans")]
+    [InlineData("/api/marketplace-seller-plans/mine")]
     public async Task NewPrivateEndpoints_WithoutAccessToken_ReturnUnauthorized(string path)
     {
         var response = await _client.GetAsync(new Uri(path, UriKind.Relative));

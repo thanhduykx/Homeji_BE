@@ -1,5 +1,6 @@
 using Homeji.Application.IRepositories.Moderation;
 using Homeji.Application.IRepositories.Marketplace;
+using Homeji.Application.IRepositories.Wallets;
 using Homeji.Application.IRepositories.Accounts;
 using Homeji.Application.IRepositories.Chatbot;
 using Homeji.Application.IRepositories.Notifications;
@@ -27,6 +28,7 @@ using Homeji.Application.IServices.Upload;
 using Homeji.Application.Services.AI;
 using Homeji.Application.Services.Chatbot;
 using Homeji.Application.Services.Subscriptions;
+using Homeji.Application.Services.Marketplace;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.External;
 using Homeji.Infrastructure.Repositories;
@@ -91,12 +93,18 @@ public static class DependencyInjection
         services.AddScoped<IPostConversationRepository, PostConversationRepository>();
         services.AddScoped<IRentalWantedPostRepository, RentalWantedPostRepository>();
         services.AddScoped<IMarketplaceOrderRepository, MarketplaceOrderRepository>();
+        services.AddScoped<IWalletRepository, WalletRepository>();
+        services.AddScoped<IMarketplaceSellerSubscriptionRepository, MarketplaceSellerSubscriptionRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
+        services.AddOptions<MarketplaceFinanceOptions>()
+            .Bind(configuration.GetSection(MarketplaceFinanceOptions.SectionName))
+            .Validate(options => options.IsValid(), "MarketplaceFinance settings are invalid.")
+            .ValidateOnStart();
         services.Configure<AiSearchOptions>(configuration.GetSection(AiSearchOptions.SectionName));
         services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
         services.Configure<ChatbotOptions>(configuration.GetSection(ChatbotOptions.SectionName));

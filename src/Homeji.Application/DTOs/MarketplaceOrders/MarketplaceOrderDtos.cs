@@ -2,7 +2,7 @@ using Homeji.Domain.Enums;
 
 namespace Homeji.Application.DTOs.MarketplaceOrders;
 
-public sealed record CreateMarketplaceOrderDto(DateTimeOffset PickupAt, string? PickupAddress, string? Note);
+public sealed record CreateMarketplaceOrderDto(DateTimeOffset PickupAt, string? PickupAddress, string? Note, int Quantity = 1);
 
 public sealed record MarketplaceOrderDto(
     Guid Id,
@@ -15,4 +15,11 @@ public sealed record MarketplaceOrderDto(
     string? Note,
     MarketplaceOrderStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    decimal UnitPrice,
+    int Quantity,
+    decimal PlatformFeeRate,
+    decimal PlatformFeeAmount,
+    decimal SellerNetAmount,
+    DateTimeOffset? FundsReleasedAt,
+    DateTimeOffset? RefundedAt);

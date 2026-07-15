@@ -40,6 +40,8 @@ using Homeji.Application.Services.Roommates;
 using Homeji.Application.Services.RoommateChats;
 using Homeji.Application.Services.SavedPosts;
 using Homeji.Application.Services.Subscriptions;
+using Homeji.Application.IServices.Wallets;
+using Homeji.Application.Services.Wallets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -72,6 +74,8 @@ public static class DependencyInjection
         services.AddScoped<IPostConversationService, PostConversationService>();
         services.AddScoped<IRentalWantedPostService, RentalWantedPostService>();
         services.AddScoped<IMarketplaceOrderService, MarketplaceOrderService>();
+        services.AddScoped<IWalletService, WalletService>();
+        services.AddScoped<IMarketplaceSellerPlanService, MarketplaceSellerPlanService>();
         services.AddSingleton(TimeProvider.System);
 
         return services;

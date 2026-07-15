@@ -4,10 +4,15 @@ using Homeji.Application.DTOs.MarketplaceOrders;
 using Homeji.Application.IRepositories.Marketplace;
 using Homeji.Application.IRepositories.MarketplaceOrders;
 using Homeji.Application.IRepositories.Notifications;
+using Homeji.Application.IRepositories.Wallets;
+using Homeji.Application.IServices.Marketplace;
 using Homeji.Application.IServices.MarketplaceOrders;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using FluentValidation;
+using Microsoft.Extensions.Options;
+using Homeji.Application.Services.Marketplace;
 
 namespace Homeji.Application.Services.MarketplaceOrders;
 
@@ -19,6 +24,10 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
     private readonly INotificationRepository _notifications;
     private readonly INotificationRealtimePublisher _realtimePublisher;
     private readonly TimeProvider _timeProvider;
+    private readonly IWalletRepository _wallets;
+    private readonly IMarketplaceSellerPlanService _sellerPlans;
+    private readonly IValidator<CreateMarketplaceOrderDto> _validator;
+    private readonly MarketplaceFinanceOptions _financeOptions;
 
     public MarketplaceOrderService(
         UserContext userContext,
@@ -26,7 +35,11 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         IMarketplacePostRepository posts,
         INotificationRepository notifications,
         INotificationRealtimePublisher realtimePublisher,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IWalletRepository wallets,
+        IMarketplaceSellerPlanService sellerPlans,
+        IValidator<CreateMarketplaceOrderDto> validator,
+        IOptions<MarketplaceFinanceOptions> financeOptions)
     {
         _userContext = userContext;
         _orders = orders;
@@ -34,6 +47,10 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         _notifications = notifications;
         _realtimePublisher = realtimePublisher;
         _timeProvider = timeProvider;
+        _wallets = wallets;
+        _sellerPlans = sellerPlans;
+        _validator = validator;
+        _financeOptions = financeOptions.Value;
     }
 
     public async Task<MarketplaceOrderDto> CreateAsync(
@@ -41,6 +58,17 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         CreateMarketplaceOrderDto request,
         CancellationToken cancellationToken = default)
     {
+        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            throw new RequestValidationException(validationResult.Errors
+                .GroupBy(error => error.PropertyName, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(error => error.ErrorMessage).Distinct().ToArray(),
+                    StringComparer.Ordinal));
+        }
+
         var buyerId = _userContext.GetRequiredUserId();
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(MarketplacePost), postId);
@@ -58,6 +86,32 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         }
 
         var now = _timeProvider.GetUtcNow();
+        var grossAmount = post.Price * request.Quantity;
+        if (post.ListingType == MarketplaceListingType.Food && grossAmount < _financeOptions.MinimumFoodOrder)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["quantity"] = [$"Food order total must be at least {_financeOptions.MinimumFoodOrder:0} VND."],
+            });
+        }
+
+        var buyerWallet = await _wallets.GetAsync(buyerId, cancellationToken);
+        if (buyerWallet is null || !buyerWallet.IsActivated || buyerWallet.Balance < grossAmount)
+        {
+            var missing = grossAmount - (buyerWallet?.Balance ?? 0);
+            throw WalletFundingRequired($"Nạp thêm ít nhất {Math.Max(0, missing):0} đồng để thanh toán đơn hàng.");
+        }
+
+        var sellerWallet = await _wallets.GetAsync(post.SellerId, cancellationToken);
+        if (sellerWallet is null || !sellerWallet.IsActivated || sellerWallet.Balance < _financeOptions.SellerReserve)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["sellerWallet"] = ["Người bán chưa duy trì đủ quỹ đảm bảo để nhận đơn."],
+            });
+        }
+
+        var commissionRate = await _sellerPlans.ResolveCommissionRateAsync(post.SellerId, now, cancellationToken);
         var order = new MarketplaceOrder(
             post.Id,
             buyerId,
@@ -66,7 +120,19 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
             request.PickupAt,
             request.PickupAddress!,
             request.Note,
-            now);
+            now,
+            request.Quantity,
+            commissionRate);
+        post.Reserve(request.Quantity, now);
+        buyerWallet.DebitPurchase(order.AgreedPrice, now);
+        await _wallets.AddTransactionAsync(new WalletTransaction(
+            buyerId,
+            WalletTransactionKind.Purchase,
+            -order.AgreedPrice,
+            buyerWallet.Balance,
+            order.Id,
+            $"Thanh toán đơn {post.Title}",
+            now), cancellationToken);
         var notification = BuildNotification(order, post.SellerId, now);
         await _orders.AddAsync(order, cancellationToken);
         await _notifications.AddAsync(notification, cancellationToken);
@@ -104,21 +170,36 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         if (target == MarketplaceOrderStatus.Cancelled)
         {
             UserContext.EnsureOwner(userId, order.BuyerId);
-            order.Cancel(_timeProvider.GetUtcNow());
+            var now = _timeProvider.GetUtcNow();
+            order.Cancel(now);
+            await RefundAndReleaseStockAsync(order, now, cancellationToken);
+        }
+        else if (target is MarketplaceOrderStatus.Accepted or MarketplaceOrderStatus.Rejected)
+        {
+            UserContext.EnsureOwner(userId, order.SellerId);
+            var now = _timeProvider.GetUtcNow();
+            if (target == MarketplaceOrderStatus.Accepted)
+            {
+                var sellerWallet = await _wallets.GetAsync(order.SellerId, cancellationToken);
+                if (sellerWallet is null || !sellerWallet.IsActivated || sellerWallet.Balance < _financeOptions.SellerReserve)
+                {
+                    throw WalletFundingRequired("Người bán phải duy trì quỹ đảm bảo trước khi nhận đơn.");
+                }
+
+                order.Accept(now);
+            }
+            else
+            {
+                order.Reject(now);
+                await RefundAndReleaseStockAsync(order, now, cancellationToken);
+            }
         }
         else
         {
-            UserContext.EnsureOwner(userId, order.SellerId);
-            if (target == MarketplaceOrderStatus.Accepted) order.Accept(_timeProvider.GetUtcNow());
-            else if (target == MarketplaceOrderStatus.Rejected) order.Reject(_timeProvider.GetUtcNow());
-            else
-            {
-                var now = _timeProvider.GetUtcNow();
-                order.Complete(now);
-                var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken)
-                    ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
-                post.MarkSold(now);
-            }
+            UserContext.EnsureOwner(userId, order.BuyerId);
+            var now = _timeProvider.GetUtcNow();
+            order.Complete(now);
+            await ReleaseSaleProceedsAsync(order, now, cancellationToken);
         }
 
         var recipientId = userId == order.BuyerId ? order.SellerId : order.BuyerId;
@@ -133,8 +214,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         new(
             recipientId,
             NotificationType.MarketplaceOrderUpdated,
-            "Yêu cầu mua đồ pass đã cập nhật",
-            $"Yêu cầu nhận đồ hiện ở trạng thái {order.Status}.",
+            "Đơn Chợ Homeji đã cập nhật",
+            $"Đơn hàng hiện ở trạng thái {order.Status}.",
             order.Id,
             now);
 
@@ -150,5 +231,68 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
             order.Note,
             order.Status,
             order.CreatedAt,
-            order.UpdatedAt);
+            order.UpdatedAt,
+            order.UnitPrice,
+            order.Quantity,
+            order.PlatformFeeRate,
+            order.PlatformFeeAmount,
+            order.SellerNetAmount,
+            order.FundsReleasedAt,
+            order.RefundedAt);
+
+    private async Task RefundAndReleaseStockAsync(
+        MarketplaceOrder order,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var buyerWallet = await _wallets.GetAsync(order.BuyerId, cancellationToken)
+            ?? throw new InvalidOperationException("Buyer wallet was not found for a funded marketplace order.");
+        var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken)
+            ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
+        buyerWallet.CreditRefund(order.AgreedPrice, now);
+        post.ReleaseReservation(order.Quantity, now);
+        order.MarkRefunded(now);
+        await _wallets.AddTransactionAsync(new WalletTransaction(
+            order.BuyerId,
+            WalletTransactionKind.Refund,
+            order.AgreedPrice,
+            buyerWallet.Balance,
+            order.Id,
+            "Hoàn tiền đơn chợ Homeji",
+            now), cancellationToken);
+    }
+
+    private async Task ReleaseSaleProceedsAsync(
+        MarketplaceOrder order,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var sellerWallet = await _wallets.GetAsync(order.SellerId, cancellationToken)
+            ?? throw new InvalidOperationException("Seller wallet was not found for a funded marketplace order.");
+        var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken)
+            ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
+        var balanceBefore = sellerWallet.Balance;
+        sellerWallet.CreditSale(order.AgreedPrice, order.PlatformFeeAmount, now);
+        post.CompleteReservation(order.Quantity, now);
+        order.MarkFundsReleased(now);
+        await _wallets.AddTransactionAsync(new WalletTransaction(
+            order.SellerId,
+            WalletTransactionKind.SaleProceeds,
+            order.AgreedPrice,
+            balanceBefore + order.AgreedPrice,
+            order.Id,
+            "Doanh thu đơn chợ Homeji",
+            now), cancellationToken);
+        await _wallets.AddTransactionAsync(new WalletTransaction(
+            order.SellerId,
+            WalletTransactionKind.PlatformFee,
+            -order.PlatformFeeAmount,
+            sellerWallet.Balance,
+            order.Id,
+            $"Phí nền tảng {order.PlatformFeeRate:P0}",
+            now), cancellationToken);
+    }
+
+    private static RequestValidationException WalletFundingRequired(string message) =>
+        new(new Dictionary<string, string[]> { ["wallet"] = [message] });
 }

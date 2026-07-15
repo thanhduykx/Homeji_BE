@@ -20,4 +20,9 @@ public sealed record MarketplacePostDto(
     IReadOnlyList<string> MediaUrls,
     decimal? DistanceKm,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    MarketplaceListingType ListingType,
+    int AvailableQuantity,
+    int ReservedQuantity,
+    string Unit,
+    int? PreparationMinutes);

@@ -16,5 +16,7 @@ public sealed class CreateMarketplaceOrderDtoValidator : AbstractValidator<Creat
             .MaximumLength(MarketplaceOrder.MaxPickupAddressLength);
         RuleFor(request => request.Note)
             .MaximumLength(MarketplaceOrder.MaxNoteLength);
+        RuleFor(request => request.Quantity)
+            .InclusiveBetween(1, MarketplacePost.MaxFoodStock);
     }
 }

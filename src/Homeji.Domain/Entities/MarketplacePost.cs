@@ -11,6 +11,8 @@ public sealed class MarketplacePost
     public const int MaxCategoryLength = 80;
     public const int MaxAddressLength = 500;
     public const int MaxMediaCount = 10;
+    public const int MaxUnitLength = 30;
+    public const int MaxFoodStock = 100;
 
     private readonly List<MarketplacePostMedia> _media = [];
 
@@ -35,7 +37,11 @@ public sealed class MarketplacePost
         decimal longitude,
         Guid? linkedRentalPostId,
         IReadOnlyCollection<string> mediaUrls,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        MarketplaceListingType listingType = MarketplaceListingType.SecondHand,
+        int availableQuantity = 1,
+        string unit = "món",
+        int? preparationMinutes = null)
     {
         if (sellerId == Guid.Empty)
         {
@@ -45,7 +51,8 @@ public sealed class MarketplacePost
         Id = Guid.NewGuid();
         SellerId = sellerId;
         Status = MarketplacePostStatus.Active;
-        SetDetails(title, description, price, condition, category, address, latitude, longitude, linkedRentalPostId);
+        SetDetails(title, description, price, condition, category, address, latitude, longitude, linkedRentalPostId,
+            listingType, availableQuantity, unit, preparationMinutes);
         ReplaceMedia(mediaUrls);
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -75,6 +82,16 @@ public sealed class MarketplacePost
 
     public Guid? LinkedRentalPostId { get; private set; }
 
+    public MarketplaceListingType ListingType { get; private set; }
+
+    public int AvailableQuantity { get; private set; }
+
+    public int ReservedQuantity { get; private set; }
+
+    public string Unit { get; private set; } = null!;
+
+    public int? PreparationMinutes { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -92,10 +109,20 @@ public sealed class MarketplacePost
         decimal longitude,
         Guid? linkedRentalPostId,
         IReadOnlyCollection<string> mediaUrls,
-        DateTimeOffset updatedAt)
+        DateTimeOffset updatedAt,
+        MarketplaceListingType listingType = MarketplaceListingType.SecondHand,
+        int availableQuantity = 1,
+        string unit = "món",
+        int? preparationMinutes = null)
     {
         EnsureActive();
-        SetDetails(title, description, price, condition, category, address, latitude, longitude, linkedRentalPostId);
+        if (ReservedQuantity > 0)
+        {
+            throw new DomainException("Marketplace posts with active reservations cannot be edited.");
+        }
+
+        SetDetails(title, description, price, condition, category, address, latitude, longitude, linkedRentalPostId,
+            listingType, availableQuantity, unit, preparationMinutes);
         ReplaceMedia(mediaUrls);
         UpdatedAt = updatedAt;
     }
@@ -114,7 +141,53 @@ public sealed class MarketplacePost
             return;
         }
 
+        if (ReservedQuantity > 0)
+        {
+            throw new DomainException("Marketplace posts with active reservations cannot be archived.");
+        }
+
         Status = MarketplacePostStatus.Archived;
+        UpdatedAt = updatedAt;
+    }
+
+    public void Reserve(int quantity, DateTimeOffset updatedAt)
+    {
+        EnsureActive();
+        if (quantity <= 0 || quantity > AvailableQuantity)
+        {
+            throw new DomainException("Requested quantity exceeds available marketplace stock.");
+        }
+
+        AvailableQuantity -= quantity;
+        ReservedQuantity += quantity;
+        UpdatedAt = updatedAt;
+    }
+
+    public void ReleaseReservation(int quantity, DateTimeOffset updatedAt)
+    {
+        if (quantity <= 0 || quantity > ReservedQuantity)
+        {
+            throw new DomainException("Marketplace reservation quantity is invalid.");
+        }
+
+        ReservedQuantity -= quantity;
+        AvailableQuantity += quantity;
+        UpdatedAt = updatedAt;
+    }
+
+    public void CompleteReservation(int quantity, DateTimeOffset updatedAt)
+    {
+        if (quantity <= 0 || quantity > ReservedQuantity)
+        {
+            throw new DomainException("Marketplace completion quantity is invalid.");
+        }
+
+        ReservedQuantity -= quantity;
+        if (ListingType == MarketplaceListingType.SecondHand)
+        {
+            Status = MarketplacePostStatus.Sold;
+        }
+
         UpdatedAt = updatedAt;
     }
 
@@ -127,7 +200,11 @@ public sealed class MarketplacePost
         string address,
         decimal latitude,
         decimal longitude,
-        Guid? linkedRentalPostId)
+        Guid? linkedRentalPostId,
+        MarketplaceListingType listingType,
+        int availableQuantity,
+        string unit,
+        int? preparationMinutes)
     {
         Title = NormalizeRequired(title, MaxTitleLength, nameof(Title));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
@@ -138,6 +215,26 @@ public sealed class MarketplacePost
         Latitude = ValidateCoordinate(latitude, -90, 90, nameof(Latitude));
         Longitude = ValidateCoordinate(longitude, -180, 180, nameof(Longitude));
         LinkedRentalPostId = linkedRentalPostId == Guid.Empty ? null : linkedRentalPostId;
+        if (!Enum.IsDefined(listingType))
+        {
+            throw new DomainException("Marketplace listing type is invalid.");
+        }
+
+        var maxStock = listingType == MarketplaceListingType.Food ? MaxFoodStock : 1;
+        if (availableQuantity is < 1 || availableQuantity > maxStock)
+        {
+            throw new DomainException($"Available quantity must be between 1 and {maxStock}.");
+        }
+
+        if (preparationMinutes is < 0 or > 240)
+        {
+            throw new DomainException("Preparation time must be between 0 and 240 minutes.");
+        }
+
+        ListingType = listingType;
+        AvailableQuantity = availableQuantity;
+        Unit = NormalizeRequired(unit, MaxUnitLength, nameof(Unit));
+        PreparationMinutes = listingType == MarketplaceListingType.Food ? preparationMinutes : null;
     }
 
     private void ReplaceMedia(IReadOnlyCollection<string> mediaUrls)

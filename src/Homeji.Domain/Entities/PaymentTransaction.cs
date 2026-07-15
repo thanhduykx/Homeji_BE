@@ -51,9 +51,9 @@ public sealed class PaymentTransaction
         OrderCode = NormalizeRequired(orderCode, MaxOrderCodeLength, nameof(OrderCode));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
         Purpose = purpose;
-        PackageCode = purpose == PaymentPurpose.General
-            ? NormalizeOptional(packageCode, MaxPackageCodeLength, nameof(PackageCode))
-            : NormalizeRequired(packageCode!, MaxPackageCodeLength, nameof(PackageCode));
+        PackageCode = purpose == PaymentPurpose.PremiumSubscription
+            ? NormalizeRequired(packageCode!, MaxPackageCodeLength, nameof(PackageCode))
+            : NormalizeOptional(packageCode, MaxPackageCodeLength, nameof(PackageCode));
         Status = PaymentStatus.Pending;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;

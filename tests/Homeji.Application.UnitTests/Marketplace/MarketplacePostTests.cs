@@ -54,6 +54,49 @@ public sealed class MarketplacePostTests
             DateTimeOffset.UtcNow.AddMinutes(2)));
     }
 
+    [Fact]
+    public void FoodReservation_ReleaseAndCompletion_PreserveStockLedger()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var post = CreateFoodPost(now, 10);
+
+        post.Reserve(3, now.AddMinutes(1));
+        Assert.Equal(7, post.AvailableQuantity);
+        Assert.Equal(3, post.ReservedQuantity);
+
+        post.ReleaseReservation(1, now.AddMinutes(2));
+        post.CompleteReservation(2, now.AddMinutes(3));
+
+        Assert.Equal(8, post.AvailableQuantity);
+        Assert.Equal(0, post.ReservedQuantity);
+        Assert.Equal(MarketplacePostStatus.Active, post.Status);
+    }
+
+    [Fact]
+    public void Update_WhenStockIsReserved_ThrowsDomainException()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var post = CreateFoodPost(now, 10);
+        post.Reserve(1, now.AddMinutes(1));
+
+        Assert.Throws<DomainException>(() => post.Update(
+            "Cơm gà mới",
+            "Mô tả mới",
+            39_000,
+            "Mới làm trong ngày",
+            "Cơm nhà",
+            "Thủ Đức",
+            10.85m,
+            106.77m,
+            null,
+            ["https://cdn.example.com/rice.jpg"],
+            now.AddMinutes(2),
+            MarketplaceListingType.Food,
+            12,
+            "phần",
+            15));
+    }
+
     private static MarketplacePost CreatePost()
     {
         return new MarketplacePost(
@@ -70,4 +113,23 @@ public sealed class MarketplacePostTests
             ["https://cdn.example.com/item.jpg"],
             DateTimeOffset.UtcNow);
     }
+
+    private static MarketplacePost CreateFoodPost(DateTimeOffset now, int quantity) =>
+        new(
+            Guid.NewGuid(),
+            "Cơm gà",
+            "Cơm gà cho sinh viên",
+            35_000,
+            "Mới làm trong ngày",
+            "Cơm nhà",
+            "Thủ Đức",
+            10.85m,
+            106.77m,
+            null,
+            ["https://cdn.example.com/rice.jpg"],
+            now,
+            MarketplaceListingType.Food,
+            quantity,
+            "phần",
+            15);
 }

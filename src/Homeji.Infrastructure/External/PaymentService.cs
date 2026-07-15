@@ -7,6 +7,7 @@ using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Payments;
 using Homeji.Application.IRepositories.Payments;
 using Homeji.Application.IRepositories.Subscriptions;
+using Homeji.Application.IRepositories.Wallets;
 using Homeji.Application.IServices.Payments;
 using Homeji.Application.Mappers.Payments;
 using Homeji.Application.Services.Common;
@@ -27,6 +28,7 @@ public sealed class PaymentService : IPaymentService
     private readonly UserContext _userContext;
     private readonly IPaymentTransactionRepository _payments;
     private readonly IUserSubscriptionRepository _subscriptions;
+    private readonly IWalletRepository _wallets;
     private readonly MomoOptions _momoOptions;
     private readonly PayOsOptions _payOsOptions;
     private readonly PremiumSubscriptionOptions _premiumOptions;
@@ -37,6 +39,7 @@ public sealed class PaymentService : IPaymentService
         UserContext userContext,
         IPaymentTransactionRepository payments,
         IUserSubscriptionRepository subscriptions,
+        IWalletRepository wallets,
         IOptions<MomoOptions> momoOptions,
         IOptions<PayOsOptions> payOsOptions,
         IOptions<PremiumSubscriptionOptions> premiumOptions,
@@ -46,6 +49,7 @@ public sealed class PaymentService : IPaymentService
         _userContext = userContext;
         _payments = payments;
         _subscriptions = subscriptions;
+        _wallets = wallets;
         _momoOptions = momoOptions.Value;
         _payOsOptions = payOsOptions.Value;
         _premiumOptions = premiumOptions.Value;
@@ -97,8 +101,8 @@ public sealed class PaymentService : IPaymentService
     {
         return await CreateMomoPaymentInternalAsync(
             request.Amount,
-            request.Description,
-            PaymentPurpose.General,
+            request.Description ?? "Nap vi Homeji",
+            PaymentPurpose.WalletTopUp,
             null,
             cancellationToken);
     }
@@ -127,6 +131,7 @@ public sealed class PaymentService : IPaymentService
         EnsureMomoConfigured();
         var userId = _userContext.GetRequiredUserId();
         var amount = ToWholeVnd(requestedAmount);
+        ValidateWalletTopUpAmount(purpose, amount);
         var description = NormalizeDescription(requestedDescription);
         var now = _timeProvider.GetUtcNow();
         var orderCode = $"MOMO{now.ToUnixTimeMilliseconds()}";
@@ -195,6 +200,7 @@ public sealed class PaymentService : IPaymentService
             responseText,
             now);
 
+        await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
         await _payments.AddAsync(payment, cancellationToken);
         await _payments.SaveChangesAsync(cancellationToken);
 
@@ -267,6 +273,7 @@ public sealed class PaymentService : IPaymentService
         {
             payment.MarkPaid(request.TransId.ToString(CultureInfo.InvariantCulture), request.Message, rawPayload, now);
             await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
+            await CreditWalletTopUpIfNeededAsync(payment, now, cancellationToken);
         }
         else
         {
@@ -283,8 +290,8 @@ public sealed class PaymentService : IPaymentService
     {
         return await CreatePayOsPaymentInternalAsync(
             request.Amount,
-            request.Description,
-            PaymentPurpose.General,
+            request.Description ?? "Nap vi Homeji",
+            PaymentPurpose.WalletTopUp,
             null,
             cancellationToken);
     }
@@ -313,6 +320,7 @@ public sealed class PaymentService : IPaymentService
         EnsurePayOsConfigured();
         var userId = _userContext.GetRequiredUserId();
         var amount = ToWholeVnd(requestedAmount);
+        ValidateWalletTopUpAmount(purpose, amount);
         var description = NormalizeDescription(requestedDescription);
         var orderCode = GeneratePayOsOrderCode();
         var providerDescription = BuildPayOsDescription(orderCode);
@@ -403,6 +411,7 @@ public sealed class PaymentService : IPaymentService
             responseText,
             now);
 
+        await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
         await _payments.AddAsync(payment, cancellationToken);
         await _payments.SaveChangesAsync(cancellationToken);
 
@@ -462,6 +471,7 @@ public sealed class PaymentService : IPaymentService
         {
             payment.MarkPaid(request.Data.Reference, request.Data.Desc ?? request.Desc, rawPayload, now);
             await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
+            await CreditWalletTopUpIfNeededAsync(payment, now, cancellationToken);
         }
         else
         {
@@ -507,6 +517,58 @@ public sealed class PaymentService : IPaymentService
         await _subscriptions.AddAsync(subscription, cancellationToken);
     }
 
+    private async Task CreditWalletTopUpIfNeededAsync(
+        PaymentTransaction payment,
+        DateTimeOffset paidAt,
+        CancellationToken cancellationToken)
+    {
+        if (payment.Purpose != PaymentPurpose.WalletTopUp || payment.Status != PaymentStatus.Paid)
+        {
+            return;
+        }
+
+        if (await _wallets.HasTransactionAsync(
+            payment.UserId,
+            WalletTransactionKind.TopUp,
+            payment.Id,
+            cancellationToken))
+        {
+            return;
+        }
+
+        var wallet = await _wallets.GetAsync(payment.UserId, cancellationToken);
+        if (wallet is null)
+        {
+            wallet = WalletAccount.Create(payment.UserId, paidAt);
+            await _wallets.AddAccountAsync(wallet, cancellationToken);
+        }
+
+        wallet.CreditTopUp(payment.Amount, paidAt);
+        await _wallets.AddTransactionAsync(new WalletTransaction(
+            payment.UserId,
+            WalletTransactionKind.TopUp,
+            payment.Amount,
+            wallet.Balance,
+            payment.Id,
+            $"Nạp ví qua {payment.Method}",
+            paidAt), cancellationToken);
+    }
+
+    private async Task EnsureWalletExistsForTopUpAsync(
+        PaymentPurpose purpose,
+        Guid userId,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken)
+    {
+        if (purpose != PaymentPurpose.WalletTopUp
+            || await _wallets.GetAsync(userId, cancellationToken) is not null)
+        {
+            return;
+        }
+
+        await _wallets.AddAccountAsync(WalletAccount.Create(userId, createdAt), cancellationToken);
+    }
+
     private static string BuildPayOsWebhookSignaturePayload(PayOsWebhookDataDto data)
     {
         var fields = new SortedDictionary<string, string?>(StringComparer.Ordinal)
@@ -546,6 +608,21 @@ public sealed class PaymentService : IPaymentService
         }
 
         return decimal.ToInt64(amount);
+    }
+
+    private static void ValidateWalletTopUpAmount(PaymentPurpose purpose, long amount)
+    {
+        if (purpose != PaymentPurpose.WalletTopUp)
+        {
+            return;
+        }
+
+        if (amount < WalletAccount.MinimumTopUp || amount > WalletAccount.MaximumTopUp)
+        {
+            throw Validation(
+                "amount",
+                $"Wallet top-up must be between {WalletAccount.MinimumTopUp:0} and {WalletAccount.MaximumTopUp:0} VND.");
+        }
     }
 
     private static string NormalizeDescription(string? description)

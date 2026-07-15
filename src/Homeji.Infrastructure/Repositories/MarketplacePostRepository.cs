@@ -38,7 +38,7 @@ public sealed class MarketplacePostRepository : IMarketplacePostRepository
         var query = _dbContext.MarketplacePosts
             .AsNoTracking()
             .Include(post => post.Media)
-            .Where(post => post.Status == MarketplacePostStatus.Active);
+            .Where(post => post.Status == MarketplacePostStatus.Active && post.AvailableQuantity > 0);
         if (!string.IsNullOrWhiteSpace(keyword))
         {
             var pattern = $"%{keyword.Trim()}%";

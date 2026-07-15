@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Accounts;
 using Homeji.Application.IRepositories.Accounts;
@@ -12,6 +13,9 @@ namespace Homeji.Infrastructure.External;
 
 public sealed class SupabaseAccountService : IAccountService
 {
+    private static readonly Regex FullNameRegex = new(
+        "^[\\p{L}\\p{M}' -]+$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Action<ILogger, Guid, Exception?> FailedToRemoveUnconfirmedUser =
         LoggerMessage.Define<Guid>(
@@ -43,7 +47,7 @@ public sealed class SupabaseAccountService : IAccountService
         RegisterAccountDto request,
         CancellationToken cancellationToken = default)
     {
-        ValidateEmailAndPassword(request.Email, request.Password);
+        var displayName = ValidateRegistration(request);
         EnsureConfigured();
         EnsureRegistrationConfigured();
 
@@ -64,7 +68,7 @@ public sealed class SupabaseAccountService : IAccountService
                 password = request.Password,
                 data = new
                 {
-                    display_name = request.DisplayName,
+                    display_name = displayName,
                 },
                 redirect_to = redirectTo,
             });
@@ -75,7 +79,7 @@ public sealed class SupabaseAccountService : IAccountService
         {
             var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
                 emailAvailability.Email,
-                request.DisplayName,
+                displayName,
                 generatedLink.ActionLink,
                 cancellationToken);
 
@@ -351,6 +355,31 @@ public sealed class SupabaseAccountService : IAccountService
         {
             throw Validation("password", "Password must contain at least 6 characters.");
         }
+    }
+
+    private static string ValidateRegistration(RegisterAccountDto request)
+    {
+        ValidateEmailAndPassword(request.Email, request.Password);
+
+        var normalizedEmail = NormalizeEmail(request.Email!);
+        if (!Regex.IsMatch(normalizedEmail, "^[^\\s@]+@gmail\\.com$", RegexOptions.CultureInvariant))
+        {
+            throw Validation("email", "Registration requires a Gmail address (@gmail.com).");
+        }
+
+        var normalizedName = Regex.Replace(request.DisplayName?.Trim() ?? string.Empty, "\\s+", " ");
+        if (normalizedName.Length is < 2 or > 60)
+        {
+            throw Validation("displayName", "Full name must contain between 2 and 60 characters.");
+        }
+
+        if (!FullNameRegex.IsMatch(normalizedName)
+            || normalizedName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 2)
+        {
+            throw Validation("displayName", "Enter both family name and given name using letters only.");
+        }
+
+        return normalizedName;
     }
 
     private static void ValidateEmail(string? email)

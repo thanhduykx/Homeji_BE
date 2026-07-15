@@ -10,4 +10,8 @@ public sealed record UpsertMarketplacePostDto(
     decimal Latitude,
     decimal Longitude,
     Guid? LinkedRentalPostId,
-    IReadOnlyCollection<string> MediaUrls);
+    IReadOnlyCollection<string> MediaUrls,
+    Homeji.Domain.Enums.MarketplaceListingType ListingType = Homeji.Domain.Enums.MarketplaceListingType.SecondHand,
+    int AvailableQuantity = 1,
+    string? Unit = "món",
+    int? PreparationMinutes = null);

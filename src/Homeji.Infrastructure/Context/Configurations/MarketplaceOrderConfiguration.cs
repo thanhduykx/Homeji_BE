@@ -12,6 +12,10 @@ public sealed class MarketplaceOrderConfiguration : IEntityTypeConfiguration<Mar
         builder.HasKey(order => order.Id);
         builder.Property(order => order.Status).HasConversion<int>();
         builder.Property(order => order.AgreedPrice).HasPrecision(18, 2).IsRequired();
+        builder.Property(order => order.UnitPrice).HasPrecision(18, 2).IsRequired();
+        builder.Property(order => order.PlatformFeeRate).HasPrecision(5, 4).IsRequired();
+        builder.Property(order => order.PlatformFeeAmount).HasPrecision(18, 2).IsRequired();
+        builder.Property(order => order.SellerNetAmount).HasPrecision(18, 2).IsRequired();
         builder.Property(order => order.PickupAddress).HasMaxLength(MarketplaceOrder.MaxPickupAddressLength).IsRequired();
         builder.Property(order => order.Note).HasMaxLength(MarketplaceOrder.MaxNoteLength);
         builder.HasIndex(order => new { order.BuyerId, order.CreatedAt });

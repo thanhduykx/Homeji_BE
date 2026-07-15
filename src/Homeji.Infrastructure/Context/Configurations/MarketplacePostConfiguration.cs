@@ -22,6 +22,11 @@ public sealed class MarketplacePostConfiguration : IEntityTypeConfiguration<Mark
         builder.Property(post => post.Latitude).HasColumnName("latitude").HasPrecision(9, 6).IsRequired();
         builder.Property(post => post.Longitude).HasColumnName("longitude").HasPrecision(9, 6).IsRequired();
         builder.Property(post => post.LinkedRentalPostId).HasColumnName("linked_rental_post_id");
+        builder.Property(post => post.ListingType).HasColumnName("listing_type").HasConversion<int>().IsRequired();
+        builder.Property(post => post.AvailableQuantity).HasColumnName("available_quantity").IsRequired();
+        builder.Property(post => post.ReservedQuantity).HasColumnName("reserved_quantity").IsRequired();
+        builder.Property(post => post.Unit).HasColumnName("unit").HasMaxLength(MarketplacePost.MaxUnitLength).IsRequired();
+        builder.Property(post => post.PreparationMinutes).HasColumnName("preparation_minutes");
         builder.Property(post => post.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(post => post.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasMany(post => post.Media)
@@ -44,5 +49,8 @@ public sealed class MarketplacePostConfiguration : IEntityTypeConfiguration<Mark
         builder.HasIndex(post => post.SellerId).HasDatabaseName("ix_marketplace_posts_seller_id");
         builder.HasIndex(post => post.LinkedRentalPostId).HasDatabaseName("ix_marketplace_posts_linked_rental_post_id");
         builder.ToTable(table => table.HasCheckConstraint("ck_marketplace_posts_price", "price > 0"));
+        builder.ToTable(table => table.HasCheckConstraint(
+            "ck_marketplace_posts_stock",
+            "available_quantity >= 0 AND reserved_quantity >= 0"));
     }
 }

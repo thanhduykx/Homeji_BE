@@ -20,10 +20,10 @@ public sealed class UserProfileServiceTests
         var repository = new InMemoryUserProfileRepository();
         var service = CreateService(repository);
 
-        var result = await service.UpsertMyProfileAsync(new UpdateMyProfileDto("  Duy  "));
+        var result = await service.UpsertMyProfileAsync(new UpdateMyProfileDto("  Thanh Duy  "));
 
         Assert.Equal(UserId, result.Id);
-        Assert.Equal("Duy", result.DisplayName);
+        Assert.Equal("Thanh Duy", result.DisplayName);
         Assert.Equal(UtcNow, result.CreatedAt);
         Assert.Same(repository.Profile, repository.UpsertedProfile);
     }
@@ -38,6 +38,22 @@ public sealed class UserProfileServiceTests
             service.UpsertMyProfileAsync(new UpdateMyProfileDto(" ")));
 
         Assert.Contains(nameof(UpdateMyProfileDto.DisplayName), exception.Errors.Keys);
+        Assert.Null(repository.UpsertedProfile);
+    }
+
+    [Theory]
+    [InlineData("1234567890")]
+    [InlineData("090123456")]
+    [InlineData("09012abc67")]
+    public async Task UpsertMyProfileAsync_WhenPhoneIsInvalid_DoesNotPersist(string phone)
+    {
+        var repository = new InMemoryUserProfileRepository();
+        var service = CreateService(repository);
+
+        var exception = await Assert.ThrowsAsync<RequestValidationException>(() =>
+            service.UpsertMyProfileAsync(new UpdateMyProfileDto("Thanh Duy", phone)));
+
+        Assert.Contains(nameof(UpdateMyProfileDto.Phone), exception.Errors.Keys);
         Assert.Null(repository.UpsertedProfile);
     }
 

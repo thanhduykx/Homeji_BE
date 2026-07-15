@@ -128,6 +128,12 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 Title = "Business rule violation",
                 Detail = exception.Message,
             },
+            DbUpdateConcurrencyException => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Concurrent wallet update",
+                Detail = "Số dư vừa thay đổi ở một giao dịch khác. Vui lòng tải lại và thử lại.",
+            },
             _ => new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,

@@ -35,6 +35,9 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<PostMessage> PostMessages => Set<PostMessage>();
     public DbSet<RentalWantedPost> RentalWantedPosts => Set<RentalWantedPost>();
     public DbSet<MarketplaceOrder> MarketplaceOrders => Set<MarketplaceOrder>();
+    public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
+    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<MarketplaceSellerSubscription> MarketplaceSellerSubscriptions => Set<MarketplaceSellerSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

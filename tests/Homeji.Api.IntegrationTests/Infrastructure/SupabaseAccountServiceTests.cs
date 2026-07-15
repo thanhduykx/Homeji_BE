@@ -36,21 +36,21 @@ public sealed class SupabaseAccountServiceTests
               "action_link": "https://project.supabase.co/auth/v1/verify?token=test&type=signup",
               "user": {
                 "id": "c664dbea-992b-4ba7-8702-bf5740e82034",
-                "email": "user@example.com"
+                "email": "user@gmail.com"
               }
             }
             """);
         var service = CreateService(repository, handler);
         var request = new RegisterAccountDto(
-            "  User@Example.COM ",
+            "  User@Gmail.COM ",
             "password123",
             "New User",
             null);
 
         var result = await service.RegisterAsync(request);
 
-        Assert.Equal("user@example.com", result.Email);
-        Assert.Equal("user@example.com", repository.LastEmail);
+        Assert.Equal("user@gmail.com", result.Email);
+        Assert.Equal("user@gmail.com", repository.LastEmail);
         Assert.True(result.EmailConfirmationRequired);
         Assert.Equal(
             "Registration succeeded. Check your email to confirm your account before signing in.",
@@ -64,7 +64,7 @@ public sealed class SupabaseAccountServiceTests
         var handler = new CountingHttpMessageHandler();
         var service = CreateService(repository, handler);
         var request = new RegisterAccountDto(
-            "existing@example.com",
+            "existing@gmail.com",
             "password123",
             "Existing User",
             null);
@@ -86,13 +86,13 @@ public sealed class SupabaseAccountServiceTests
               "action_link": "https://project.supabase.co/auth/v1/verify?token=test&type=signup",
               "user": {
                 "id": "c664dbea-992b-4ba7-8702-bf5740e82034",
-                "email": "new@example.com"
+                "email": "new@gmail.com"
               }
             }
             """);
         var service = CreateService(repository, handler);
         var request = new RegisterAccountDto(
-            "new@example.com",
+            "new@gmail.com",
             "password123",
             "New User",
             null);
@@ -108,6 +108,26 @@ public sealed class SupabaseAccountServiceTests
             handler.LastRequestBody,
             StringComparison.Ordinal);
         Assert.Equal("Bearer test-service-role-key", handler.LastAuthorization);
+    }
+
+    [Theory]
+    [InlineData("user@example.com", "New User", "email")]
+    [InlineData("user@gmail.com", "Duy", "displayName")]
+    [InlineData("user@gmail.com", "Duy 123", "displayName")]
+    public async Task RegisterAsync_WhenIdentityFieldsAreInvalid_DoesNotCallSupabase(
+        string email,
+        string displayName,
+        string expectedField)
+    {
+        var repository = new StubAccountEmailRepository(exists: false);
+        var handler = new CountingHttpMessageHandler();
+        var service = CreateService(repository, handler);
+
+        var exception = await Assert.ThrowsAsync<RequestValidationException>(() =>
+            service.RegisterAsync(new RegisterAccountDto(email, "password123", displayName, null)));
+
+        Assert.Contains(expectedField, exception.Errors.Keys);
+        Assert.Equal(0, handler.RequestCount);
     }
 
     private static SupabaseAccountService CreateService(

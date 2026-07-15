@@ -3,11 +3,13 @@ using Homeji.Application.DTOs.Marketplace;
 using Homeji.Application.IRepositories.Marketplace;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IRepositories.RentalPosts;
+using Homeji.Application.IRepositories.Wallets;
 using Homeji.Application.IServices.Marketplace;
 using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Moderation;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Microsoft.Extensions.Options;
 
 namespace Homeji.Application.Services.Marketplace;
 
@@ -23,6 +25,8 @@ public sealed class MarketplacePostService : IMarketplacePostService
     private readonly IUserProfileRepository _profiles;
     private readonly ContentModerationService _moderation;
     private readonly TimeProvider _timeProvider;
+    private readonly IWalletRepository _wallets;
+    private readonly MarketplaceFinanceOptions _financeOptions;
 
     public MarketplacePostService(
         UserContext userContext,
@@ -30,7 +34,9 @@ public sealed class MarketplacePostService : IMarketplacePostService
         IRentalPostRepository rentalPosts,
         IUserProfileRepository profiles,
         ContentModerationService moderation,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IWalletRepository wallets,
+        IOptions<MarketplaceFinanceOptions> financeOptions)
     {
         _userContext = userContext;
         _marketplacePosts = marketplacePosts;
@@ -38,6 +44,8 @@ public sealed class MarketplacePostService : IMarketplacePostService
         _profiles = profiles;
         _moderation = moderation;
         _timeProvider = timeProvider;
+        _wallets = wallets;
+        _financeOptions = financeOptions.Value;
     }
 
     public async Task<IReadOnlyList<MarketplacePostDto>> SearchAsync(
@@ -95,6 +103,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
     {
         await ValidateAsync(request, cancellationToken);
         var seller = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        await EnsureSellerFundedAsync(seller.Id, cancellationToken);
         await EnsureLinkedRentalPostExistsAsync(request.LinkedRentalPostId, cancellationToken);
         var post = new MarketplacePost(
             seller.Id,
@@ -108,7 +117,11 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.Longitude,
             request.LinkedRentalPostId,
             request.MediaUrls,
-            _timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow(),
+            request.ListingType,
+            request.AvailableQuantity,
+            request.Unit ?? "món",
+            request.PreparationMinutes);
         await _marketplacePosts.AddAsync(post, cancellationToken);
         await _marketplacePosts.SaveChangesAsync(cancellationToken);
         return ToDto(post, seller, null, null);
@@ -120,6 +133,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         CancellationToken cancellationToken = default)
     {
         await ValidateAsync(request, cancellationToken);
+        await EnsureSellerFundedAsync(_userContext.GetRequiredUserId(), cancellationToken);
         var post = await GetOwnedPostAsync(id, cancellationToken);
         await EnsureLinkedRentalPostExistsAsync(request.LinkedRentalPostId, cancellationToken);
         post.Update(
@@ -133,7 +147,11 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.Longitude,
             request.LinkedRentalPostId,
             request.MediaUrls,
-            _timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow(),
+            request.ListingType,
+            request.AvailableQuantity,
+            request.Unit ?? "món",
+            request.PreparationMinutes);
         await _marketplacePosts.SaveChangesAsync(cancellationToken);
         var seller = await _profiles.GetByIdAsync(post.SellerId, cancellationToken);
         return ToDto(post, seller, null, null);
@@ -170,9 +188,26 @@ public sealed class MarketplacePostService : IMarketplacePostService
         AddRequiredError(errors, "condition", request.Condition, MarketplacePost.MaxConditionLength);
         AddRequiredError(errors, "category", request.Category, MarketplacePost.MaxCategoryLength);
         AddRequiredError(errors, "address", request.Address, MarketplacePost.MaxAddressLength);
-        if (request.Price <= 0)
+        if (request.Price <= 0 || decimal.Truncate(request.Price) != request.Price)
         {
-            errors["price"] = ["Price must be greater than zero."];
+            errors["price"] = ["Price must be a positive whole VND value."];
+        }
+
+        if (request.ListingType == MarketplaceListingType.Food && request.Price < _financeOptions.MinimumFoodPrice)
+        {
+            errors["price"] = [$"Food price must be at least {_financeOptions.MinimumFoodPrice:0} VND."];
+        }
+
+        var maxQuantity = request.ListingType == MarketplaceListingType.Food ? MarketplacePost.MaxFoodStock : 1;
+        if (request.AvailableQuantity is < 1 || request.AvailableQuantity > maxQuantity)
+        {
+            errors["availableQuantity"] = [$"Available quantity must be between 1 and {maxQuantity}."];
+        }
+
+        AddRequiredError(errors, "unit", request.Unit, MarketplacePost.MaxUnitLength);
+        if (request.PreparationMinutes is < 0 or > 240)
+        {
+            errors["preparationMinutes"] = ["Preparation time must be between 0 and 240 minutes."];
         }
 
         if (request.Latitude is < -90 or > 90)
@@ -185,7 +220,8 @@ public sealed class MarketplacePostService : IMarketplacePostService
             errors["longitude"] = ["Longitude must be between -180 and 180."];
         }
 
-        if (request.MediaUrls.Count is < 1 or > MarketplacePost.MaxMediaCount)
+        if (request.MediaUrls is null
+            || request.MediaUrls.Count is < 1 or > MarketplacePost.MaxMediaCount)
         {
             errors["mediaUrls"] = [$"Provide between 1 and {MarketplacePost.MaxMediaCount} images."];
         }
@@ -319,7 +355,12 @@ public sealed class MarketplacePostService : IMarketplacePostService
             post.Media.OrderBy(media => media.SortOrder).Select(media => media.Url).ToArray(),
             distanceKm,
             post.CreatedAt,
-            post.UpdatedAt);
+            post.UpdatedAt,
+            post.ListingType,
+            post.AvailableQuantity,
+            post.ReservedQuantity,
+            post.Unit,
+            post.PreparationMinutes);
     }
 
     private static decimal CalculateDistanceKm(decimal lat1, decimal lon1, decimal lat2, decimal lon2)
@@ -351,6 +392,19 @@ public sealed class MarketplacePostService : IMarketplacePostService
         else if (value.Trim().Length > maxLength)
         {
             errors[field] = [$"{field} must not exceed {maxLength} characters."];
+        }
+    }
+
+    private async Task EnsureSellerFundedAsync(Guid sellerId, CancellationToken cancellationToken)
+    {
+        var wallet = await _wallets.GetAsync(sellerId, cancellationToken);
+        if (wallet is null || !wallet.IsActivated || wallet.Balance < _financeOptions.SellerReserve)
+        {
+            var missing = _financeOptions.SellerReserve - (wallet?.Balance ?? 0);
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["wallet"] = [$"Nạp thêm ít nhất {Math.Max(0, missing):0} đồng để duy trì quỹ đảm bảo người bán."],
+            });
         }
     }
 

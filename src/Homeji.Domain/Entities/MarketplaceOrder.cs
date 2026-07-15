@@ -21,7 +21,9 @@ public sealed class MarketplaceOrder
         DateTimeOffset pickupAt,
         string pickupAddress,
         string? note,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        int quantity = 1,
+        decimal platformFeeRate = 0.10m)
     {
         if (buyerId == sellerId)
         {
@@ -37,7 +39,17 @@ public sealed class MarketplaceOrder
         MarketplacePostId = marketplacePostId;
         BuyerId = buyerId;
         SellerId = sellerId;
-        AgreedPrice = agreedPrice > 0 ? agreedPrice : throw new DomainException("Agreed price must be greater than zero.");
+        if (agreedPrice <= 0 || quantity <= 0 || platformFeeRate is <= 0 or >= 1)
+        {
+            throw new DomainException("Order price, quantity, or platform fee rate is invalid.");
+        }
+
+        UnitPrice = agreedPrice;
+        Quantity = quantity;
+        AgreedPrice = agreedPrice * quantity;
+        PlatformFeeRate = platformFeeRate;
+        PlatformFeeAmount = decimal.Round(AgreedPrice * platformFeeRate, 0, MidpointRounding.AwayFromZero);
+        SellerNetAmount = AgreedPrice - PlatformFeeAmount;
         PickupAt = pickupAt;
         PickupAddress = Normalize(pickupAddress, MaxPickupAddressLength, nameof(PickupAddress));
         Note = NormalizeOptional(note, MaxNoteLength, nameof(Note));
@@ -51,6 +63,13 @@ public sealed class MarketplaceOrder
     public Guid BuyerId { get; private set; }
     public Guid SellerId { get; private set; }
     public decimal AgreedPrice { get; private set; }
+    public decimal UnitPrice { get; private set; }
+    public int Quantity { get; private set; }
+    public decimal PlatformFeeRate { get; private set; }
+    public decimal PlatformFeeAmount { get; private set; }
+    public decimal SellerNetAmount { get; private set; }
+    public DateTimeOffset? FundsReleasedAt { get; private set; }
+    public DateTimeOffset? RefundedAt { get; private set; }
     public DateTimeOffset PickupAt { get; private set; }
     public string PickupAddress { get; private set; }
     public string? Note { get; private set; }
@@ -73,6 +92,30 @@ public sealed class MarketplaceOrder
     }
 
     public void Complete(DateTimeOffset updatedAt) => Transition(MarketplaceOrderStatus.Accepted, MarketplaceOrderStatus.Completed, updatedAt);
+
+    public void MarkFundsReleased(DateTimeOffset updatedAt)
+    {
+        if (Status != MarketplaceOrderStatus.Completed || FundsReleasedAt.HasValue || RefundedAt.HasValue)
+        {
+            throw new DomainException("Marketplace order funds cannot be released in the current state.");
+        }
+
+        FundsReleasedAt = updatedAt;
+        UpdatedAt = updatedAt;
+    }
+
+    public void MarkRefunded(DateTimeOffset updatedAt)
+    {
+        if (Status is not (MarketplaceOrderStatus.Rejected or MarketplaceOrderStatus.Cancelled)
+            || FundsReleasedAt.HasValue
+            || RefundedAt.HasValue)
+        {
+            throw new DomainException("Marketplace order cannot be refunded in the current state.");
+        }
+
+        RefundedAt = updatedAt;
+        UpdatedAt = updatedAt;
+    }
 
     private void Transition(MarketplaceOrderStatus expected, MarketplaceOrderStatus target, DateTimeOffset updatedAt)
     {
