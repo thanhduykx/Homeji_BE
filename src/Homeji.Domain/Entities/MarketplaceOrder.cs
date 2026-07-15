@@ -93,6 +93,11 @@ public sealed class MarketplaceOrder
 
     public void Complete(DateTimeOffset updatedAt) => Transition(MarketplaceOrderStatus.Accepted, MarketplaceOrderStatus.Completed, updatedAt);
 
+    public void Expire(DateTimeOffset updatedAt)
+    {
+        Transition(MarketplaceOrderStatus.Requested, MarketplaceOrderStatus.Expired, updatedAt);
+    }
+
     public void MarkFundsReleased(DateTimeOffset updatedAt)
     {
         if (Status != MarketplaceOrderStatus.Completed || FundsReleasedAt.HasValue || RefundedAt.HasValue)
@@ -106,7 +111,7 @@ public sealed class MarketplaceOrder
 
     public void MarkRefunded(DateTimeOffset updatedAt)
     {
-        if (Status is not (MarketplaceOrderStatus.Rejected or MarketplaceOrderStatus.Cancelled)
+        if (Status is not (MarketplaceOrderStatus.Rejected or MarketplaceOrderStatus.Cancelled or MarketplaceOrderStatus.Expired)
             || FundsReleasedAt.HasValue
             || RefundedAt.HasValue)
         {

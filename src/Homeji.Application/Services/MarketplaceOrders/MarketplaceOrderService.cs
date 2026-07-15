@@ -10,14 +10,16 @@ using Homeji.Application.IServices.MarketplaceOrders;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Homeji.Domain.Exceptions;
 using FluentValidation;
 using Microsoft.Extensions.Options;
 using Homeji.Application.Services.Marketplace;
 
 namespace Homeji.Application.Services.MarketplaceOrders;
 
-public sealed class MarketplaceOrderService : IMarketplaceOrderService
+public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketplaceOrderExpirationService
 {
+    private const int ExpirationBatchSize = 200;
     private readonly UserContext _userContext;
     private readonly IMarketplaceOrderRepository _orders;
     private readonly IMarketplacePostRepository _posts;
@@ -143,8 +145,47 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
 
     public async Task<IReadOnlyList<MarketplaceOrderDto>> GetMineAsync(CancellationToken cancellationToken = default)
     {
-        var orders = await _orders.GetForUserAsync(_userContext.GetRequiredUserId(), cancellationToken);
+        var requestedCutoff = _timeProvider.GetUtcNow()
+            .AddMinutes(-_financeOptions.OrderRequestTimeoutMinutes);
+        var orders = await _orders.GetForUserAsync(
+            _userContext.GetRequiredUserId(),
+            requestedCutoff,
+            cancellationToken);
         return orders.Select(ToDto).ToArray();
+    }
+
+    public async Task<int> ExpireOverdueAsync(CancellationToken cancellationToken = default)
+    {
+        var now = _timeProvider.GetUtcNow();
+        var cutoff = now.AddMinutes(-_financeOptions.OrderRequestTimeoutMinutes);
+        var overdueOrders = await _orders.GetExpiredRequestedAsync(
+            cutoff,
+            ExpirationBatchSize,
+            cancellationToken);
+        if (overdueOrders.Count == 0)
+        {
+            return 0;
+        }
+
+        var notifications = new List<Notification>(overdueOrders.Count * 2);
+        foreach (var order in overdueOrders)
+        {
+            order.Expire(now);
+            await RefundAndReleaseStockAsync(order, now, cancellationToken);
+            notifications.AddRange(BuildExpirationNotifications(
+                order,
+                now,
+                _financeOptions.OrderRequestTimeoutMinutes));
+        }
+
+        await _notifications.AddRangeAsync(notifications, cancellationToken);
+        await _orders.SaveChangesAsync(cancellationToken);
+        foreach (var notification in notifications)
+        {
+            await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        }
+
+        return overdueOrders.Count;
     }
 
     public Task<MarketplaceOrderDto> AcceptAsync(Guid id, CancellationToken cancellationToken = default) =>
@@ -167,17 +208,38 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         var userId = _userContext.GetRequiredUserId();
         var order = await _orders.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(MarketplaceOrder), id);
+        var currentTime = _timeProvider.GetUtcNow();
+        if (order.Status == MarketplaceOrderStatus.Requested
+            && order.CreatedAt.AddMinutes(_financeOptions.OrderRequestTimeoutMinutes) <= currentTime)
+        {
+            order.Expire(currentTime);
+            await RefundAndReleaseStockAsync(order, currentTime, cancellationToken);
+            var expirationNotifications = BuildExpirationNotifications(
+                order,
+                currentTime,
+                _financeOptions.OrderRequestTimeoutMinutes);
+            await _notifications.AddRangeAsync(expirationNotifications, cancellationToken);
+            await _orders.SaveChangesAsync(cancellationToken);
+            foreach (var expirationNotification in expirationNotifications)
+            {
+                await _realtimePublisher.PublishAsync(expirationNotification, cancellationToken);
+            }
+
+            throw new DomainException(
+                $"Đơn hàng đã hết hạn sau {_financeOptions.OrderRequestTimeoutMinutes} phút chờ xác nhận và đã được hoàn tiền.");
+        }
+
         if (target == MarketplaceOrderStatus.Cancelled)
         {
             UserContext.EnsureOwner(userId, order.BuyerId);
-            var now = _timeProvider.GetUtcNow();
+            var now = currentTime;
             order.Cancel(now);
             await RefundAndReleaseStockAsync(order, now, cancellationToken);
         }
         else if (target is MarketplaceOrderStatus.Accepted or MarketplaceOrderStatus.Rejected)
         {
             UserContext.EnsureOwner(userId, order.SellerId);
-            var now = _timeProvider.GetUtcNow();
+            var now = currentTime;
             if (target == MarketplaceOrderStatus.Accepted)
             {
                 var sellerWallet = await _wallets.GetAsync(order.SellerId, cancellationToken);
@@ -197,7 +259,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
         else
         {
             UserContext.EnsureOwner(userId, order.BuyerId);
-            var now = _timeProvider.GetUtcNow();
+            var now = currentTime;
             order.Complete(now);
             await ReleaseSaleProceedsAsync(order, now, cancellationToken);
         }
@@ -218,6 +280,27 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService
             $"Đơn hàng hiện ở trạng thái {order.Status}.",
             order.Id,
             now);
+
+    private static IReadOnlyList<Notification> BuildExpirationNotifications(
+        MarketplaceOrder order,
+        DateTimeOffset now,
+        int timeoutMinutes) =>
+        [
+            new Notification(
+                order.BuyerId,
+                NotificationType.MarketplaceOrderUpdated,
+                "Đơn Chợ Homeji đã hết hạn",
+                $"Đơn chờ quá {timeoutMinutes} phút đã được hủy tự động và hoàn tiền vào Số dư Homeji.",
+                order.Id,
+                now),
+            new Notification(
+                order.SellerId,
+                NotificationType.MarketplaceOrderUpdated,
+                "Đơn Chợ Homeji đã hết hạn",
+                $"Đơn chờ quá {timeoutMinutes} phút đã được hủy tự động và trả lại tồn kho.",
+                order.Id,
+                now),
+        ];
 
     private static MarketplaceOrderDto ToDto(MarketplaceOrder order) =>
         new(

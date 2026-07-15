@@ -9,6 +9,7 @@ public sealed class MarketplaceFinanceOptions
     public decimal SellerReserve { get; set; } = 100_000m;
     public decimal MinimumFoodPrice { get; set; } = 10_000m;
     public decimal MinimumFoodOrder { get; set; } = 25_000m;
+    public int OrderRequestTimeoutMinutes { get; set; } = 30;
     // Intentionally empty: configuration binding appends collection entries instead of replacing
     // initialized defaults. The required appsettings section is validated at application startup.
     public List<MarketplaceSellerPlanOptions> SellerPlans { get; set; } = [];
@@ -29,6 +30,7 @@ public sealed class MarketplaceFinanceOptions
         return SellerReserve >= WalletAccount.MinimumTopUp
             && MinimumFoodPrice > 0
             && MinimumFoodOrder >= MinimumFoodPrice
+            && OrderRequestTimeoutMinutes is >= 5 and <= 1_440
             && decimal.Truncate(SellerReserve) == SellerReserve
             && decimal.Truncate(MinimumFoodPrice) == MinimumFoodPrice
             && decimal.Truncate(MinimumFoodOrder) == MinimumFoodOrder

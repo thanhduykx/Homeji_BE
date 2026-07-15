@@ -65,6 +65,30 @@ public sealed class MarketplaceOrderTests
         Assert.Throws<DomainException>(() => order.MarkFundsReleased(now.AddMinutes(4)));
     }
 
+    [Fact]
+    public void Expire_WhenRequested_AllowsRefundAndPreventsAcceptance()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var order = CreateOrder(now);
+
+        order.Expire(now.AddMinutes(30));
+        order.MarkRefunded(now.AddMinutes(30));
+
+        Assert.Equal(MarketplaceOrderStatus.Expired, order.Status);
+        Assert.Equal(now.AddMinutes(30), order.RefundedAt);
+        Assert.Throws<DomainException>(() => order.Accept(now.AddMinutes(31)));
+    }
+
+    [Fact]
+    public void Expire_WhenAccepted_ThrowsDomainException()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var order = CreateOrder(now);
+        order.Accept(now.AddMinutes(1));
+
+        Assert.Throws<DomainException>(() => order.Expire(now.AddMinutes(30)));
+    }
+
     private static MarketplaceOrder CreateOrder(DateTimeOffset now) =>
         new(
             Guid.NewGuid(),

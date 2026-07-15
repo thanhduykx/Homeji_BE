@@ -10,7 +10,7 @@ public sealed class MarketplaceOrderConfiguration : IEntityTypeConfiguration<Mar
     {
         builder.ToTable("marketplace_orders", "homeji");
         builder.HasKey(order => order.Id);
-        builder.Property(order => order.Status).HasConversion<int>();
+        builder.Property(order => order.Status).HasConversion<int>().IsConcurrencyToken();
         builder.Property(order => order.AgreedPrice).HasPrecision(18, 2).IsRequired();
         builder.Property(order => order.UnitPrice).HasPrecision(18, 2).IsRequired();
         builder.Property(order => order.PlatformFeeRate).HasPrecision(5, 4).IsRequired();

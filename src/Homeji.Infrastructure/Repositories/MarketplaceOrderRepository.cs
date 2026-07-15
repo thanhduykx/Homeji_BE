@@ -21,9 +21,24 @@ public sealed class MarketplaceOrderRepository : IMarketplaceOrderRepository
             && (order.Status == MarketplaceOrderStatus.Requested || order.Status == MarketplaceOrderStatus.Accepted),
             cancellationToken);
 
-    public async Task<IReadOnlyList<MarketplaceOrder>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
+    public async Task<IReadOnlyList<MarketplaceOrder>> GetExpiredRequestedAsync(
+        DateTimeOffset cutoff,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.MarketplaceOrders
+            .Where(order => order.Status == MarketplaceOrderStatus.Requested && order.CreatedAt <= cutoff)
+            .OrderBy(order => order.CreatedAt)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<MarketplaceOrder>> GetForUserAsync(
+        Guid userId,
+        DateTimeOffset requestedCutoff,
+        CancellationToken cancellationToken = default) =>
         await _dbContext.MarketplaceOrders.AsNoTracking()
-            .Where(order => order.BuyerId == userId || order.SellerId == userId)
+            .Where(order => order.Status != MarketplaceOrderStatus.Expired
+                && !(order.Status == MarketplaceOrderStatus.Requested && order.CreatedAt <= requestedCutoff)
+                && (order.BuyerId == userId || order.SellerId == userId))
             .OrderByDescending(order => order.CreatedAt)
             .ToListAsync(cancellationToken);
 

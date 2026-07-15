@@ -131,8 +131,8 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             DbUpdateConcurrencyException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "Concurrent wallet update",
-                Detail = "Số dư vừa thay đổi ở một giao dịch khác. Vui lòng tải lại và thử lại.",
+                Title = "Concurrent update",
+                Detail = "Dữ liệu vừa thay đổi ở một giao dịch khác. Vui lòng tải lại và thử lại.",
             },
             _ => new ProblemDetails
             {

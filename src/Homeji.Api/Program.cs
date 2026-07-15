@@ -4,6 +4,7 @@ using Homeji.Api.ErrorHandling;
 using Homeji.Api.RateLimiting;
 using Homeji.Api.Realtime;
 using Homeji.Api.Middlewares;
+using Homeji.Api.BackgroundJobs;
 using Homeji.Application;
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Abstractions.Notifications;
@@ -41,6 +42,7 @@ builder.Services.AddOptions<PaymentRedirectOptions>()
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();

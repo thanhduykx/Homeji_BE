@@ -73,7 +73,9 @@ public static class DependencyInjection
         services.AddScoped<IUserActivityService, UserActivityService>();
         services.AddScoped<IPostConversationService, PostConversationService>();
         services.AddScoped<IRentalWantedPostService, RentalWantedPostService>();
-        services.AddScoped<IMarketplaceOrderService, MarketplaceOrderService>();
+        services.AddScoped<MarketplaceOrderService>();
+        services.AddScoped<IMarketplaceOrderService>(provider => provider.GetRequiredService<MarketplaceOrderService>());
+        services.AddScoped<IMarketplaceOrderExpirationService>(provider => provider.GetRequiredService<MarketplaceOrderService>());
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IMarketplaceSellerPlanService, MarketplaceSellerPlanService>();
         services.AddSingleton(TimeProvider.System);
