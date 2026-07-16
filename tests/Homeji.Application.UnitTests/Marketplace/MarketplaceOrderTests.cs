@@ -28,6 +28,28 @@ public sealed class MarketplaceOrderTests
     }
 
     [Fact]
+    public void Cancel_WhenRequested_ChangesStatus()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var order = CreateOrder(now);
+
+        order.Cancel(now.AddMinutes(1));
+
+        Assert.Equal(MarketplaceOrderStatus.Cancelled, order.Status);
+    }
+
+    [Fact]
+    public void Cancel_WhenSellerAlreadyAccepted_ThrowsDomainException()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var order = CreateOrder(now);
+        order.Accept(now.AddMinutes(1));
+
+        Assert.Throws<DomainException>(() => order.Cancel(now.AddMinutes(2)));
+        Assert.Equal(MarketplaceOrderStatus.Accepted, order.Status);
+    }
+
+    [Fact]
     public void Constructor_WithQuantityAndCommission_CalculatesEscrowAmounts()
     {
         var now = DateTimeOffset.UtcNow;
