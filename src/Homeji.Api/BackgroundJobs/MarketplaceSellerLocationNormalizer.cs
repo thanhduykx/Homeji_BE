@@ -35,6 +35,16 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var changed = await dbContext.Database.ExecuteSqlRawAsync(
                 """
+                -- Repair the legacy demo seller first. Its historical seed mixed
+                -- unrelated Hanoi and Thu Duc coordinates under one account.
+                UPDATE homeji.marketplace_posts
+                SET address = '01 Lưu Hữu Phước, Khu phố Tân Lập, phường Đông Hòa, TP.HCM',
+                    latitude = 10.875340,
+                    longitude = 106.800033
+                WHERE seller_id = 'd3000000-0000-0000-0000-000000000021'
+                  AND (address, latitude, longitude) IS DISTINCT FROM
+                      ('01 Lưu Hữu Phước, Khu phố Tân Lập, phường Đông Hòa, TP.HCM', 10.875340, 106.800033);
+
                 WITH anchors AS (
                     SELECT DISTINCT ON (seller_id)
                         seller_id,
