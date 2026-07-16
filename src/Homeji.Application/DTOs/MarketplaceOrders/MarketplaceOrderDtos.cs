@@ -22,4 +22,9 @@ public sealed record MarketplaceOrderDto(
     decimal PlatformFeeAmount,
     decimal SellerNetAmount,
     DateTimeOffset? FundsReleasedAt,
-    DateTimeOffset? RefundedAt);
+    DateTimeOffset? RefundedAt,
+    string? PostTitle = null,
+    string? PostImageUrl = null,
+    string? BuyerDisplayName = null,
+    string? SellerDisplayName = null,
+    string? SellerAddress = null);

@@ -50,7 +50,8 @@ public sealed class MarketplaceOrderExpirationServiceTests
             wallets,
             sellerPlans: null!,
             validator: null!,
-            Options.Create(new MarketplaceFinanceOptions { OrderRequestTimeoutMinutes = 30 }));
+            Options.Create(new MarketplaceFinanceOptions { OrderRequestTimeoutMinutes = 30 }),
+            profiles: null!);
 
         var expiredCount = await service.ExpireOverdueAsync();
 
