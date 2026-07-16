@@ -185,6 +185,8 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         builder.AppendLine("- Không yêu cầu hoặc hiển thị API key, password, token.");
         builder.AppendLine("- Nếu câu hỏi ngoài phạm vi Homeji, trả lời ngắn và hướng về nhu cầu thuê trọ/Homeji.");
         builder.AppendLine();
+        builder.AppendLine(HomejiLocationKnowledge.GroundingPrompt);
+        builder.AppendLine();
         builder.AppendLine("Lịch sử chat gần nhất:");
 
         foreach (var message in conversationMessages.OrderBy(message => message.CreatedAt))
