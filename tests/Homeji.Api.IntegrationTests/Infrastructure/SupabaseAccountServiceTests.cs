@@ -130,6 +130,108 @@ public sealed class SupabaseAccountServiceTests
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task RegisterAsync_WhenServiceRoleKeyIsEmpty_FallsBackToStandardSignup()
+    {
+        var repository = new StubAccountEmailRepository(exists: false);
+        var handler = new CountingHttpMessageHandler(
+            """
+            {
+              "access_token": "fallback-access-token",
+              "token_type": "bearer",
+              "expires_in": 3600,
+              "refresh_token": "fallback-refresh-token",
+              "user": {
+                "id": "c664dbea-992b-4ba7-8702-bf5740e82034",
+                "email": "fallback@gmail.com"
+              }
+            }
+            """);
+
+        var httpClient = new HttpClient(handler);
+        var options = Options.Create(new SupaBaseAuthOptions
+        {
+            ProjectUrl = "https://project.supabase.co",
+            ApiKey = "test-key",
+            ServiceRoleKey = "",
+            RegistrationRedirectUrl = "https://homeji.example/auth/callback",
+        });
+
+        var service = new SupabaseAccountService(
+            httpClient,
+            options,
+            new StubAccountEmailSender(),
+            repository,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupabaseAccountService>.Instance);
+
+        var request = new RegisterAccountDto(
+            "fallback@gmail.com",
+            "password123",
+            "New User",
+            null);
+
+        var result = await service.RegisterAsync(request);
+
+        Assert.Equal("fallback@gmail.com", result.Email);
+        Assert.False(result.EmailConfirmationRequired);
+        Assert.NotNull(handler.LastRequestUri);
+        Assert.Equal(
+            "/auth/v1/signup",
+            handler.LastRequestUri!.AbsolutePath);
+        Assert.Contains(
+            "redirect_to=https%3A%2F%2Fhomeji.example%2Fauth%2Fcallback",
+            handler.LastRequestUri!.Query);
+        Assert.Equal("Bearer test-key", handler.LastAuthorization);
+    }
+
+    [Fact]
+    public async Task RegisterAsync_WhenServiceRoleKeyIsEmptyAndConfirmationRequired_FallsBackToStandardSignup()
+    {
+        var repository = new StubAccountEmailRepository(exists: false);
+        var handler = new CountingHttpMessageHandler(
+            """
+            {
+              "id": "c664dbea-992b-4ba7-8702-bf5740e82034",
+              "email": "fallback@gmail.com"
+            }
+            """);
+
+        var httpClient = new HttpClient(handler);
+        var options = Options.Create(new SupaBaseAuthOptions
+        {
+            ProjectUrl = "https://project.supabase.co",
+            ApiKey = "test-key",
+            ServiceRoleKey = "",
+            RegistrationRedirectUrl = "https://homeji.example/auth/callback",
+        });
+
+        var service = new SupabaseAccountService(
+            httpClient,
+            options,
+            new StubAccountEmailSender(),
+            repository,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupabaseAccountService>.Instance);
+
+        var request = new RegisterAccountDto(
+            "fallback@gmail.com",
+            "password123",
+            "New User",
+            null);
+
+        var result = await service.RegisterAsync(request);
+
+        Assert.Equal("fallback@gmail.com", result.Email);
+        Assert.True(result.EmailConfirmationRequired);
+        Assert.NotNull(handler.LastRequestUri);
+        Assert.Equal(
+            "/auth/v1/signup",
+            handler.LastRequestUri!.AbsolutePath);
+        Assert.Contains(
+            "redirect_to=https%3A%2F%2Fhomeji.example%2Fauth%2Fcallback",
+            handler.LastRequestUri!.Query);
+        Assert.Equal("Bearer test-key", handler.LastAuthorization);
+    }
+
     private static SupabaseAccountService CreateService(
         IAccountEmailRepository repository,
         HttpMessageHandler? handler = null)
