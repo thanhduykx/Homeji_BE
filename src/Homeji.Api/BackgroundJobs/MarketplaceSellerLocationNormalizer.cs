@@ -86,7 +86,9 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
                         ('4979493d-6cc5-417c-b936-fa91410f82b8'::uuid,
                          'Đường số 12, phường Linh Trung, TP. Thủ Đức, TP.HCM', 10.8662100::numeric, 106.7768200::numeric),
                         ('653aaa8a-f586-40e6-8934-20971dcf7bb7'::uuid,
-                         'Đường Lê Văn Việt, phường Tăng Nhơn Phú, TP.HCM', 10.8476500::numeric, 106.7824200::numeric)
+                         'Đường Lê Văn Việt, phường Tăng Nhơn Phú, TP.HCM', 10.8476500::numeric, 106.7824200::numeric),
+                        ('e2222222-2222-2222-2222-222222222222'::uuid,
+                         'Đường Tạ Quang Bửu, phường Đông Hòa, TP.HCM', 10.8799000::numeric, 106.8041000::numeric)
                 )
                 UPDATE homeji.rental_posts AS post
                 SET address = location.address,
@@ -97,6 +99,12 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
                 WHERE post.id = location.id
                   AND (post.address, post.latitude, post.longitude)
                       IS DISTINCT FROM (location.address, location.latitude, location.longitude);
+
+                UPDATE homeji.rental_posts
+                SET title = 'Phòng ở ghép tiện nghi gần ĐH Bách Khoa - khu ĐHQG',
+                    updated_at = NOW()
+                WHERE id = 'e2222222-2222-2222-2222-222222222222'
+                  AND title IS DISTINCT FROM 'Phòng ở ghép tiện nghi gần ĐH Bách Khoa - khu ĐHQG';
                 """,
                 stoppingToken);
             LogNormalized(_logger, changed, null);
