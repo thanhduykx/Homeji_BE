@@ -9,11 +9,13 @@ using Homeji.Application;
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Infrastructure;
+using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Health;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -89,6 +91,13 @@ builder.Services.AddHealthChecks()
     .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
 
 var app = builder.Build();
+
+if (builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
+{
+    await using var migrationScope = app.Services.CreateAsyncScope();
+    var database = migrationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await database.Database.MigrateAsync();
+}
 
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
