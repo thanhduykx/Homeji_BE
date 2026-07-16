@@ -49,7 +49,6 @@ public sealed class SupabaseAccountService : IAccountService
     {
         var displayName = ValidateRegistration(request);
         EnsureConfigured();
-        EnsureRegistrationConfigured();
 
         var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
         if (emailAvailability.Exists)
@@ -58,54 +57,77 @@ public sealed class SupabaseAccountService : IAccountService
         }
 
         var redirectTo = ResolveRedirectUrl(request.RedirectTo, _options.RegistrationRedirectUrl);
-        using var httpRequest = CreateAdminJsonRequest(
-            HttpMethod.Post,
-            new Uri("auth/v1/admin/generate_link", UriKind.Relative),
-            new
-            {
-                type = "signup",
-                email = emailAvailability.Email,
-                password = request.Password,
-                data = new
-                {
-                    display_name = displayName,
-                },
-                redirect_to = redirectTo,
-            });
 
-        var json = await SendAsync(httpRequest, cancellationToken);
-        var generatedLink = ParseGeneratedSignupLink(json);
-        try
+        if (!string.IsNullOrWhiteSpace(_options.ServiceRoleKey))
         {
-            var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
-                emailAvailability.Email,
-                displayName,
-                generatedLink.ActionLink,
-                cancellationToken);
+            using var httpRequest = CreateAdminJsonRequest(
+                HttpMethod.Post,
+                new Uri("auth/v1/admin/generate_link", UriKind.Relative),
+                new
+                {
+                    type = "signup",
+                    email = emailAvailability.Email,
+                    password = request.Password,
+                    data = new
+                    {
+                        display_name = displayName,
+                    },
+                    redirect_to = redirectTo,
+                });
 
-            if (!emailResult.Sent)
+            var json = await SendAsync(httpRequest, cancellationToken);
+            var generatedLink = ParseGeneratedSignupLink(json);
+            try
+            {
+                var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
+                    emailAvailability.Email,
+                    displayName,
+                    generatedLink.ActionLink,
+                    cancellationToken);
+
+                if (!emailResult.Sent)
+                {
+                    await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
+                    throw new ExternalServiceUnavailableException(
+                        "SMTP",
+                        "The confirmation email could not be sent. Please try registering again.");
+                }
+            }
+            catch (OperationCanceledException)
             {
                 await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
-                throw new ExternalServiceUnavailableException(
-                    "SMTP",
-                    "The confirmation email could not be sent. Please try registering again.");
+                throw;
             }
-        }
-        catch (OperationCanceledException)
-        {
-            await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
-            throw;
-        }
 
-        return new AuthSessionDto(
-            null,
-            null,
-            null,
-            null,
-            generatedLink.UserId,
-            generatedLink.Email ?? emailAvailability.Email,
-            true,
-            "Registration succeeded. Check your email to confirm your account before signing in.");
+            return new AuthSessionDto(
+                null,
+                null,
+                null,
+                null,
+                generatedLink.UserId,
+                generatedLink.Email ?? emailAvailability.Email,
+                true,
+                "Registration succeeded. Check your email to confirm your account before signing in.");
+        }
+        else
+        {
+            var endpoint = BuildAuthUri("signup", redirectTo);
+            using var httpRequest = CreateJsonRequest(
+                HttpMethod.Post,
+                endpoint,
+                new
+                {
+                    email = emailAvailability.Email,
+                    password = request.Password,
+                    data = new
+                    {
+                        display_name = displayName,
+                    },
+                });
+
+            var json = await SendAsync(httpRequest, cancellationToken);
+            return ParseAuthSession(json, "Registration succeeded. Check your email to confirm your account before signing in.");
+        }
     }
 
     public async Task<EmailAvailabilityDto> GetEmailAvailabilityAsync(
@@ -343,9 +365,15 @@ public sealed class SupabaseAccountService : IAccountService
 
     private static string? ResolveRedirectUrl(string? requestRedirectTo, string? configuredRedirectTo)
     {
-        return !string.IsNullOrWhiteSpace(requestRedirectTo)
-            ? requestRedirectTo
-            : configuredRedirectTo;
+        if (!string.IsNullOrWhiteSpace(requestRedirectTo)
+            && requestRedirectTo != "string"
+            && Uri.TryCreate(requestRedirectTo, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            return requestRedirectTo;
+        }
+
+        return configuredRedirectTo;
     }
 
     private static void ValidateEmailAndPassword(string? email, string? password)

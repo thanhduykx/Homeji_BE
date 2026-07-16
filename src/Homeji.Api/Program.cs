@@ -43,6 +43,7 @@ builder.Services.AddOptions<PaymentRedirectOptions>()
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
+builder.Services.AddHostedService<MarketplaceSellerLocationNormalizer>();
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();

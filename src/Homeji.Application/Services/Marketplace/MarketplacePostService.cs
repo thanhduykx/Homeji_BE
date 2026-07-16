@@ -106,6 +106,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         var seller = await _userContext.GetRequiredProfileAsync(cancellationToken);
         await EnsureSellerFundedAsync(seller.Id, cancellationToken);
         await EnsureLinkedRentalPostExistsAsync(request.LinkedRentalPostId, cancellationToken);
+        var sellerLocation = await ResolveSellerLocationAsync(seller.Id, null, request, cancellationToken);
         var post = new MarketplacePost(
             seller.Id,
             request.Title!,
@@ -113,9 +114,9 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.Price,
             request.Condition!,
             request.Category!,
-            request.Address!,
-            request.Latitude,
-            request.Longitude,
+            sellerLocation.Address,
+            sellerLocation.Latitude,
+            sellerLocation.Longitude,
             request.LinkedRentalPostId,
             request.MediaUrls,
             _timeProvider.GetUtcNow(),
@@ -137,15 +138,16 @@ public sealed class MarketplacePostService : IMarketplacePostService
         await EnsureSellerFundedAsync(_userContext.GetRequiredUserId(), cancellationToken);
         var post = await GetOwnedPostAsync(id, cancellationToken);
         await EnsureLinkedRentalPostExistsAsync(request.LinkedRentalPostId, cancellationToken);
+        var sellerLocation = await ResolveSellerLocationAsync(post.SellerId, post.Id, request, cancellationToken);
         post.Update(
             request.Title!,
             request.Description!,
             request.Price,
             request.Condition!,
             request.Category!,
-            request.Address!,
-            request.Latitude,
-            request.Longitude,
+            sellerLocation.Address,
+            sellerLocation.Latitude,
+            sellerLocation.Longitude,
             request.LinkedRentalPostId,
             request.MediaUrls,
             _timeProvider.GetUtcNow(),
@@ -256,6 +258,21 @@ public sealed class MarketplacePostService : IMarketplacePostService
         {
             throw new NotFoundException(nameof(RentalPost), rentalPostId.Value);
         }
+    }
+
+    private async Task<SellerLocation> ResolveSellerLocationAsync(
+        Guid sellerId,
+        Guid? excludingPostId,
+        UpsertMarketplacePostDto request,
+        CancellationToken cancellationToken)
+    {
+        var anchor = await _marketplacePosts.GetSellerLocationAnchorAsync(
+            sellerId,
+            excludingPostId,
+            cancellationToken);
+        return anchor is null
+            ? new SellerLocation(request.Address!, request.Latitude, request.Longitude)
+            : new SellerLocation(anchor.Address, anchor.Latitude, anchor.Longitude);
     }
 
     private async Task<NormalizedSearch> NormalizeSearchAsync(
@@ -427,4 +444,6 @@ public sealed class MarketplacePostService : IMarketplacePostService
         decimal? MaxLongitude,
         int Page,
         int PageSize);
+
+    private sealed record SellerLocation(string Address, decimal Latitude, decimal Longitude);
 }

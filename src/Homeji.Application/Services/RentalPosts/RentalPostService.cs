@@ -262,17 +262,26 @@ public sealed class RentalPostService : IRentalPostService
             .ThenByDescending(post => post.ViewCount)
             .ToArray();
 
-        if (_userContext.TryGetUserId() is { } userId && HasSearchCriteria(search))
+        if (_userContext.TryGetUserId() is { } userId
+            && HasSearchCriteria(search)
+            && await _profiles.GetByIdAsync(userId, cancellationToken) is not null)
         {
-            await _activities.RecordAsync(
-                userId,
-                "Searched rental posts",
-                "/api/rental-posts",
-                "GET",
-                200,
-                UserActivityType.RentalSearch,
-                details: JsonSerializer.Serialize(search),
-                cancellationToken: cancellationToken);
+            try
+            {
+                await _activities.RecordAsync(
+                    userId,
+                    "Searched rental posts",
+                    "/api/rental-posts",
+                    "GET",
+                    200,
+                    UserActivityType.RentalSearch,
+                    details: JsonSerializer.Serialize(search),
+                    cancellationToken: cancellationToken);
+            }
+            catch (Exception)
+            {
+                // Telemetry logging failures should not cause search queries to fail.
+            }
         }
 
         return result;

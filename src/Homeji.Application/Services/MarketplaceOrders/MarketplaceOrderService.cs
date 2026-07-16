@@ -14,6 +14,7 @@ using Homeji.Domain.Exceptions;
 using FluentValidation;
 using Microsoft.Extensions.Options;
 using Homeji.Application.Services.Marketplace;
+using Homeji.Application.IRepositories.Profiles;
 
 namespace Homeji.Application.Services.MarketplaceOrders;
 
@@ -30,6 +31,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
     private readonly IMarketplaceSellerPlanService _sellerPlans;
     private readonly IValidator<CreateMarketplaceOrderDto> _validator;
     private readonly MarketplaceFinanceOptions _financeOptions;
+    private readonly IUserProfileRepository _profiles;
 
     public MarketplaceOrderService(
         UserContext userContext,
@@ -41,7 +43,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         IWalletRepository wallets,
         IMarketplaceSellerPlanService sellerPlans,
         IValidator<CreateMarketplaceOrderDto> validator,
-        IOptions<MarketplaceFinanceOptions> financeOptions)
+        IOptions<MarketplaceFinanceOptions> financeOptions,
+        IUserProfileRepository profiles)
     {
         _userContext = userContext;
         _orders = orders;
@@ -53,6 +56,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         _sellerPlans = sellerPlans;
         _validator = validator;
         _financeOptions = financeOptions.Value;
+        _profiles = profiles;
     }
 
     public async Task<MarketplaceOrderDto> CreateAsync(
@@ -151,7 +155,19 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             _userContext.GetRequiredUserId(),
             requestedCutoff,
             cancellationToken);
-        return orders.Select(ToDto).ToArray();
+        var posts = await _posts.GetByIdsAsync(
+            orders.Select(order => order.MarketplacePostId).Distinct().ToArray(),
+            cancellationToken);
+        var postsById = posts.ToDictionary(post => post.Id);
+        var profiles = await _profiles.GetByIdsAsync(
+            orders.SelectMany(order => new[] { order.BuyerId, order.SellerId }).Distinct().ToArray(),
+            cancellationToken);
+        var profilesById = profiles.ToDictionary(profile => profile.Id);
+        return orders.Select(order => ToDto(
+            order,
+            postsById.GetValueOrDefault(order.MarketplacePostId),
+            profilesById.GetValueOrDefault(order.BuyerId)?.DisplayName,
+            profilesById.GetValueOrDefault(order.SellerId)?.DisplayName)).ToArray();
     }
 
     public async Task<int> ExpireOverdueAsync(CancellationToken cancellationToken = default)
@@ -302,7 +318,11 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 now),
         ];
 
-    private static MarketplaceOrderDto ToDto(MarketplaceOrder order) =>
+    private static MarketplaceOrderDto ToDto(
+        MarketplaceOrder order,
+        MarketplacePost? post = null,
+        string? buyerDisplayName = null,
+        string? sellerDisplayName = null) =>
         new(
             order.Id,
             order.MarketplacePostId,
@@ -321,7 +341,12 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             order.PlatformFeeAmount,
             order.SellerNetAmount,
             order.FundsReleasedAt,
-            order.RefundedAt);
+            order.RefundedAt,
+            post?.Title,
+            post?.Media.OrderBy(media => media.SortOrder).Select(media => media.Url).FirstOrDefault(),
+            buyerDisplayName,
+            sellerDisplayName,
+            post?.Address);
 
     private async Task RefundAndReleaseStockAsync(
         MarketplaceOrder order,

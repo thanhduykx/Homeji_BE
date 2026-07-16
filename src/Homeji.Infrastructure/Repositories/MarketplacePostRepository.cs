@@ -22,6 +22,24 @@ public sealed class MarketplacePostRepository : IMarketplacePostRepository
             .SingleOrDefaultAsync(post => post.Id == id, cancellationToken);
     }
 
+    public Task<MarketplacePost?> GetSellerLocationAnchorAsync(
+        Guid sellerId,
+        Guid? excludingPostId = null,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.MarketplacePosts.AsNoTracking()
+            .Where(post => post.SellerId == sellerId
+                && (!excludingPostId.HasValue || post.Id != excludingPostId.Value))
+            .OrderBy(post => post.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<MarketplacePost>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.MarketplacePosts.AsNoTracking()
+            .Include(post => post.Media)
+            .Where(post => ids.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
         string? keyword,
         string? category,

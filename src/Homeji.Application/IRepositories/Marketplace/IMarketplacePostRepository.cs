@@ -6,6 +6,17 @@ public interface IMarketplacePostRepository
 {
     Task<MarketplacePost?> GetByIdWithMediaAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<MarketplacePost?> GetSellerLocationAnchorAsync(
+        Guid sellerId,
+        Guid? excludingPostId = null,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<MarketplacePost?>(null);
+
+    Task<IReadOnlyList<MarketplacePost>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MarketplacePost>>([]);
+
     Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
         string? keyword,
         string? category,

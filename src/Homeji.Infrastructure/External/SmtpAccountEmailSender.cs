@@ -53,19 +53,9 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             await smtpClient.SendMailAsync(mailMessage, cancellationToken);
             return new EmailSendResultDto(true, "SMTP registration confirmation email was sent.");
         }
-        catch (SmtpException exception)
+        catch (Exception exception) when (exception is not OperationCanceledException)
         {
             FailedToSendRegistrationEmail(_logger, email, exception);
-            return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
-        }
-        catch (InvalidOperationException exception)
-        {
-            InvalidSmtpConfiguration(_logger, email, exception);
-            return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
-        }
-        catch (FormatException exception)
-        {
-            InvalidSmtpConfiguration(_logger, email, exception);
             return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
         }
     }

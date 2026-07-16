@@ -115,6 +115,7 @@ public sealed class RentalPostRepository : IRentalPostRepository
         return await query
             .AsSplitQuery()
             .OrderByDescending(post => post.UpdatedAt)
+            .ThenBy(post => post.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync(cancellationToken);
