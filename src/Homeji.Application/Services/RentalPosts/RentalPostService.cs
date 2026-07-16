@@ -262,7 +262,9 @@ public sealed class RentalPostService : IRentalPostService
             .ThenByDescending(post => post.ViewCount)
             .ToArray();
 
-        if (_userContext.TryGetUserId() is { } userId && HasSearchCriteria(search))
+        if (_userContext.TryGetUserId() is { } userId
+            && HasSearchCriteria(search)
+            && await _profiles.GetByIdAsync(userId, cancellationToken) is not null)
         {
             try
             {
