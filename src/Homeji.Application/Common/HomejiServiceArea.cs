@@ -8,7 +8,7 @@ public static class HomejiServiceArea
 {
     public const decimal MinLatitude = 10.70m;
     public const decimal MaxLatitude = 10.93m;
-    public const decimal MinLongitude = 106.70m;
+    public const decimal MinLongitude = 106.72m;
     public const decimal MaxLongitude = 106.90m;
 
     public static bool Contains(decimal latitude, decimal longitude)
