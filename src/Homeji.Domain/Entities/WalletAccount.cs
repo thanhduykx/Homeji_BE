@@ -66,16 +66,11 @@ public sealed class WalletAccount
         Touch(updatedAt);
     }
 
-    public void CreditSale(decimal grossAmount, decimal platformFee, DateTimeOffset updatedAt)
+    public void CreditSaleProceeds(decimal netAmount, DateTimeOffset updatedAt)
     {
-        EnsurePositive(grossAmount);
-        if (platformFee < 0 || platformFee >= grossAmount)
-        {
-            throw new DomainException("Platform fee must be non-negative and lower than the gross sale amount.");
-        }
-
-        Balance += grossAmount - platformFee;
-        TotalEarned += grossAmount - platformFee;
+        EnsurePositive(netAmount);
+        Balance += netAmount;
+        TotalEarned += netAmount;
         Touch(updatedAt);
     }
 

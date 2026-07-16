@@ -82,9 +82,9 @@ public sealed class MarketplaceOrder
 
     public void Cancel(DateTimeOffset updatedAt)
     {
-        if (Status is not (MarketplaceOrderStatus.Requested or MarketplaceOrderStatus.Accepted))
+        if (Status != MarketplaceOrderStatus.Requested)
         {
-            throw new DomainException("This marketplace order can no longer be cancelled.");
+            throw new DomainException("Marketplace orders can only be cancelled before the seller accepts them.");
         }
 
         Status = MarketplaceOrderStatus.Cancelled;

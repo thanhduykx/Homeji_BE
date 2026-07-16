@@ -14,6 +14,25 @@ public sealed class MarketplaceOrderRepository : IMarketplaceOrderRepository
     public Task<MarketplaceOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbContext.MarketplaceOrders.SingleOrDefaultAsync(order => order.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<MarketplaceOrder>> GetGroupByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var anchor = await _dbContext.MarketplaceOrders
+            .SingleOrDefaultAsync(order => order.Id == id, cancellationToken);
+        if (anchor is null)
+        {
+            return [];
+        }
+
+        return await _dbContext.MarketplaceOrders
+            .Where(order => order.BuyerId == anchor.BuyerId
+                && order.SellerId == anchor.SellerId
+                && order.CreatedAt == anchor.CreatedAt)
+            .OrderBy(order => order.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> HasActiveAsync(Guid postId, Guid buyerId, CancellationToken cancellationToken = default) =>
         _dbContext.MarketplaceOrders.AnyAsync(order =>
             order.MarketplacePostId == postId

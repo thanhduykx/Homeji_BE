@@ -34,12 +34,12 @@ public sealed class WalletAccountTests
     }
 
     [Fact]
-    public void CreditSale_CreditsOnlySellerNetAmount()
+    public void CreditSaleProceeds_CreditsOnlyProvidedNetAmount()
     {
         var now = DateTimeOffset.UtcNow;
         var wallet = WalletAccount.Create(Guid.NewGuid(), now);
 
-        wallet.CreditSale(70_000, 7_000, now.AddMinutes(1));
+        wallet.CreditSaleProceeds(63_000, now.AddMinutes(1));
 
         Assert.Equal(63_000, wallet.Balance);
         Assert.Equal(63_000, wallet.TotalEarned);

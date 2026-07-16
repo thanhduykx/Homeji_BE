@@ -73,6 +73,123 @@ public sealed class MarketplaceCartOrderServiceTests
         Assert.Equal(1, orderRepository.SaveCount);
     }
 
+    [Fact]
+    public async Task CancelAsync_CartOrder_CancelsAndRefundsEveryItemInCheckout()
+    {
+        var buyerId = Guid.NewGuid();
+        var sellerId = Guid.NewGuid();
+        var posts = new[]
+        {
+            CreateFoodPost(sellerId, "Bánh mì", 20_000),
+            CreateFoodPost(sellerId, "Trà đào", 15_000),
+        };
+        var buyerWallet = ActivatedWallet(buyerId, 200_000);
+        var sellerWallet = ActivatedWallet(sellerId, 100_000);
+        sellerWallet.DebitWithdrawal(80_000, UtcNow.AddMinutes(-1));
+        var orderRepository = new StubOrderRepository();
+        var walletRepository = new StubWalletRepository(buyerWallet, sellerWallet);
+        var notifications = new StubNotificationRepository();
+        var publisher = new StubNotificationPublisher();
+        var timeProvider = new StubTimeProvider();
+        var service = new MarketplaceOrderService(
+            new UserContext(new StubCurrentUser(buyerId), profiles: null!),
+            orderRepository,
+            new StubPostRepository(posts),
+            notifications,
+            publisher,
+            timeProvider,
+            walletRepository,
+            new StubSellerPlanService(),
+            new CreateMarketplaceOrderDtoValidator(timeProvider),
+            new CreateMarketplaceCartOrderDtoValidator(timeProvider),
+            Options.Create(new MarketplaceFinanceOptions
+            {
+                MinimumFoodOrder = 25_000,
+                SellerReserve = 20_000,
+            }),
+            profiles: null!);
+
+        var created = await service.CreateCartAsync(new CreateMarketplaceCartOrderDto(
+            posts.Select(post => new MarketplaceCartItemDto(post.Id, 1)).ToArray(),
+            UtcNow.AddHours(1),
+            "Nhận tại bếp",
+            null));
+
+        await service.CancelAsync(created[0].Id);
+
+        Assert.All(orderRepository.Added, order => Assert.Equal(MarketplaceOrderStatus.Cancelled, order.Status));
+        Assert.All(posts, post => Assert.Equal(0, post.ReservedQuantity));
+        Assert.Equal(200_000, buyerWallet.Balance);
+        Assert.Equal(4, walletRepository.AddedTransactions.Count);
+        Assert.Equal(4, notifications.Added.Count);
+        Assert.Equal(4, publisher.Published.Count);
+        Assert.Equal(2, orderRepository.SaveCount);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_CreditsOnlyNetProceedsAfterFeesAreWithheld()
+    {
+        var buyerId = Guid.NewGuid();
+        var sellerId = Guid.NewGuid();
+        var posts = new[]
+        {
+            CreateFoodPost(sellerId, "Bánh mì", 20_000),
+            CreateFoodPost(sellerId, "Trà đào", 15_000),
+        };
+        var buyerWallet = ActivatedWallet(buyerId, 200_000);
+        var sellerWallet = ActivatedWallet(sellerId, 100_000);
+        sellerWallet.DebitWithdrawal(80_000, UtcNow.AddMinutes(-1));
+        var orderRepository = new StubOrderRepository();
+        var walletRepository = new StubWalletRepository(buyerWallet, sellerWallet);
+        var notifications = new StubNotificationRepository();
+        var publisher = new StubNotificationPublisher();
+        var timeProvider = new StubTimeProvider();
+
+        MarketplaceOrderService CreateService(Guid userId) => new(
+            new UserContext(new StubCurrentUser(userId), profiles: null!),
+            orderRepository,
+            new StubPostRepository(posts),
+            notifications,
+            publisher,
+            timeProvider,
+            walletRepository,
+            new StubSellerPlanService(),
+            new CreateMarketplaceOrderDtoValidator(timeProvider),
+            new CreateMarketplaceCartOrderDtoValidator(timeProvider),
+            Options.Create(new MarketplaceFinanceOptions
+            {
+                MinimumFoodOrder = 25_000,
+                SellerReserve = 20_000,
+            }),
+            profiles: null!);
+
+        var buyerService = CreateService(buyerId);
+        var created = await buyerService.CreateCartAsync(new CreateMarketplaceCartOrderDto(
+            posts.Select(post => new MarketplaceCartItemDto(post.Id, 1)).ToArray(),
+            UtcNow.AddHours(1),
+            "Nhận tại bếp",
+            null));
+
+        await CreateService(sellerId).AcceptAsync(created[0].Id);
+        await buyerService.CompleteAsync(created[0].Id);
+
+        var orders = orderRepository.Added;
+        var expectedNet = orders.Sum(order => order.SellerNetAmount);
+        Assert.Equal(20_000 + expectedNet, sellerWallet.Balance);
+        Assert.Equal(expectedNet, sellerWallet.TotalEarned);
+
+        var sellerTransactions = walletRepository.AddedTransactions
+            .Where(transaction => transaction.WalletUserId == sellerId)
+            .ToArray();
+        Assert.Equal(orders.Count, sellerTransactions.Length);
+        Assert.All(sellerTransactions, transaction =>
+            Assert.Equal(WalletTransactionKind.SaleProceeds, transaction.Kind));
+        Assert.Equal(
+            orders.Select(order => order.SellerNetAmount).Order(),
+            sellerTransactions.Select(transaction => transaction.Amount).Order());
+        Assert.Equal(sellerWallet.Balance, sellerTransactions[^1].BalanceAfter);
+    }
+
     private static MarketplacePost CreateFoodPost(Guid sellerId, string title, decimal price) =>
         new(
             sellerId,
@@ -135,7 +252,20 @@ public sealed class MarketplaceCartOrderServiceTests
         public int SaveCount { get; private set; }
 
         public Task<MarketplaceOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
-            Task.FromResult<MarketplaceOrder?>(null);
+            Task.FromResult(Added.SingleOrDefault(order => order.Id == id));
+
+        public Task<IReadOnlyList<MarketplaceOrder>> GetGroupByIdAsync(
+            Guid id,
+            CancellationToken cancellationToken = default)
+        {
+            var anchor = Added.SingleOrDefault(order => order.Id == id);
+            return Task.FromResult<IReadOnlyList<MarketplaceOrder>>(anchor is null
+                ? []
+                : Added.Where(order => order.BuyerId == anchor.BuyerId
+                    && order.SellerId == anchor.SellerId
+                    && order.CreatedAt == anchor.CreatedAt)
+                    .ToArray());
+        }
 
         public Task<bool> HasActiveAsync(Guid postId, Guid buyerId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);

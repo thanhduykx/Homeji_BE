@@ -5,6 +5,13 @@ namespace Homeji.Application.IRepositories.MarketplaceOrders;
 public interface IMarketplaceOrderRepository
 {
     Task<MarketplaceOrder?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    async Task<IReadOnlyList<MarketplaceOrder>> GetGroupByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var order = await GetByIdAsync(id, cancellationToken);
+        return order is null ? [] : [order];
+    }
     Task<bool> HasActiveAsync(Guid postId, Guid buyerId, CancellationToken cancellationToken = default);
     Task<IReadOnlySet<Guid>> GetActivePostIdsAsync(
         IReadOnlyCollection<Guid> postIds,

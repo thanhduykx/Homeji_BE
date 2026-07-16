@@ -350,18 +350,28 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         CancellationToken cancellationToken)
     {
         var userId = _userContext.GetRequiredUserId();
-        var order = await _orders.GetByIdAsync(id, cancellationToken)
-            ?? throw new NotFoundException(nameof(MarketplaceOrder), id);
+        var orderGroup = await _orders.GetGroupByIdAsync(id, cancellationToken);
+        if (orderGroup.Count == 0)
+        {
+            throw new NotFoundException(nameof(MarketplaceOrder), id);
+        }
+
+        var order = orderGroup.Single(groupOrder => groupOrder.Id == id);
         var currentTime = _timeProvider.GetUtcNow();
-        if (order.Status == MarketplaceOrderStatus.Requested
+        if (orderGroup.All(groupOrder => groupOrder.Status == MarketplaceOrderStatus.Requested)
             && order.CreatedAt.AddMinutes(_financeOptions.OrderRequestTimeoutMinutes) <= currentTime)
         {
-            order.Expire(currentTime);
-            await RefundAndReleaseStockAsync(order, currentTime, cancellationToken);
-            var expirationNotifications = BuildExpirationNotifications(
-                order,
-                currentTime,
-                _financeOptions.OrderRequestTimeoutMinutes);
+            var expirationNotifications = new List<Notification>(orderGroup.Count * 2);
+            foreach (var groupOrder in orderGroup)
+            {
+                groupOrder.Expire(currentTime);
+                await RefundAndReleaseStockAsync(groupOrder, currentTime, cancellationToken);
+                expirationNotifications.AddRange(BuildExpirationNotifications(
+                    groupOrder,
+                    currentTime,
+                    _financeOptions.OrderRequestTimeoutMinutes));
+            }
+
             await _notifications.AddRangeAsync(expirationNotifications, cancellationToken);
             await _orders.SaveChangesAsync(cancellationToken);
             foreach (var expirationNotification in expirationNotifications)
@@ -376,14 +386,23 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         if (target == MarketplaceOrderStatus.Cancelled)
         {
             UserContext.EnsureOwner(userId, order.BuyerId);
-            var now = currentTime;
-            order.Cancel(now);
-            await RefundAndReleaseStockAsync(order, now, cancellationToken);
+            EnsureGroupStatus(
+                orderGroup,
+                MarketplaceOrderStatus.Requested,
+                "Chỉ có thể hủy đơn trước khi bếp xác nhận.");
+            foreach (var groupOrder in orderGroup)
+            {
+                groupOrder.Cancel(currentTime);
+                await RefundAndReleaseStockAsync(groupOrder, currentTime, cancellationToken);
+            }
         }
         else if (target is MarketplaceOrderStatus.Accepted or MarketplaceOrderStatus.Rejected)
         {
             UserContext.EnsureOwner(userId, order.SellerId);
-            var now = currentTime;
+            EnsureGroupStatus(
+                orderGroup,
+                MarketplaceOrderStatus.Requested,
+                "Chỉ có thể xử lý đơn khi toàn bộ món đang chờ xác nhận.");
             if (target == MarketplaceOrderStatus.Accepted)
             {
                 var sellerWallet = await _wallets.GetAsync(order.SellerId, cancellationToken);
@@ -392,28 +411,59 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                     throw WalletFundingRequired("Người bán phải duy trì quỹ đảm bảo trước khi nhận đơn.");
                 }
 
-                order.Accept(now);
+                foreach (var groupOrder in orderGroup)
+                {
+                    groupOrder.Accept(currentTime);
+                }
             }
             else
             {
-                order.Reject(now);
-                await RefundAndReleaseStockAsync(order, now, cancellationToken);
+                foreach (var groupOrder in orderGroup)
+                {
+                    groupOrder.Reject(currentTime);
+                    await RefundAndReleaseStockAsync(groupOrder, currentTime, cancellationToken);
+                }
             }
         }
         else
         {
             UserContext.EnsureOwner(userId, order.BuyerId);
-            var now = currentTime;
-            order.Complete(now);
-            await ReleaseSaleProceedsAsync(order, now, cancellationToken);
+            EnsureGroupStatus(
+                orderGroup,
+                MarketplaceOrderStatus.Accepted,
+                "Chỉ có thể hoàn tất khi bếp đã xác nhận toàn bộ đơn.");
+            foreach (var groupOrder in orderGroup)
+            {
+                groupOrder.Complete(currentTime);
+                await ReleaseSaleProceedsAsync(groupOrder, currentTime, cancellationToken);
+            }
         }
 
-        var recipientId = userId == order.BuyerId ? order.SellerId : order.BuyerId;
-        var notification = BuildNotification(order, recipientId, _timeProvider.GetUtcNow());
-        await _notifications.AddAsync(notification, cancellationToken);
+        var notifications = orderGroup
+            .Select(groupOrder => BuildNotification(
+                groupOrder,
+                userId == groupOrder.BuyerId ? groupOrder.SellerId : groupOrder.BuyerId,
+                currentTime))
+            .ToArray();
+        await _notifications.AddRangeAsync(notifications, cancellationToken);
         await _orders.SaveChangesAsync(cancellationToken);
-        await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        foreach (var notification in notifications)
+        {
+            await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        }
+
         return ToDto(order);
+    }
+
+    private static void EnsureGroupStatus(
+        IReadOnlyList<MarketplaceOrder> orderGroup,
+        MarketplaceOrderStatus expectedStatus,
+        string message)
+    {
+        if (orderGroup.Any(order => order.Status != expectedStatus))
+        {
+            throw new DomainException(message);
+        }
     }
 
     private static Notification BuildNotification(MarketplaceOrder order, Guid recipientId, DateTimeOffset now) =>
@@ -507,25 +557,16 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             ?? throw new InvalidOperationException("Seller wallet was not found for a funded marketplace order.");
         var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken)
             ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
-        var balanceBefore = sellerWallet.Balance;
-        sellerWallet.CreditSale(order.AgreedPrice, order.PlatformFeeAmount, now);
+        sellerWallet.CreditSaleProceeds(order.SellerNetAmount, now);
         post.CompleteReservation(order.Quantity, now);
         order.MarkFundsReleased(now);
         await _wallets.AddTransactionAsync(new WalletTransaction(
             order.SellerId,
             WalletTransactionKind.SaleProceeds,
-            order.AgreedPrice,
-            balanceBefore + order.AgreedPrice,
-            order.Id,
-            "Doanh thu đơn chợ Homeji",
-            now), cancellationToken);
-        await _wallets.AddTransactionAsync(new WalletTransaction(
-            order.SellerId,
-            WalletTransactionKind.PlatformFee,
-            -order.PlatformFeeAmount,
+            order.SellerNetAmount,
             sellerWallet.Balance,
             order.Id,
-            $"Phí nền tảng {order.PlatformFeeRate:P0}",
+            $"Tiền bán hàng sau phí {order.PlatformFeeRate:P0} (đã trừ {order.PlatformFeeAmount:0} đồng)",
             now), cancellationToken);
     }
 
