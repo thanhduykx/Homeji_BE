@@ -11,6 +11,7 @@ public sealed record WalletDto(
     bool IsActivated,
     decimal MinimumTopUp,
     decimal MaximumTopUp,
+    decimal MinimumWithdrawalReserve,
     DateTimeOffset? UpdatedAt);
 
 public sealed record WalletTransactionDto(
@@ -21,3 +22,24 @@ public sealed record WalletTransactionDto(
     Guid ReferenceId,
     string Description,
     DateTimeOffset CreatedAt);
+
+public sealed record CreateWalletWithdrawalDto(
+    decimal Amount,
+    string BankName,
+    string AccountNumber,
+    string AccountHolder);
+
+public sealed record ReviewWalletWithdrawalDto(string? Note);
+
+public sealed record WalletWithdrawalDto(
+    Guid Id,
+    Guid UserId,
+    decimal Amount,
+    string BankName,
+    string AccountNumber,
+    string AccountHolder,
+    WalletWithdrawalStatus Status,
+    string? AdminNote,
+    Guid? ProcessedBy,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ProcessedAt);

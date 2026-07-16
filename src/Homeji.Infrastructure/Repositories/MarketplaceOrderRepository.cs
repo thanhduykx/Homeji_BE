@@ -21,6 +21,19 @@ public sealed class MarketplaceOrderRepository : IMarketplaceOrderRepository
             && (order.Status == MarketplaceOrderStatus.Requested || order.Status == MarketplaceOrderStatus.Accepted),
             cancellationToken);
 
+    public async Task<IReadOnlySet<Guid>> GetActivePostIdsAsync(
+        IReadOnlyCollection<Guid> postIds,
+        Guid buyerId,
+        CancellationToken cancellationToken = default) =>
+        (await _dbContext.MarketplaceOrders.AsNoTracking()
+            .Where(order => postIds.Contains(order.MarketplacePostId)
+                && order.BuyerId == buyerId
+                && (order.Status == MarketplaceOrderStatus.Requested
+                    || order.Status == MarketplaceOrderStatus.Accepted))
+            .Select(order => order.MarketplacePostId)
+            .ToListAsync(cancellationToken))
+        .ToHashSet();
+
     public async Task<IReadOnlyList<MarketplaceOrder>> GetExpiredRequestedAsync(
         DateTimeOffset cutoff,
         int take,

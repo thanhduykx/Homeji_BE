@@ -25,6 +25,15 @@ public sealed class MarketplaceOrdersController : ControllerBase
         return Created($"/api/marketplace-orders/{result.Id}", result);
     }
 
+    [HttpPost("cart")]
+    public async Task<ActionResult<IReadOnlyList<MarketplaceOrderDto>>> CreateCart(
+        [FromBody] CreateMarketplaceCartOrderDto request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _orders.CreateCartAsync(request, cancellationToken);
+        return Created("/api/marketplace-orders", result);
+    }
+
     [HttpPost("{id:guid}/accept")]
     public async Task<ActionResult<MarketplaceOrderDto>> Accept(Guid id, CancellationToken cancellationToken) =>
         Ok(await _orders.AcceptAsync(id, cancellationToken));

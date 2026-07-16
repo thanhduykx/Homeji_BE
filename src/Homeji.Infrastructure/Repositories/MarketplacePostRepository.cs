@@ -40,6 +40,14 @@ public sealed class MarketplacePostRepository : IMarketplacePostRepository
             .Where(post => ids.Contains(post.Id))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<MarketplacePost>> GetByIdsForUpdateAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.MarketplacePosts
+            .Include(post => post.Media)
+            .Where(post => ids.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
         string? keyword,
         string? category,

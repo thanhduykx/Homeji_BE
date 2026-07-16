@@ -22,7 +22,7 @@ public sealed class WalletService : IWalletService
         var userId = _userContext.GetRequiredUserId();
         var wallet = await _wallets.GetAsync(userId, cancellationToken);
         return wallet is null
-            ? new WalletDto(userId, 0, 0, 0, 0, false, WalletAccount.MinimumTopUp, WalletAccount.MaximumTopUp, null)
+            ? new WalletDto(userId, 0, 0, 0, 0, false, WalletAccount.MinimumTopUp, WalletAccount.MaximumTopUp, WalletAccount.MinimumWithdrawalReserve, null)
             : ToDto(wallet);
     }
 
@@ -53,5 +53,6 @@ public sealed class WalletService : IWalletService
         wallet.IsActivated,
         WalletAccount.MinimumTopUp,
         WalletAccount.MaximumTopUp,
+        WalletAccount.MinimumWithdrawalReserve,
         wallet.UpdatedAt);
 }

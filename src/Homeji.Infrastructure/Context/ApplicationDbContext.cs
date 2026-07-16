@@ -37,6 +37,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<MarketplaceOrder> MarketplaceOrders => Set<MarketplaceOrder>();
     public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+    public DbSet<WalletWithdrawalRequest> WalletWithdrawalRequests => Set<WalletWithdrawalRequest>();
     public DbSet<MarketplaceSellerSubscription> MarketplaceSellerSubscriptions => Set<MarketplaceSellerSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

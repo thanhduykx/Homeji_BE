@@ -94,6 +94,7 @@ public static class DependencyInjection
         services.AddScoped<IRentalWantedPostRepository, RentalWantedPostRepository>();
         services.AddScoped<IMarketplaceOrderRepository, MarketplaceOrderRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
+        services.AddScoped<IWalletWithdrawalRepository, WalletWithdrawalRepository>();
         services.AddScoped<IMarketplaceSellerSubscriptionRepository, MarketplaceSellerSubscriptionRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
