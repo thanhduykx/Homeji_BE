@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Marketplace;
 using Homeji.Application.IRepositories.Marketplace;
@@ -218,6 +219,11 @@ public sealed class MarketplacePostService : IMarketplacePostService
         if (request.Longitude is < -180 or > 180)
         {
             errors["longitude"] = ["Longitude must be between -180 and 180."];
+        }
+
+        if (!HomejiServiceArea.Contains(request.Latitude, request.Longitude))
+        {
+            errors["location"] = ["Vị trí người bán phải nằm trong khu vực Thủ Đức và Quận 9 cũ."];
         }
 
         if (request.MediaUrls is null

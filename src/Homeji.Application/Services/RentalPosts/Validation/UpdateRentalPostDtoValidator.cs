@@ -1,4 +1,5 @@
 using FluentValidation;
+using Homeji.Application.Common;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Domain.Entities;
 
@@ -30,10 +31,12 @@ public sealed class UpdateRentalPostDtoValidator : AbstractValidator<UpdateRenta
             .MaximumLength(RentalPost.MaxAddressLength);
 
         RuleFor(request => request.Latitude)
-            .InclusiveBetween(-90, 90);
+            .InclusiveBetween(HomejiServiceArea.MinLatitude, HomejiServiceArea.MaxLatitude)
+            .WithMessage("Vị trí phải nằm trong khu vực Thủ Đức và Quận 9 cũ.");
 
         RuleFor(request => request.Longitude)
-            .InclusiveBetween(-180, 180);
+            .InclusiveBetween(HomejiServiceArea.MinLongitude, HomejiServiceArea.MaxLongitude)
+            .WithMessage("Vị trí phải nằm trong khu vực Thủ Đức và Quận 9 cũ.");
 
         RuleFor(request => request.ElectricityPrice).GreaterThanOrEqualTo(0);
         RuleFor(request => request.WaterPrice).GreaterThanOrEqualTo(0);
