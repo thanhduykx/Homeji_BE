@@ -365,9 +365,15 @@ public sealed class SupabaseAccountService : IAccountService
 
     private static string? ResolveRedirectUrl(string? requestRedirectTo, string? configuredRedirectTo)
     {
-        return !string.IsNullOrWhiteSpace(requestRedirectTo)
-            ? requestRedirectTo
-            : configuredRedirectTo;
+        if (!string.IsNullOrWhiteSpace(requestRedirectTo)
+            && requestRedirectTo != "string"
+            && Uri.TryCreate(requestRedirectTo, UriKind.Absolute, out var uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            return requestRedirectTo;
+        }
+
+        return configuredRedirectTo;
     }
 
     private static void ValidateEmailAndPassword(string? email, string? password)
