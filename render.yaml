@@ -10,5 +10,7 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: Database__ApplyMigrationsOnStartup
+        value: "true"
       - key: Ai__Gemini__ApiKey
         sync: false
