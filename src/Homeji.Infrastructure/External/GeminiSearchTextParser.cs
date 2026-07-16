@@ -105,6 +105,8 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
             - Chuẩn hóa criteria sang camelCase tiếng Anh nếu phù hợp: parking, freeTime, wifi, airConditioner, privateToilet, security, quiet, petFriendly, kitchen.
             - Nếu không chắc, để null hoặc mảng rỗng.
 
+            {{HomejiLocationKnowledge.SearchParserRules}}
+
             Câu người dùng:
             {{text}}
             """;

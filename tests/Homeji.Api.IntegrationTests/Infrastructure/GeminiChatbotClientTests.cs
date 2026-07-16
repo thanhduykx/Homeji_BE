@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Infrastructure.External;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -65,6 +66,33 @@ public sealed class GeminiChatbotClientTests
         Assert.Equal(3, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task GenerateReplyAsync_IncludesVerifiedThuDucLandmarkKnowledge()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"candidates":[{"content":{"parts":[{"text":"Đã hiểu khu vực."}]}}]}"""),
+            });
+        var client = new GeminiChatbotClient(
+            new HttpClient(handler),
+            Options.Create(new GeminiOptions
+            {
+                ApiKey = "test-key",
+                TimeoutSeconds = 5,
+            }),
+            NullLogger<GeminiChatbotClient>.Instance);
+
+        await client.GenerateReplyAsync([], "Tìm trọ gần FPTU hoặc Nhà Văn hóa Sinh viên");
+
+        var prompt = ExtractPrompt(handler.RequestBodies.Single());
+        Assert.Contains("Quận 9 cũ", prompt, StringComparison.Ordinal);
+        Assert.Contains("phường Tăng Nhơn Phú", prompt, StringComparison.Ordinal);
+        Assert.Contains("01 Lưu Hữu Phước", prompt, StringComparison.Ordinal);
+        Assert.Contains("hai mốc độc lập", prompt, StringComparison.Ordinal);
+    }
+
     private static HttpResponseMessage CreateRateLimitedResponse()
     {
         var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests)
@@ -75,24 +103,36 @@ public sealed class GeminiChatbotClientTests
         return response;
     }
 
+    private static string ExtractPrompt(string requestBody)
+    {
+        using var document = JsonDocument.Parse(requestBody);
+        return document.RootElement
+            .GetProperty("contents")[0]
+            .GetProperty("parts")[0]
+            .GetProperty("text")
+            .GetString()!;
+    }
+
     private sealed class SequenceHttpMessageHandler(params HttpResponseMessage[] responses)
         : HttpMessageHandler
     {
         private readonly Queue<HttpResponseMessage> _responses = new(responses);
 
         public int RequestCount { get; private set; }
+        public List<string> RequestBodies { get; } = [];
 
-        protected override Task<HttpResponseMessage> SendAsync(
+        protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             RequestCount++;
+            RequestBodies.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
             if (_responses.Count == 0)
             {
                 throw new InvalidOperationException("No fake Gemini response remains.");
             }
 
-            return Task.FromResult(_responses.Dequeue());
+            return _responses.Dequeue();
         }
     }
 }
