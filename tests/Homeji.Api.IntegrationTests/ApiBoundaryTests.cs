@@ -66,11 +66,28 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [InlineData("/api/activities")]
     [InlineData("/api/wallet")]
     [InlineData("/api/wallet/transactions")]
+    [InlineData("/api/wallet/withdrawals")]
+    [InlineData("/api/admin/wallet-withdrawals?status=1")]
     [InlineData("/api/marketplace-seller-plans")]
     [InlineData("/api/marketplace-seller-plans/mine")]
     public async Task NewPrivateEndpoints_WithoutAccessToken_ReturnUnauthorized(string path)
     {
         var response = await _client.GetAsync(new Uri(path, UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MarketplaceCartCheckout_WithoutAccessToken_ReturnsUnauthorized()
+    {
+        var response = await _client.PostAsJsonAsync(
+            new Uri("/api/marketplace-orders/cart", UriKind.Relative),
+            new
+            {
+                items = new[] { new { postId = Guid.NewGuid(), quantity = 1 } },
+                pickupAt = DateTimeOffset.UtcNow.AddHours(1),
+                pickupAddress = "Bếp Homeji",
+            });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }

@@ -9,10 +9,12 @@ namespace Homeji.Api.Controllers;
 public sealed class WalletController : ControllerBase
 {
     private readonly IWalletService _wallets;
+    private readonly IWalletWithdrawalService _withdrawals;
 
-    public WalletController(IWalletService wallets)
+    public WalletController(IWalletService wallets, IWalletWithdrawalService withdrawals)
     {
         _wallets = wallets;
+        _withdrawals = withdrawals;
     }
 
     [HttpGet]
@@ -26,4 +28,19 @@ public sealed class WalletController : ControllerBase
         [FromQuery] int take = 50,
         CancellationToken cancellationToken = default) =>
         Ok(await _wallets.GetMyTransactionsAsync(take, cancellationToken));
+
+    [HttpGet("withdrawals")]
+    [ProducesResponseType<IReadOnlyList<WalletWithdrawalDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<WalletWithdrawalDto>>> GetWithdrawals(CancellationToken cancellationToken) =>
+        Ok(await _withdrawals.GetMineAsync(cancellationToken));
+
+    [HttpPost("withdrawals")]
+    [ProducesResponseType<WalletWithdrawalDto>(StatusCodes.Status201Created)]
+    public async Task<ActionResult<WalletWithdrawalDto>> CreateWithdrawal(
+        [FromBody] CreateWalletWithdrawalDto request,
+        CancellationToken cancellationToken)
+    {
+        var created = await _withdrawals.CreateAsync(request, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, created);
+    }
 }

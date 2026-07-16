@@ -6,7 +6,7 @@ public sealed class MarketplaceFinanceOptions
 {
     public const string SectionName = "MarketplaceFinance";
 
-    public decimal SellerReserve { get; set; } = 100_000m;
+    public decimal SellerReserve { get; set; } = WalletAccount.MinimumWithdrawalReserve;
     public decimal MinimumFoodPrice { get; set; } = 10_000m;
     public decimal MinimumFoodOrder { get; set; } = 25_000m;
     public int OrderRequestTimeoutMinutes { get; set; } = 30;
@@ -27,7 +27,7 @@ public sealed class MarketplaceFinanceOptions
 
     public bool IsValid()
     {
-        return SellerReserve >= WalletAccount.MinimumTopUp
+        return SellerReserve >= WalletAccount.MinimumWithdrawalReserve
             && MinimumFoodPrice > 0
             && MinimumFoodOrder >= MinimumFoodPrice
             && OrderRequestTimeoutMinutes is >= 5 and <= 1_440

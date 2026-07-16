@@ -6,6 +6,7 @@ public sealed class WalletAccount
 {
     public const decimal MinimumTopUp = 100_000m;
     public const decimal MaximumTopUp = 5_000_000m;
+    public const decimal MinimumWithdrawalReserve = 20_000m;
 
     private WalletAccount()
     {
@@ -75,6 +76,25 @@ public sealed class WalletAccount
 
         Balance += grossAmount - platformFee;
         TotalEarned += grossAmount - platformFee;
+        Touch(updatedAt);
+    }
+
+    public void DebitWithdrawal(decimal amount, DateTimeOffset updatedAt)
+    {
+        EnsurePositive(amount);
+        if (Balance - amount < MinimumWithdrawalReserve)
+        {
+            throw new DomainException($"Wallet must retain at least {MinimumWithdrawalReserve:0} VND after withdrawal.");
+        }
+
+        Balance -= amount;
+        Touch(updatedAt);
+    }
+
+    public void CreditWithdrawalRefund(decimal amount, DateTimeOffset updatedAt)
+    {
+        EnsurePositive(amount);
+        Balance += amount;
         Touch(updatedAt);
     }
 

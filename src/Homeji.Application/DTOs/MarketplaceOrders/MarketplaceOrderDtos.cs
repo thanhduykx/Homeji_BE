@@ -4,6 +4,14 @@ namespace Homeji.Application.DTOs.MarketplaceOrders;
 
 public sealed record CreateMarketplaceOrderDto(DateTimeOffset PickupAt, string? PickupAddress, string? Note, int Quantity = 1);
 
+public sealed record MarketplaceCartItemDto(Guid PostId, int Quantity);
+
+public sealed record CreateMarketplaceCartOrderDto(
+    IReadOnlyList<MarketplaceCartItemDto> Items,
+    DateTimeOffset PickupAt,
+    string? PickupAddress,
+    string? Note);
+
 public sealed record MarketplaceOrderDto(
     Guid Id,
     Guid MarketplacePostId,

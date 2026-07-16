@@ -44,4 +44,43 @@ public sealed class WalletAccountTests
         Assert.Equal(63_000, wallet.Balance);
         Assert.Equal(63_000, wallet.TotalEarned);
     }
+
+    [Fact]
+    public void DebitWithdrawal_WhenReserveWouldRemain_DebitsBalance()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var wallet = WalletAccount.Create(Guid.NewGuid(), now);
+        wallet.CreditTopUp(200_000, now.AddMinutes(1));
+
+        wallet.DebitWithdrawal(180_000, now.AddMinutes(2));
+
+        Assert.Equal(WalletAccount.MinimumWithdrawalReserve, wallet.Balance);
+        Assert.Equal(2, wallet.Version);
+    }
+
+    [Fact]
+    public void DebitWithdrawal_WhenReserveWouldBeViolated_LeavesWalletUnchanged()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var wallet = WalletAccount.Create(Guid.NewGuid(), now);
+        wallet.CreditTopUp(200_000, now.AddMinutes(1));
+
+        Assert.Throws<DomainException>(() => wallet.DebitWithdrawal(180_001, now.AddMinutes(2)));
+        Assert.Equal(200_000, wallet.Balance);
+        Assert.Equal(1, wallet.Version);
+    }
+
+    [Fact]
+    public void CreditWithdrawalRefund_RestoresRejectedWithdrawal()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var wallet = WalletAccount.Create(Guid.NewGuid(), now);
+        wallet.CreditTopUp(200_000, now.AddMinutes(1));
+        wallet.DebitWithdrawal(100_000, now.AddMinutes(2));
+
+        wallet.CreditWithdrawalRefund(100_000, now.AddMinutes(3));
+
+        Assert.Equal(200_000, wallet.Balance);
+        Assert.Equal(3, wallet.Version);
+    }
 }

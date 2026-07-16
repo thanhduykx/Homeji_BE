@@ -17,6 +17,11 @@ public interface IMarketplacePostRepository
         CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<MarketplacePost>>([]);
 
+    Task<IReadOnlyList<MarketplacePost>> GetByIdsForUpdateAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MarketplacePost>>([]);
+
     Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
         string? keyword,
         string? category,

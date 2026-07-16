@@ -8,4 +8,6 @@ public enum WalletTransactionKind
     SaleProceeds = 4,
     PlatformFee = 5,
     SellerPlanPurchase = 6,
+    Withdrawal = 7,
+    WithdrawalRefund = 8,
 }

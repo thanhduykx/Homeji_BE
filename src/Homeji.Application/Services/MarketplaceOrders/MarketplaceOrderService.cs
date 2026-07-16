@@ -30,6 +30,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
     private readonly IWalletRepository _wallets;
     private readonly IMarketplaceSellerPlanService _sellerPlans;
     private readonly IValidator<CreateMarketplaceOrderDto> _validator;
+    private readonly IValidator<CreateMarketplaceCartOrderDto> _cartValidator;
     private readonly MarketplaceFinanceOptions _financeOptions;
     private readonly IUserProfileRepository _profiles;
 
@@ -43,6 +44,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         IWalletRepository wallets,
         IMarketplaceSellerPlanService sellerPlans,
         IValidator<CreateMarketplaceOrderDto> validator,
+        IValidator<CreateMarketplaceCartOrderDto> cartValidator,
         IOptions<MarketplaceFinanceOptions> financeOptions,
         IUserProfileRepository profiles)
     {
@@ -55,6 +57,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         _wallets = wallets;
         _sellerPlans = sellerPlans;
         _validator = validator;
+        _cartValidator = cartValidator;
         _financeOptions = financeOptions.Value;
         _profiles = profiles;
     }
@@ -145,6 +148,131 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         await _orders.SaveChangesAsync(cancellationToken);
         await _realtimePublisher.PublishAsync(notification, cancellationToken);
         return ToDto(order);
+    }
+
+    public async Task<IReadOnlyList<MarketplaceOrderDto>> CreateCartAsync(
+        CreateMarketplaceCartOrderDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var validationResult = await _cartValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            throw new RequestValidationException(validationResult.Errors
+                .GroupBy(error => error.PropertyName, StringComparer.Ordinal)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(error => error.ErrorMessage).Distinct().ToArray(),
+                    StringComparer.Ordinal));
+        }
+
+        var buyerId = _userContext.GetRequiredUserId();
+        var itemByPostId = request.Items.ToDictionary(item => item.PostId);
+        var postIds = itemByPostId.Keys.ToArray();
+        var posts = await _posts.GetByIdsForUpdateAsync(postIds, cancellationToken);
+        if (posts.Count != postIds.Length
+            || posts.Any(post => post.Status != MarketplacePostStatus.Active
+                || post.ListingType != MarketplaceListingType.Food))
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["items"] = ["Một hoặc nhiều món không còn được bán."],
+            });
+        }
+
+        var sellerIds = posts.Select(post => post.SellerId).Distinct().ToArray();
+        if (sellerIds.Length != 1)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["items"] = ["Mỗi lần thanh toán chỉ áp dụng cho món của cùng một bếp."],
+            });
+        }
+
+        var sellerId = sellerIds[0];
+        if (sellerId == buyerId)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["items"] = ["Bạn không thể mua món do chính mình đăng bán."],
+            });
+        }
+
+        var activePostIds = await _orders.GetActivePostIdsAsync(postIds, buyerId, cancellationToken);
+        if (activePostIds.Count > 0)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["items"] = ["Giỏ có món đang nằm trong một yêu cầu mua chưa hoàn tất."],
+            });
+        }
+
+        var grossAmount = posts.Sum(post => post.Price * itemByPostId[post.Id].Quantity);
+        if (grossAmount < _financeOptions.MinimumFoodOrder)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["items"] = [$"Tổng giỏ hàng tối thiểu {_financeOptions.MinimumFoodOrder:0} đồng."],
+            });
+        }
+
+        var buyerWallet = await _wallets.GetAsync(buyerId, cancellationToken);
+        if (buyerWallet is null || !buyerWallet.IsActivated || buyerWallet.Balance < grossAmount)
+        {
+            var missing = grossAmount - (buyerWallet?.Balance ?? 0);
+            throw WalletFundingRequired($"Nạp thêm ít nhất {Math.Max(0, missing):0} đồng để thanh toán giỏ hàng.");
+        }
+
+        var sellerWallet = await _wallets.GetAsync(sellerId, cancellationToken);
+        if (sellerWallet is null || !sellerWallet.IsActivated || sellerWallet.Balance < _financeOptions.SellerReserve)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["sellerWallet"] = ["Người bán chưa duy trì đủ quỹ đảm bảo để nhận đơn."],
+            });
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        var commissionRate = await _sellerPlans.ResolveCommissionRateAsync(sellerId, now, cancellationToken);
+        var createdOrders = new List<(MarketplaceOrder Order, MarketplacePost Post)>(posts.Count);
+        var notifications = new List<Notification>(posts.Count);
+        foreach (var post in posts)
+        {
+            var item = itemByPostId[post.Id];
+            var order = new MarketplaceOrder(
+                post.Id,
+                buyerId,
+                sellerId,
+                post.Price,
+                request.PickupAt,
+                request.PickupAddress!,
+                request.Note,
+                now,
+                item.Quantity,
+                commissionRate);
+            post.Reserve(item.Quantity, now);
+            buyerWallet.DebitPurchase(order.AgreedPrice, now);
+            await _wallets.AddTransactionAsync(new WalletTransaction(
+                buyerId,
+                WalletTransactionKind.Purchase,
+                -order.AgreedPrice,
+                buyerWallet.Balance,
+                order.Id,
+                $"Thanh toán món {post.Title}",
+                now), cancellationToken);
+            await _orders.AddAsync(order, cancellationToken);
+            var notification = BuildNotification(order, sellerId, now);
+            notifications.Add(notification);
+            createdOrders.Add((order, post));
+        }
+
+        await _notifications.AddRangeAsync(notifications, cancellationToken);
+        await _orders.SaveChangesAsync(cancellationToken);
+        foreach (var notification in notifications)
+        {
+            await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        }
+
+        return createdOrders.Select(item => ToDto(item.Order, item.Post)).ToArray();
     }
 
     public async Task<IReadOnlyList<MarketplaceOrderDto>> GetMineAsync(CancellationToken cancellationToken = default)
