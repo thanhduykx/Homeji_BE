@@ -9,12 +9,12 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
         LoggerMessage.Define<int>(
             LogLevel.Information,
             new EventId(1, nameof(LogNormalized)),
-            "Normalized {PostCount} legacy marketplace posts to one location per seller.");
+            "Normalized {PostCount} legacy demo post locations to the Homeji service area.");
     private static readonly Action<ILogger, Exception?> LogFailed =
         LoggerMessage.Define(
             LogLevel.Error,
             new EventId(2, nameof(LogFailed)),
-            "Failed to normalize legacy marketplace seller locations.");
+            "Failed to normalize legacy demo post locations.");
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MarketplaceSellerLocationNormalizer> _logger;
@@ -35,15 +35,25 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var changed = await dbContext.Database.ExecuteSqlRawAsync(
                 """
-                -- Repair the legacy demo seller first. Its historical seed mixed
-                -- unrelated Hanoi and Thu Duc coordinates under one account.
-                UPDATE homeji.marketplace_posts
-                SET address = '01 Lưu Hữu Phước, Khu phố Tân Lập, phường Đông Hòa, TP.HCM',
-                    latitude = 10.875340,
-                    longitude = 106.800033
-                WHERE seller_id = 'd3000000-0000-0000-0000-000000000021'
-                  AND (address, latitude, longitude) IS DISTINCT FROM
-                      ('01 Lưu Hữu Phước, Khu phố Tân Lập, phường Đông Hòa, TP.HCM', 10.875340, 106.800033);
+                -- Each seller has one canonical Thu Duc-area location. The
+                -- historical demo mixed Hanoi and Thu Duc under these accounts.
+                WITH seller_locations(seller_id, address, latitude, longitude) AS (
+                    VALUES
+                        ('d3000000-0000-0000-0000-000000000021'::uuid,
+                         '01 Lưu Hữu Phước, Khu phố Tân Lập, phường Đông Hòa, TP.HCM', 10.875340::numeric, 106.800033::numeric),
+                        ('d3000000-0000-0000-0000-000000000022'::uuid,
+                         '12 Lưu Hữu Phước, phường Đông Hòa, TP.HCM', 10.874820::numeric, 106.800610::numeric),
+                        ('d3000000-0000-0000-0000-000000000024'::uuid,
+                         'Lô E2a-7, Đường D1, Khu Công nghệ cao, phường Tăng Nhơn Phú, TP.HCM', 10.841350::numeric, 106.809950::numeric)
+                )
+                UPDATE homeji.marketplace_posts AS post
+                SET address = location.address,
+                    latitude = location.latitude,
+                    longitude = location.longitude
+                FROM seller_locations AS location
+                WHERE post.seller_id = location.seller_id
+                  AND (post.address, post.latitude, post.longitude)
+                      IS DISTINCT FROM (location.address, location.latitude, location.longitude);
 
                 WITH anchors AS (
                     SELECT DISTINCT ON (seller_id)
@@ -62,6 +72,31 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
                 WHERE post.seller_id = anchor.seller_id
                   AND (post.address, post.latitude, post.longitude)
                       IS DISTINCT FROM (anchor.address, anchor.latitude, anchor.longitude);
+
+                WITH rental_locations(id, address, latitude, longitude) AS (
+                    VALUES
+                        ('f5a69bc2-ffed-4fe5-a6b9-7c9d712b85b7'::uuid,
+                         'Đường D1, phường Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM', 10.8421800::numeric, 106.8097000::numeric),
+                        ('391b0b6e-2f78-4413-abc7-3268de7ad576'::uuid,
+                         'Đường D2, phường Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM', 10.8446200::numeric, 106.8078500::numeric),
+                        ('c96829e9-e4b5-436f-b7a5-f108879d9e65'::uuid,
+                         'Đường Man Thiện, phường Tăng Nhơn Phú, TP.HCM', 10.8499300::numeric, 106.7892400::numeric),
+                        ('0d9948fd-73f4-450b-a24c-30cb43140cf5'::uuid,
+                         'Đường D1, phường Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM', 10.8435100::numeric, 106.8090300::numeric),
+                        ('4979493d-6cc5-417c-b936-fa91410f82b8'::uuid,
+                         'Đường số 12, phường Linh Trung, TP. Thủ Đức, TP.HCM', 10.8662100::numeric, 106.7768200::numeric),
+                        ('653aaa8a-f586-40e6-8934-20971dcf7bb7'::uuid,
+                         'Đường Lê Văn Việt, phường Tăng Nhơn Phú, TP.HCM', 10.8476500::numeric, 106.7824200::numeric)
+                )
+                UPDATE homeji.rental_posts AS post
+                SET address = location.address,
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    updated_at = NOW()
+                FROM rental_locations AS location
+                WHERE post.id = location.id
+                  AND (post.address, post.latitude, post.longitude)
+                      IS DISTINCT FROM (location.address, location.latitude, location.longitude);
                 """,
                 stoppingToken);
             LogNormalized(_logger, changed, null);
