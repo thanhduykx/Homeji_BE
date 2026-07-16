@@ -185,6 +185,11 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         builder.AppendLine("- Không yêu cầu hoặc hiển thị API key, password, token.");
         builder.AppendLine("- Nếu câu hỏi ngoài phạm vi Homeji, trả lời ngắn và hướng về nhu cầu thuê trọ/Homeji.");
         builder.AppendLine();
+        builder.AppendLine("Markdown formatting requirements:");
+        builder.AppendLine("- Format the answer as compact Markdown suitable for a narrow chat popup.");
+        builder.AppendLine("- Use short paragraphs, ## headings when useful, bullet or numbered lists for multiple items, and **bold** for key facts.");
+        builder.AppendLine("- Do not use HTML or Markdown tables. Avoid a heading when the answer is only one short sentence.");
+        builder.AppendLine();
         builder.AppendLine(HomejiLocationKnowledge.GroundingPrompt);
         builder.AppendLine();
         builder.AppendLine("Lịch sử chat gần nhất:");
