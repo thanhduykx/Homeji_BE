@@ -1,6 +1,7 @@
 using Homeji.Api.RateLimiting;
 using Homeji.Application.DTOs.Marketplace;
 using Homeji.Application.IServices.Marketplace;
+using Homeji.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -25,6 +26,7 @@ public sealed class MarketplacePostsController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<MarketplacePostDto>>> Search(
         [FromQuery] string? keyword,
         [FromQuery] string? category,
+        [FromQuery] MarketplaceListingType? listingType,
         [FromQuery] decimal? minPrice,
         [FromQuery] decimal? maxPrice,
         [FromQuery] decimal? latitude,
@@ -38,6 +40,7 @@ public sealed class MarketplacePostsController : ControllerBase
         return Ok(await _marketplaceService.SearchAsync(new MarketplaceSearchDto(
             keyword,
             category,
+            listingType,
             minPrice,
             maxPrice,
             latitude,

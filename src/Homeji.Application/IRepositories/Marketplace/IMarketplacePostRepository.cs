@@ -25,6 +25,7 @@ public interface IMarketplacePostRepository
     Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
         string? keyword,
         string? category,
+        Homeji.Domain.Enums.MarketplaceListingType? listingType,
         decimal? minPrice,
         decimal? maxPrice,
         decimal? minLatitude,

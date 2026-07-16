@@ -312,14 +312,33 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         }
 
         var notifications = new List<Notification>(overdueOrders.Count * 2);
-        foreach (var order in overdueOrders)
+        var expiredOrderCount = 0;
+        foreach (var overdueGroup in overdueOrders.GroupBy(order => new
+                 {
+                     order.BuyerId,
+                     order.SellerId,
+                     order.CreatedAt,
+                 }))
         {
-            order.Expire(now);
-            await RefundAndReleaseStockAsync(order, now, cancellationToken);
-            notifications.AddRange(BuildExpirationNotifications(
-                order,
-                now,
-                _financeOptions.OrderRequestTimeoutMinutes));
+            var orderGroup = await _orders.GetGroupByIdAsync(overdueGroup.First().Id, cancellationToken);
+            if (orderGroup.Count == 0
+                || orderGroup.Any(order => order.Status != MarketplaceOrderStatus.Requested
+                    || order.CreatedAt > cutoff))
+            {
+                continue;
+            }
+
+            foreach (var order in orderGroup)
+            {
+                order.Expire(now);
+                notifications.AddRange(BuildExpirationNotifications(
+                    order,
+                    now,
+                    _financeOptions.OrderRequestTimeoutMinutes));
+            }
+
+            await RefundOrderGroupAndReleaseStockAsync(orderGroup, now, cancellationToken);
+            expiredOrderCount += orderGroup.Count;
         }
 
         await _notifications.AddRangeAsync(notifications, cancellationToken);
@@ -329,7 +348,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             await _realtimePublisher.PublishAsync(notification, cancellationToken);
         }
 
-        return overdueOrders.Count;
+        return expiredOrderCount;
     }
 
     public Task<MarketplaceOrderDto> AcceptAsync(Guid id, CancellationToken cancellationToken = default) =>
@@ -365,12 +384,12 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             foreach (var groupOrder in orderGroup)
             {
                 groupOrder.Expire(currentTime);
-                await RefundAndReleaseStockAsync(groupOrder, currentTime, cancellationToken);
                 expirationNotifications.AddRange(BuildExpirationNotifications(
                     groupOrder,
                     currentTime,
                     _financeOptions.OrderRequestTimeoutMinutes));
             }
+            await RefundOrderGroupAndReleaseStockAsync(orderGroup, currentTime, cancellationToken);
 
             await _notifications.AddRangeAsync(expirationNotifications, cancellationToken);
             await _orders.SaveChangesAsync(cancellationToken);
@@ -393,8 +412,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             foreach (var groupOrder in orderGroup)
             {
                 groupOrder.Cancel(currentTime);
-                await RefundAndReleaseStockAsync(groupOrder, currentTime, cancellationToken);
             }
+            await RefundOrderGroupAndReleaseStockAsync(orderGroup, currentTime, cancellationToken);
         }
         else if (target is MarketplaceOrderStatus.Accepted or MarketplaceOrderStatus.Rejected)
         {
@@ -421,8 +440,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 foreach (var groupOrder in orderGroup)
                 {
                     groupOrder.Reject(currentTime);
-                    await RefundAndReleaseStockAsync(groupOrder, currentTime, cancellationToken);
                 }
+                await RefundOrderGroupAndReleaseStockAsync(orderGroup, currentTime, cancellationToken);
             }
         }
         else
@@ -526,25 +545,45 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             sellerDisplayName,
             post?.Address);
 
-    private async Task RefundAndReleaseStockAsync(
-        MarketplaceOrder order,
+    private async Task RefundOrderGroupAndReleaseStockAsync(
+        IReadOnlyList<MarketplaceOrder> orders,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        var buyerWallet = await _wallets.GetAsync(order.BuyerId, cancellationToken)
+        if (orders.Count == 0)
+        {
+            throw new InvalidOperationException("Marketplace order refund group must not be empty.");
+        }
+
+        var buyerId = orders[0].BuyerId;
+        if (orders.Any(order => order.BuyerId != buyerId))
+        {
+            throw new InvalidOperationException("Marketplace order refund group must belong to one buyer.");
+        }
+
+        var buyerWallet = await _wallets.GetAsync(buyerId, cancellationToken)
             ?? throw new InvalidOperationException("Buyer wallet was not found for a funded marketplace order.");
-        var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken)
-            ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
-        buyerWallet.CreditRefund(order.AgreedPrice, now);
-        post.ReleaseReservation(order.Quantity, now);
-        order.MarkRefunded(now);
+        var refundAmount = orders.Sum(order => order.AgreedPrice);
+        buyerWallet.CreditRefund(refundAmount, now);
+
+        foreach (var order in orders)
+        {
+            var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken)
+                ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
+            post.ReleaseReservation(order.Quantity, now);
+            order.MarkRefunded(now);
+        }
+
+        var referenceId = orders.MinBy(order => order.Id)!.Id;
         await _wallets.AddTransactionAsync(new WalletTransaction(
-            order.BuyerId,
+            buyerId,
             WalletTransactionKind.Refund,
-            order.AgreedPrice,
+            refundAmount,
             buyerWallet.Balance,
-            order.Id,
-            "Hoàn tiền đơn chợ Homeji",
+            referenceId,
+            orders.Count == 1
+                ? "Hoàn tiền đơn chợ Homeji"
+                : $"Hoàn tổng đơn chợ Homeji · {orders.Count} món",
             now), cancellationToken);
     }
 

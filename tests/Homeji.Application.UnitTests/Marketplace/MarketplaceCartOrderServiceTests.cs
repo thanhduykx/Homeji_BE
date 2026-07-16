@@ -74,7 +74,7 @@ public sealed class MarketplaceCartOrderServiceTests
     }
 
     [Fact]
-    public async Task CancelAsync_CartOrder_CancelsAndRefundsEveryItemInCheckout()
+    public async Task CancelAsync_CartOrder_RefundsCheckoutTotalInOneWalletTransaction()
     {
         var buyerId = Guid.NewGuid();
         var sellerId = Guid.NewGuid();
@@ -120,7 +120,12 @@ public sealed class MarketplaceCartOrderServiceTests
         Assert.All(orderRepository.Added, order => Assert.Equal(MarketplaceOrderStatus.Cancelled, order.Status));
         Assert.All(posts, post => Assert.Equal(0, post.ReservedQuantity));
         Assert.Equal(200_000, buyerWallet.Balance);
-        Assert.Equal(4, walletRepository.AddedTransactions.Count);
+        var refund = Assert.Single(
+            walletRepository.AddedTransactions,
+            transaction => transaction.Kind == WalletTransactionKind.Refund);
+        Assert.Equal(35_000, refund.Amount);
+        Assert.Equal(200_000, refund.BalanceAfter);
+        Assert.Equal(3, walletRepository.AddedTransactions.Count);
         Assert.Equal(4, notifications.Added.Count);
         Assert.Equal(4, publisher.Published.Count);
         Assert.Equal(2, orderRepository.SaveCount);
@@ -234,7 +239,8 @@ public sealed class MarketplaceCartOrderServiceTests
             Task.FromResult<IReadOnlyList<MarketplacePost>>(posts.Where(post => ids.Contains(post.Id)).ToArray());
 
         public Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
-            string? keyword, string? category, decimal? minPrice, decimal? maxPrice,
+            string? keyword, string? category, MarketplaceListingType? listingType,
+            decimal? minPrice, decimal? maxPrice,
             decimal? minLatitude, decimal? maxLatitude, decimal? minLongitude, decimal? maxLongitude,
             int skip, int take, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

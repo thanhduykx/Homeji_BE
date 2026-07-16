@@ -51,6 +51,7 @@ public sealed class MarketplacePostRepository : IMarketplacePostRepository
     public async Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
         string? keyword,
         string? category,
+        MarketplaceListingType? listingType,
         decimal? minPrice,
         decimal? maxPrice,
         decimal? minLatitude,
@@ -76,6 +77,11 @@ public sealed class MarketplacePostRepository : IMarketplacePostRepository
         if (!string.IsNullOrWhiteSpace(category))
         {
             query = query.Where(post => post.Category == category.Trim());
+        }
+
+        if (listingType.HasValue)
+        {
+            query = query.Where(post => post.ListingType == listingType.Value);
         }
 
         if (minPrice.HasValue)

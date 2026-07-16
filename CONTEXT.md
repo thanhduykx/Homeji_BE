@@ -24,6 +24,10 @@ _Avoid_: Candidate, invitation
 A single checkout between one buyer and one seller that can contain one or more item lines. Its status changes and cancellation apply to every line together.
 _Avoid_: Item order, per-item order
 
+**Marketplace Listing Type**:
+The mutually exclusive kind selected when publishing a marketplace item. Food appears only in Food; household and second-hand items appear only in Marketplace.
+_Avoid_: Inferring the type from the title, showing one item in both sections
+
 **Marketplace Order Line**:
 One purchased marketplace item and quantity inside a Marketplace Order.
 _Avoid_: Separate order, product order
@@ -39,3 +43,7 @@ _Avoid_: Wallet debit, seller withdrawal
 **Seller Net Amount**:
 The amount credited to the seller wallet after all applicable order fees have been withheld from the Marketplace Gross Amount.
 _Avoid_: Gross revenue, order total
+
+**Marketplace Order Refund**:
+A single wallet credit equal to the Marketplace Gross Amount of the whole checkout, even when that checkout contains multiple Marketplace Order Lines.
+_Avoid_: Per-item refund, line refund

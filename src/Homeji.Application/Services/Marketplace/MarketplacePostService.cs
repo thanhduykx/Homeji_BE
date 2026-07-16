@@ -57,6 +57,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         var posts = await _marketplacePosts.SearchActiveAsync(
             search.Keyword,
             search.Category,
+            search.ListingType,
             search.MinPrice,
             search.MaxPrice,
             search.MinLatitude,
@@ -289,6 +290,14 @@ public sealed class MarketplacePostService : IMarketplacePostService
             });
         }
 
+        if (request.ListingType.HasValue && !Enum.IsDefined(request.ListingType.Value))
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["listingType"] = ["Listing type is invalid."],
+            });
+        }
+
         decimal? latitude = request.Latitude;
         decimal? longitude = request.Longitude;
         if (request.NearRentalPostId.HasValue)
@@ -339,6 +348,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         return new NormalizedSearch(
             request.Keyword?.Trim(),
             request.Category?.Trim(),
+            request.ListingType,
             request.MinPrice,
             request.MaxPrice,
             latitude,
@@ -434,6 +444,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
     private sealed record NormalizedSearch(
         string? Keyword,
         string? Category,
+        MarketplaceListingType? ListingType,
         decimal? MinPrice,
         decimal? MaxPrice,
         decimal? CenterLatitude,

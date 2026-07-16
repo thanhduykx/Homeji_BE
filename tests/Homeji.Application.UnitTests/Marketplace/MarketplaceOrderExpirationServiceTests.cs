@@ -140,6 +140,7 @@ public sealed class MarketplaceOrderExpirationServiceTests
         public Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
             string? keyword,
             string? category,
+            MarketplaceListingType? listingType,
             decimal? minPrice,
             decimal? maxPrice,
             decimal? minLatitude,
