@@ -12,5 +12,6 @@ public interface IMarketplaceOrderService
     Task<MarketplaceOrderDto> AcceptAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MarketplaceOrderDto> RejectAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MarketplaceOrderDto> CancelAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<MarketplaceOrderDto> MarkDeliveredAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MarketplaceOrderDto> CompleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

@@ -49,4 +49,8 @@ public sealed class MarketplaceOrdersController : ControllerBase
     [HttpPost("{id:guid}/complete")]
     public async Task<ActionResult<MarketplaceOrderDto>> Complete(Guid id, CancellationToken cancellationToken) =>
         Ok(await _orders.CompleteAsync(id, cancellationToken));
+
+    [HttpPost("{id:guid}/delivered")]
+    public async Task<ActionResult<MarketplaceOrderDto>> MarkDelivered(Guid id, CancellationToken cancellationToken) =>
+        Ok(await _orders.MarkDeliveredAsync(id, cancellationToken));
 }

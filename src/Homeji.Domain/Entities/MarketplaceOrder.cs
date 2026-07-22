@@ -69,6 +69,7 @@ public sealed class MarketplaceOrder
     public decimal PlatformFeeAmount { get; private set; }
     public decimal SellerNetAmount { get; private set; }
     public DateTimeOffset? FundsReleasedAt { get; private set; }
+    public DateTimeOffset? DeliveredAt { get; private set; }
     public DateTimeOffset? RefundedAt { get; private set; }
     public DateTimeOffset PickupAt { get; private set; }
     public string PickupAddress { get; private set; }
@@ -91,7 +92,29 @@ public sealed class MarketplaceOrder
         UpdatedAt = updatedAt;
     }
 
-    public void Complete(DateTimeOffset updatedAt) => Transition(MarketplaceOrderStatus.Accepted, MarketplaceOrderStatus.Completed, updatedAt);
+    public void Complete(DateTimeOffset updatedAt) => ConfirmReceived(updatedAt);
+
+    public void MarkDelivered(DateTimeOffset updatedAt)
+    {
+        Transition(MarketplaceOrderStatus.Accepted, MarketplaceOrderStatus.Delivered, updatedAt);
+        DeliveredAt = updatedAt;
+    }
+
+    public void ConfirmReceived(DateTimeOffset updatedAt) =>
+        Transition(MarketplaceOrderStatus.Delivered, MarketplaceOrderStatus.Completed, updatedAt);
+
+    public void AutoComplete(DateTimeOffset updatedAt)
+    {
+        if (Status == MarketplaceOrderStatus.Delivered)
+        {
+            Status = MarketplaceOrderStatus.Completed;
+            UpdatedAt = updatedAt;
+        }
+        else if (Status != MarketplaceOrderStatus.Completed)
+        {
+            throw new DomainException("Marketplace order cannot be auto-completed in the current state.");
+        }
+    }
 
     public void Expire(DateTimeOffset updatedAt)
     {
@@ -100,7 +123,11 @@ public sealed class MarketplaceOrder
 
     public void MarkFundsReleased(DateTimeOffset updatedAt)
     {
-        if (Status != MarketplaceOrderStatus.Completed || FundsReleasedAt.HasValue || RefundedAt.HasValue)
+        if (Status != MarketplaceOrderStatus.Completed
+            || !DeliveredAt.HasValue
+            || updatedAt < DeliveredAt.Value
+            || FundsReleasedAt.HasValue
+            || RefundedAt.HasValue)
         {
             throw new DomainException("Marketplace order funds cannot be released in the current state.");
         }

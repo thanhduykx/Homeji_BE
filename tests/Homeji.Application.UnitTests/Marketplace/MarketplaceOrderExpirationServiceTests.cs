@@ -69,6 +69,60 @@ public sealed class MarketplaceOrderExpirationServiceTests
         Assert.Equal(1, orders.SaveCount);
     }
 
+    [Fact]
+    public async Task ReleaseOverdueFundsAsync_DeliveredForTwentyFourHours_AutoCompletesAndPaysSeller()
+    {
+        var buyerId = Guid.NewGuid();
+        var sellerId = Guid.NewGuid();
+        var post = CreateFoodPost(sellerId);
+        var order = new MarketplaceOrder(
+            post.Id,
+            buyerId,
+            sellerId,
+            post.Price,
+            UtcNow.AddHours(-25),
+            "Ký túc xá",
+            null,
+            UtcNow.AddHours(-26));
+        post.Reserve(1, order.CreatedAt);
+        order.Accept(UtcNow.AddHours(-25));
+        order.MarkDelivered(UtcNow.AddHours(-24));
+
+        var sellerWallet = WalletAccount.Create(sellerId, UtcNow.AddHours(-30));
+        sellerWallet.CreditTopUp(100_000, UtcNow.AddHours(-29));
+        var wallets = new StubWalletRepository(sellerWallet);
+        var orders = new StubOrderRepository(order);
+        var notifications = new StubNotificationRepository();
+        var publisher = new StubNotificationPublisher();
+        var service = new MarketplaceOrderService(
+            userContext: null!,
+            orders,
+            new StubPostRepository(post),
+            notifications,
+            publisher,
+            new StubTimeProvider(),
+            wallets,
+            validator: null!,
+            cartValidator: null!,
+            Options.Create(new MarketplaceFinanceOptions { EscrowHoldHours = 24 }),
+            profiles: null!);
+
+        var releasedCount = await service.ReleaseOverdueFundsAsync();
+
+        Assert.Equal(1, releasedCount);
+        Assert.Equal(MarketplaceOrderStatus.Completed, order.Status);
+        Assert.Equal(UtcNow, order.FundsReleasedAt);
+        Assert.Equal(100_000 + order.SellerNetAmount, sellerWallet.Balance);
+        Assert.Equal(order.SellerNetAmount, sellerWallet.TotalEarned);
+        Assert.Equal(9, post.AvailableQuantity);
+        Assert.Equal(0, post.ReservedQuantity);
+        Assert.Single(wallets.AddedTransactions);
+        Assert.Equal(WalletTransactionKind.SaleProceeds, wallets.AddedTransactions[0].Kind);
+        Assert.Equal(2, notifications.Added.Count);
+        Assert.Equal(2, publisher.Published.Count);
+        Assert.Equal(1, orders.SaveCount);
+    }
+
     private static MarketplacePost CreateFoodPost(Guid sellerId) =>
         new(
             sellerId,
@@ -110,6 +164,19 @@ public sealed class MarketplaceOrderExpirationServiceTests
         {
             IReadOnlyList<MarketplaceOrder> result =
                 order.Status == MarketplaceOrderStatus.Requested && order.CreatedAt <= cutoff
+                    ? [order]
+                    : [];
+            return Task.FromResult(result);
+        }
+
+        public Task<IReadOnlyList<MarketplaceOrder>> GetFundsReleaseDueAsync(
+            DateTimeOffset deliveredCutoff,
+            int take,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyList<MarketplaceOrder> result = order.FundsReleasedAt is null
+                && order.DeliveredAt <= deliveredCutoff
+                && order.Status is MarketplaceOrderStatus.Delivered or MarketplaceOrderStatus.Completed
                     ? [order]
                     : [];
             return Task.FromResult(result);
@@ -158,12 +225,12 @@ public sealed class MarketplaceOrderExpirationServiceTests
             throw new NotSupportedException();
     }
 
-    private sealed class StubWalletRepository(WalletAccount wallet) : IWalletRepository
+    private sealed class StubWalletRepository(params WalletAccount[] wallets) : IWalletRepository
     {
         public List<WalletTransaction> AddedTransactions { get; } = [];
 
         public Task<WalletAccount?> GetAsync(Guid userId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<WalletAccount?>(userId == wallet.UserId ? wallet : null);
+            Task.FromResult(wallets.SingleOrDefault(wallet => userId == wallet.UserId));
 
         public Task<IReadOnlyList<WalletTransaction>> GetTransactionsAsync(
             Guid userId,

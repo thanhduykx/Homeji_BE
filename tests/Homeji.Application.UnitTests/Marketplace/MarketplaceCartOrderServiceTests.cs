@@ -129,7 +129,7 @@ public sealed class MarketplaceCartOrderServiceTests
     }
 
     [Fact]
-    public async Task CompleteAsync_CreditsOnlyNetProceedsAfterFeesAreWithheld()
+    public async Task CompleteAsync_HoldsFundsUntilTwentyFourHoursAfterDelivery()
     {
         var buyerId = Guid.NewGuid();
         var sellerId = Guid.NewGuid();
@@ -172,10 +172,27 @@ public sealed class MarketplaceCartOrderServiceTests
             null));
 
         await CreateService(sellerId).AcceptAsync(created[0].Id);
+        await CreateService(sellerId).MarkDeliveredAsync(created[0].Id);
         await buyerService.CompleteAsync(created[0].Id);
 
         var orders = orderRepository.Added;
         var expectedNet = orders.Sum(order => order.SellerNetAmount);
+        Assert.Equal(20_000, sellerWallet.Balance);
+        Assert.Equal(0, sellerWallet.TotalEarned);
+        Assert.All(orders, order => Assert.Null(order.FundsReleasedAt));
+        Assert.DoesNotContain(
+            walletRepository.AddedTransactions,
+            transaction => transaction.WalletUserId == sellerId);
+
+        timeProvider.UtcNowValue = UtcNow.AddHours(24).AddSeconds(-1);
+        Assert.Equal(0, await buyerService.ReleaseOverdueFundsAsync());
+        Assert.Equal(20_000, sellerWallet.Balance);
+        Assert.All(orders, order => Assert.Null(order.FundsReleasedAt));
+
+        timeProvider.UtcNowValue = UtcNow.AddHours(24);
+        var releasedCount = await buyerService.ReleaseOverdueFundsAsync();
+
+        Assert.Equal(orders.Count, releasedCount);
         Assert.Equal(20_000 + expectedNet, sellerWallet.Balance);
         Assert.Equal(expectedNet, sellerWallet.TotalEarned);
 
@@ -221,7 +238,8 @@ public sealed class MarketplaceCartOrderServiceTests
 
     private sealed class StubTimeProvider : TimeProvider
     {
-        public override DateTimeOffset GetUtcNow() => UtcNow;
+        public DateTimeOffset UtcNowValue { get; set; } = UtcNow;
+        public override DateTimeOffset GetUtcNow() => UtcNowValue;
     }
 
     private sealed class StubPostRepository(IReadOnlyList<MarketplacePost> posts) : IMarketplacePostRepository
@@ -281,6 +299,17 @@ public sealed class MarketplaceCartOrderServiceTests
         public Task<IReadOnlyList<MarketplaceOrder>> GetExpiredRequestedAsync(
             DateTimeOffset cutoff, int take, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MarketplaceOrder>>([]);
+
+        public Task<IReadOnlyList<MarketplaceOrder>> GetFundsReleaseDueAsync(
+            DateTimeOffset deliveredCutoff,
+            int take,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MarketplaceOrder>>(Added
+                .Where(order => order.FundsReleasedAt is null
+                    && order.DeliveredAt <= deliveredCutoff
+                    && order.Status is MarketplaceOrderStatus.Delivered or MarketplaceOrderStatus.Completed)
+                .Take(take)
+                .ToArray());
 
         public Task<IReadOnlyList<MarketplaceOrder>> GetForUserAsync(
             Guid userId, DateTimeOffset requestedCutoff, CancellationToken cancellationToken = default) =>

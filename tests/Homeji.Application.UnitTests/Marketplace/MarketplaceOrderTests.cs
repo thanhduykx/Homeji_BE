@@ -7,15 +7,17 @@ namespace Homeji.Application.UnitTests.Marketplace;
 public sealed class MarketplaceOrderTests
 {
     [Fact]
-    public void Complete_WhenAccepted_ChangesStatus()
+    public void Complete_WhenDelivered_ChangesStatus()
     {
         var now = DateTimeOffset.UtcNow;
         var order = CreateOrder(now);
         order.Accept(now.AddMinutes(1));
+        order.MarkDelivered(now.AddMinutes(2));
 
-        order.Complete(now.AddMinutes(2));
+        order.Complete(now.AddMinutes(3));
 
         Assert.Equal(MarketplaceOrderStatus.Completed, order.Status);
+        Assert.Equal(now.AddMinutes(2), order.DeliveredAt);
     }
 
     [Fact]
@@ -80,11 +82,12 @@ public sealed class MarketplaceOrderTests
 
         Assert.Throws<DomainException>(() => order.MarkFundsReleased(now.AddMinutes(1)));
         order.Accept(now.AddMinutes(1));
-        order.Complete(now.AddMinutes(2));
-        order.MarkFundsReleased(now.AddMinutes(3));
+        order.MarkDelivered(now.AddMinutes(2));
+        order.Complete(now.AddMinutes(3));
+        order.MarkFundsReleased(now.AddMinutes(4));
 
-        Assert.Equal(now.AddMinutes(3), order.FundsReleasedAt);
-        Assert.Throws<DomainException>(() => order.MarkFundsReleased(now.AddMinutes(4)));
+        Assert.Equal(now.AddMinutes(4), order.FundsReleasedAt);
+        Assert.Throws<DomainException>(() => order.MarkFundsReleased(now.AddMinutes(5)));
     }
 
     [Fact]

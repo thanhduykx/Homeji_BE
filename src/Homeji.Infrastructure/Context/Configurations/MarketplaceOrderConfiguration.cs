@@ -21,6 +21,7 @@ public sealed class MarketplaceOrderConfiguration : IEntityTypeConfiguration<Mar
         builder.HasIndex(order => new { order.BuyerId, order.CreatedAt });
         builder.HasIndex(order => new { order.SellerId, order.CreatedAt });
         builder.HasIndex(order => new { order.MarketplacePostId, order.BuyerId, order.Status });
+        builder.HasIndex(order => new { order.Status, order.DeliveredAt, order.FundsReleasedAt });
         builder.HasOne<MarketplacePost>()
             .WithMany()
             .HasForeignKey(order => order.MarketplacePostId)

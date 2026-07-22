@@ -8,4 +8,5 @@ public enum MarketplaceOrderStatus
     Cancelled = 4,
     Completed = 5,
     Expired = 6,
+    Delivered = 7,
 }

@@ -29,6 +29,8 @@ public sealed record MarketplaceOrderDto(
     decimal PlatformFeeRate,
     decimal PlatformFeeAmount,
     decimal SellerNetAmount,
+    DateTimeOffset? DeliveredAt,
+    DateTimeOffset? FundsReleaseDueAt,
     DateTimeOffset? FundsReleasedAt,
     DateTimeOffset? RefundedAt,
     string? PostTitle = null,

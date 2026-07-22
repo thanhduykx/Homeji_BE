@@ -347,6 +347,61 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         return expiredOrderCount;
     }
 
+    public async Task<int> ReleaseOverdueFundsAsync(CancellationToken cancellationToken = default)
+    {
+        var now = _timeProvider.GetUtcNow();
+        var deliveredCutoff = now.AddHours(-_financeOptions.EscrowHoldHours);
+        var dueOrders = await _orders.GetFundsReleaseDueAsync(
+            deliveredCutoff,
+            ExpirationBatchSize,
+            cancellationToken);
+        if (dueOrders.Count == 0)
+        {
+            return 0;
+        }
+
+        var notifications = new List<Notification>(dueOrders.Count * 2);
+        var releasedCount = 0;
+        foreach (var dueGroup in dueOrders.GroupBy(order => new
+                 {
+                     order.BuyerId,
+                     order.SellerId,
+                     order.CreatedAt,
+                 }))
+        {
+            var orderGroup = await _orders.GetGroupByIdAsync(dueGroup.First().Id, cancellationToken);
+            if (orderGroup.Count == 0
+                || orderGroup.Any(order => order.FundsReleasedAt.HasValue
+                    || !order.DeliveredAt.HasValue
+                    || order.DeliveredAt > deliveredCutoff
+                    || order.Status is not (MarketplaceOrderStatus.Delivered or MarketplaceOrderStatus.Completed)))
+            {
+                continue;
+            }
+
+            foreach (var groupOrder in orderGroup)
+            {
+                groupOrder.AutoComplete(now);
+                await ReleaseSaleProceedsAsync(groupOrder, now, cancellationToken);
+                notifications.AddRange(BuildFundsReleasedNotifications(
+                    groupOrder,
+                    now,
+                    _financeOptions.EscrowHoldHours));
+            }
+
+            releasedCount += orderGroup.Count;
+        }
+
+        await _notifications.AddRangeAsync(notifications, cancellationToken);
+        await _orders.SaveChangesAsync(cancellationToken);
+        foreach (var notification in notifications)
+        {
+            await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        }
+
+        return releasedCount;
+    }
+
     public Task<MarketplaceOrderDto> AcceptAsync(Guid id, CancellationToken cancellationToken = default) =>
         UpdateAsync(id, MarketplaceOrderStatus.Accepted, cancellationToken);
 
@@ -355,6 +410,9 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
 
     public Task<MarketplaceOrderDto> CancelAsync(Guid id, CancellationToken cancellationToken = default) =>
         UpdateAsync(id, MarketplaceOrderStatus.Cancelled, cancellationToken);
+
+    public Task<MarketplaceOrderDto> MarkDeliveredAsync(Guid id, CancellationToken cancellationToken = default) =>
+        UpdateAsync(id, MarketplaceOrderStatus.Delivered, cancellationToken);
 
     public Task<MarketplaceOrderDto> CompleteAsync(Guid id, CancellationToken cancellationToken = default) =>
         UpdateAsync(id, MarketplaceOrderStatus.Completed, cancellationToken);
@@ -440,17 +498,28 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 await RefundOrderGroupAndReleaseStockAsync(orderGroup, currentTime, cancellationToken);
             }
         }
+        else if (target == MarketplaceOrderStatus.Delivered)
+        {
+            UserContext.EnsureOwner(userId, order.SellerId);
+            EnsureGroupStatus(
+                orderGroup,
+                MarketplaceOrderStatus.Accepted,
+                "Chỉ có thể báo đã giao khi toàn bộ đơn đã được người bán nhận.");
+            foreach (var groupOrder in orderGroup)
+            {
+                groupOrder.MarkDelivered(currentTime);
+            }
+        }
         else
         {
             UserContext.EnsureOwner(userId, order.BuyerId);
             EnsureGroupStatus(
                 orderGroup,
-                MarketplaceOrderStatus.Accepted,
-                "Chỉ có thể hoàn tất khi bếp đã xác nhận toàn bộ đơn.");
+                MarketplaceOrderStatus.Delivered,
+                "Chỉ có thể xác nhận khi người bán đã báo giao toàn bộ đơn.");
             foreach (var groupOrder in orderGroup)
             {
-                groupOrder.Complete(currentTime);
-                await ReleaseSaleProceedsAsync(groupOrder, currentTime, cancellationToken);
+                groupOrder.ConfirmReceived(currentTime);
             }
         }
 
@@ -511,7 +580,28 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 now),
         ];
 
-    private static MarketplaceOrderDto ToDto(
+    private static IReadOnlyList<Notification> BuildFundsReleasedNotifications(
+        MarketplaceOrder order,
+        DateTimeOffset now,
+        int holdHours) =>
+        [
+            new Notification(
+                order.BuyerId,
+                NotificationType.MarketplaceOrderUpdated,
+                "Đơn Chợ Homeji đã tự hoàn tất",
+                $"Đơn đã qua thời gian đảm bảo {holdHours} giờ và được hoàn tất tự động.",
+                order.Id,
+                now),
+            new Notification(
+                order.SellerId,
+                NotificationType.MarketplaceOrderUpdated,
+                "Tiền bán hàng đã về ví",
+                $"Tiền đơn hàng đã được giải ngân sau thời gian đảm bảo {holdHours} giờ.",
+                order.Id,
+                now),
+        ];
+
+    private MarketplaceOrderDto ToDto(
         MarketplaceOrder order,
         MarketplacePost? post = null,
         string? buyerDisplayName = null,
@@ -533,6 +623,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             order.PlatformFeeRate,
             order.PlatformFeeAmount,
             order.SellerNetAmount,
+            order.DeliveredAt,
+            order.DeliveredAt?.AddHours(_financeOptions.EscrowHoldHours),
             order.FundsReleasedAt,
             order.RefundedAt,
             post?.Title,

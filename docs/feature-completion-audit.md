@@ -34,7 +34,7 @@ Audit date: 2026-07-14. Source of truth: all tabs in the Homeji requirements doc
 
 ## Conditional product decisions
 
-The source document marks marketplace deposit/holding/refund as conditional (“if the system supports it”). Homeji currently implements pickup confirmation without holding customer funds. Adding escrow requires a written cancellation/refund policy, provider merchant approval and webhook reconciliation rules; it must not be inferred in code.
+Marketplace holding is now an explicit product decision: checkout debits the buyer, the seller marks the whole order delivered, and Homeji holds the Seller Net Amount for 24 hours. Buyer confirmation can close receipt early but cannot release funds early; a background lifecycle worker auto-completes and releases the held amount after the deadline. Production operation still requires an approved cancellation/dispute policy, PSP merchant approval and webhook reconciliation.
 
 Search-by-travel-time and route distance require choosing and funding a geocoding/directions provider. Current APIs support text, coordinates and bounding-box filtering without locking the product to one provider.
 
