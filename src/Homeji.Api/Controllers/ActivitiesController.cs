@@ -26,7 +26,4 @@ public sealed class ActivitiesController : ControllerBase
         return Ok(await _activities.GetMineAsync(type, take, cancellationToken));
     }
 
-    [HttpPost("presence")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    public IActionResult RecordPresence() => NoContent();
 }
