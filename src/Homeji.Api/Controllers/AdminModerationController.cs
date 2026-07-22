@@ -18,6 +18,18 @@ public sealed class AdminModerationController : ControllerBase
         _moderationService = moderationService;
     }
 
+    [HttpGet("active-users")]
+    [ProducesResponseType<IReadOnlyList<AdminActiveUserDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AdminActiveUserDto>>> GetActiveUsers(
+        [FromQuery] int onlineMinutes = 5,
+        [FromQuery] int recentMinutes = 30,
+        CancellationToken cancellationToken = default)
+    {
+        var onlineWindow = TimeSpan.FromMinutes(Math.Clamp(onlineMinutes, 1, 30));
+        var recentWindow = TimeSpan.FromMinutes(Math.Clamp(recentMinutes, onlineMinutes, 1440));
+        return Ok(await _moderationService.GetActiveUsersAsync(onlineWindow, recentWindow, cancellationToken));
+    }
+
     [HttpGet("rental-posts/pending")]
     [ProducesResponseType<IReadOnlyList<RentalPostSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RentalPostSummaryDto>>> GetPendingRentalPosts(CancellationToken cancellationToken)
