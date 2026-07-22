@@ -44,4 +44,22 @@ public sealed class UserActivityRepository : IUserActivityRepository
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyDictionary<Guid, DateTimeOffset>> GetLatestByUserSinceAsync(
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await _dbContext.UserActivities
+            .AsNoTracking()
+            .Where(activity => activity.OccurredAt >= since)
+            .GroupBy(activity => activity.UserId)
+            .Select(group => new
+            {
+                UserId = group.Key,
+                LastSeenAt = group.Max(activity => activity.OccurredAt),
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows.ToDictionary(row => row.UserId, row => row.LastSeenAt);
+    }
 }

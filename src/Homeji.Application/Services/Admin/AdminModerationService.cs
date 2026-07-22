@@ -4,6 +4,7 @@ using Homeji.Application.DTOs.Admin;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.DTOs.Reports;
 using Homeji.Application.IRepositories.Notifications;
+using Homeji.Application.IRepositories.Activities;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Reports;
 using Homeji.Application.IRepositories.SavedPosts;
@@ -27,6 +28,7 @@ public sealed class AdminModerationService : IAdminModerationService
     private readonly INotificationRealtimePublisher _realtimePublisher;
     private readonly ISavedPostRepository _savedPosts;
     private readonly IUserProfileRepository _profiles;
+    private readonly IUserActivityRepository _activities;
 
     public AdminModerationService(
         UserContext userContext,
@@ -35,6 +37,7 @@ public sealed class AdminModerationService : IAdminModerationService
         INotificationRepository notifications,
         ISavedPostRepository savedPosts,
         IUserProfileRepository profiles,
+        IUserActivityRepository activities,
         TimeProvider timeProvider,
         INotificationRealtimePublisher realtimePublisher)
     {
@@ -44,8 +47,39 @@ public sealed class AdminModerationService : IAdminModerationService
         _notifications = notifications;
         _savedPosts = savedPosts;
         _profiles = profiles;
+        _activities = activities;
         _timeProvider = timeProvider;
         _realtimePublisher = realtimePublisher;
+    }
+
+    public async Task<IReadOnlyList<AdminActiveUserDto>> GetActiveUsersAsync(
+        TimeSpan onlineWindow,
+        TimeSpan recentWindow,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAdminAsync(cancellationToken);
+        var now = _timeProvider.GetUtcNow();
+        var activityByUser = await _activities.GetLatestByUserSinceAsync(
+            now.Subtract(recentWindow),
+            cancellationToken);
+        var profiles = await _profiles.GetByIdsAsync(activityByUser.Keys.ToArray(), cancellationToken);
+
+        return profiles
+            .Where(profile => activityByUser.ContainsKey(profile.Id))
+            .Select(profile =>
+            {
+                var lastSeenAt = activityByUser[profile.Id];
+                return new AdminActiveUserDto(
+                    profile.Id,
+                    profile.DisplayName,
+                    profile.Role,
+                    profile.AvatarPath,
+                    lastSeenAt,
+                    now - lastSeenAt <= onlineWindow);
+            })
+            .OrderByDescending(user => user.IsOnline)
+            .ThenByDescending(user => user.LastSeenAt)
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default)
