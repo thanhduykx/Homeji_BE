@@ -58,6 +58,8 @@ public sealed class UserProfile
 
     public LandlordVerificationStatus LandlordVerificationStatus { get; private set; }
 
+    public DateTimeOffset? SessionsRevokedBefore { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -131,6 +133,15 @@ public sealed class UserProfile
     {
         Role = role;
         UpdatedAt = updatedAt;
+    }
+
+    public void RevokeSessions(DateTimeOffset revokedBefore)
+    {
+        if (!SessionsRevokedBefore.HasValue || revokedBefore > SessionsRevokedBefore.Value)
+        {
+            SessionsRevokedBefore = revokedBefore;
+            UpdatedAt = revokedBefore;
+        }
     }
 
     public void SubmitLandlordVerification(DateTimeOffset updatedAt)

@@ -1,5 +1,6 @@
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Abstractions.Presence;
+using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Admin;
 using Homeji.Application.DTOs.RentalPosts;
@@ -14,6 +15,7 @@ using Homeji.Application.IRepositories.SavedPosts;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IRepositories.WantedPosts;
 using Homeji.Application.IServices.Admin;
+using Homeji.Application.IServices.Accounts;
 using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Application.Mappers.Reports;
 using Homeji.Application.Services.Common;
@@ -37,6 +39,8 @@ public sealed class AdminModerationService : IAdminModerationService
     private readonly IRoommateInvitationRepository _roommateInvitations;
     private readonly IRentalReviewRepository _reviews;
     private readonly IRentalWantedPostRepository _wantedPosts;
+    private readonly IUserSessionRevocationService _sessionRevocations;
+    private readonly IUserSessionRealtimePublisher _sessionRealtimePublisher;
 
     public AdminModerationService(
         UserContext userContext,
@@ -50,6 +54,8 @@ public sealed class AdminModerationService : IAdminModerationService
         IRoommateInvitationRepository roommateInvitations,
         IRentalReviewRepository reviews,
         IRentalWantedPostRepository wantedPosts,
+        IUserSessionRevocationService sessionRevocations,
+        IUserSessionRealtimePublisher sessionRealtimePublisher,
         TimeProvider timeProvider,
         INotificationRealtimePublisher realtimePublisher)
     {
@@ -64,6 +70,8 @@ public sealed class AdminModerationService : IAdminModerationService
         _roommateInvitations = roommateInvitations;
         _reviews = reviews;
         _wantedPosts = wantedPosts;
+        _sessionRevocations = sessionRevocations;
+        _sessionRealtimePublisher = sessionRealtimePublisher;
         _timeProvider = timeProvider;
         _realtimePublisher = realtimePublisher;
     }
@@ -91,6 +99,47 @@ public sealed class AdminModerationService : IAdminModerationService
             .OrderByDescending(user => user.IsOnline)
             .ThenByDescending(user => user.LastSeenAt)
             .ToArray();
+    }
+
+    public async Task<TerminateUserSessionResultDto> TerminateUserSessionAsync(
+        Guid userId,
+        TerminateUserSessionRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var admin = await EnsureAdminAsync(cancellationToken);
+        if (admin.Id == userId)
+        {
+            throw new ConflictException("Không thể kết thúc phiên đăng nhập đang dùng để quản trị.");
+        }
+
+        var target = await _profiles.GetByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException(nameof(UserProfile), userId);
+        var reason = string.IsNullOrWhiteSpace(request.Reason)
+            ? "Quản trị viên đã kết thúc phiên đăng nhập của bạn."
+            : request.Reason.Trim();
+        if (reason.Length > 300)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["reason"] = ["Lý do không được vượt quá 300 ký tự."],
+            });
+        }
+
+        var terminatedAt = await _sessionRevocations.RevokeAsync(
+            userId,
+            _timeProvider.GetUtcNow(),
+            cancellationToken);
+        await _sessionRealtimePublisher.TerminateAsync(
+            userId,
+            reason,
+            terminatedAt,
+            cancellationToken);
+
+        return new TerminateUserSessionResultDto(
+            userId,
+            target.DisplayName,
+            reason,
+            terminatedAt);
     }
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default)
@@ -224,7 +273,7 @@ public sealed class AdminModerationService : IAdminModerationService
             .Concat(reviews.Values.Select(review => review.RentalPostId))
             .Distinct()
             .ToArray();
-        var rentalPosts = (await _posts.GetByIdsAsync(rentalPostIds, cancellationToken))
+        var rentalPosts = (await _posts.GetByIdsWithMediaAsync(rentalPostIds, cancellationToken))
             .ToDictionary(post => post.Id);
 
         return reports.Select(report =>
@@ -246,6 +295,7 @@ public sealed class AdminModerationService : IAdminModerationService
                 report.TargetType,
                 report.TargetId,
                 target.DisplayName,
+                target.ImagePath,
                 target.RelatedRentalPostId,
                 report.Reason,
                 report.Description,
@@ -317,11 +367,11 @@ public sealed class AdminModerationService : IAdminModerationService
         switch (report.TargetType)
         {
             case ReportTargetType.RentalPost when rentalPosts.TryGetValue(report.TargetId, out var rentalPost):
-                return new ReportTargetDisplay(rentalPost.Title, rentalPost.Id);
+                return new ReportTargetDisplay(rentalPost.Title, rentalPost.Media.OrderBy(media => media.SortOrder).FirstOrDefault()?.Path, rentalPost.Id);
             case ReportTargetType.User when profiles.TryGetValue(report.TargetId, out var user):
-                return new ReportTargetDisplay(user.DisplayName, null);
+                return new ReportTargetDisplay(user.DisplayName, user.AvatarPath, null);
             case ReportTargetType.MarketplacePost when marketplacePosts.TryGetValue(report.TargetId, out var marketplacePost):
-                return new ReportTargetDisplay(marketplacePost.Title, marketplacePost.LinkedRentalPostId);
+                return new ReportTargetDisplay(marketplacePost.Title, marketplacePost.Media.OrderBy(media => media.SortOrder).FirstOrDefault()?.Url, marketplacePost.LinkedRentalPostId);
             case ReportTargetType.RoommateInvitation when invitations.TryGetValue(report.TargetId, out var invitation):
                 return rentalPosts.TryGetValue(invitation.RentalPostId, out var invitationPost)
                     ? new ReportTargetDisplay($"Lời mời ở ghép cho “{invitationPost.Title}”", invitationPost.Id)
@@ -337,5 +387,11 @@ public sealed class AdminModerationService : IAdminModerationService
         }
     }
 
-    private sealed record ReportTargetDisplay(string DisplayName, Guid? RelatedRentalPostId);
+    private sealed record ReportTargetDisplay(string DisplayName, string? ImagePath, Guid? RelatedRentalPostId)
+    {
+        public ReportTargetDisplay(string displayName, Guid? relatedRentalPostId)
+            : this(displayName, null, relatedRentalPostId)
+        {
+        }
+    }
 }

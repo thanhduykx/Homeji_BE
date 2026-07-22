@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Microsoft.IdentityModel.Tokens;
+using Homeji.Application.IServices.Accounts;
 
 namespace Homeji.Api.Authentication;
 
@@ -71,6 +72,28 @@ public static class SupabaseAuthenticationExtensions
                         }
 
                         return Task.CompletedTask;
+                    },
+                    OnTokenValidated = async context =>
+                    {
+                        var subject = context.Principal?.FindFirst("sub")?.Value;
+                        var issuedAtValue = context.Principal?.FindFirst("iat")?.Value;
+                        if (!Guid.TryParse(subject, out var userId)
+                            || !long.TryParse(issuedAtValue, out var issuedAtUnixSeconds))
+                        {
+                            context.Fail("Token không chứa thông tin phiên hợp lệ.");
+                            return;
+                        }
+
+                        var revocations = context.HttpContext.RequestServices
+                            .GetRequiredService<IUserSessionRevocationService>();
+                        var revokedBefore = await revocations.GetRevokedBeforeAsync(
+                            userId,
+                            context.HttpContext.RequestAborted);
+                        var issuedAt = DateTimeOffset.FromUnixTimeSeconds(issuedAtUnixSeconds);
+                        if (revokedBefore.HasValue && issuedAt <= revokedBefore.Value)
+                        {
+                            context.Fail("Phiên đăng nhập đã bị quản trị viên kết thúc.");
+                        }
                     },
                 };
             });

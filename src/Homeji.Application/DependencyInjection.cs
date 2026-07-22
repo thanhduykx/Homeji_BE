@@ -1,7 +1,9 @@
 using System.Globalization;
 using FluentValidation;
 using Homeji.Application.Abstractions.Notifications;
+using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.IServices.AI;
+using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.Appointments;
 using Homeji.Application.IServices.Verifications;
 using Homeji.Application.IServices.Activities;
@@ -11,6 +13,7 @@ using Homeji.Application.IServices.MarketplaceOrders;
 using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.IServices.Marketplace;
 using Homeji.Application.Services.Admin;
+using Homeji.Application.Services.Accounts;
 using Homeji.Application.Services.AI;
 using Homeji.Application.Services.Appointments;
 using Homeji.Application.Services.Verifications;
@@ -57,6 +60,9 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddScoped<UserContext>();
+        services.AddScoped<IUserSessionRevocationService, UserSessionRevocationService>();
+        services.TryAddSingleton<IUserSessionRevocationCache, NoOpUserSessionRevocationCache>();
+        services.TryAddSingleton<IUserSessionRealtimePublisher, NoOpUserSessionRealtimePublisher>();
         services.AddScoped<ContentModerationService>();
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IRentalPostService, RentalPostService>();
