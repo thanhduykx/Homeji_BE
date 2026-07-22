@@ -5,6 +5,7 @@ namespace Homeji.Domain.Entities;
 public sealed class PostMessage
 {
     public const int MaxBodyLength = 2_000;
+    private readonly List<PostMessageAttachment> _attachments = [];
 
     private PostMessage()
     {
@@ -31,4 +32,30 @@ public sealed class PostMessage
     public Guid SenderId { get; private set; }
     public string Body { get; private set; }
     public DateTimeOffset SentAt { get; private set; }
+
+    public IReadOnlyCollection<PostMessageAttachment> Attachments => _attachments;
+
+    public PostMessageAttachment AddImage(
+        Guid uploaderId,
+        Homeji.Domain.Enums.MessageAttachmentContext context,
+        string mimeType,
+        byte[] content,
+        int width,
+        int height,
+        string sha256,
+        DateTimeOffset createdAt)
+    {
+        var attachment = new PostMessageAttachment(
+            Id,
+            uploaderId,
+            context,
+            mimeType,
+            content,
+            width,
+            height,
+            sha256,
+            createdAt);
+        _attachments.Add(attachment);
+        return attachment;
+    }
 }

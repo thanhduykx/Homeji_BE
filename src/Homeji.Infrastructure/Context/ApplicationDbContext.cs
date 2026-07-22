@@ -33,6 +33,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
     public DbSet<PostConversation> PostConversations => Set<PostConversation>();
     public DbSet<PostMessage> PostMessages => Set<PostMessage>();
+    public DbSet<PostMessageAttachment> PostMessageAttachments => Set<PostMessageAttachment>();
     public DbSet<RentalWantedPost> RentalWantedPosts => Set<RentalWantedPost>();
     public DbSet<MarketplaceOrder> MarketplaceOrders => Set<MarketplaceOrder>();
     public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();

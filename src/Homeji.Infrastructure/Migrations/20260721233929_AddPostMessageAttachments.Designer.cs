@@ -3,6 +3,7 @@ using System;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Homeji.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260721233929_AddPostMessageAttachments")]
+    partial class AddPostMessageAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -796,40 +799,9 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("moderation_reason");
 
-                    b.Property<DateOnly?>("OriginalLeaseEndsOn")
-                        .HasColumnType("date")
-                        .HasColumnName("original_lease_ends_on");
-
-                    b.Property<bool>("OwnerConsentConfirmed")
-                        .HasColumnType("boolean")
-                        .HasColumnName("owner_consent_confirmed");
-
-                    b.Property<string>("OwnerConsentContact")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("owner_consent_contact");
-
-                    b.Property<string>("OwnerConsentVerificationNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("owner_consent_verification_note");
-
-                    b.Property<DateTimeOffset?>("OwnerConsentVerifiedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("owner_consent_verified_at");
-
-                    b.Property<Guid?>("OwnerConsentVerifiedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_consent_verified_by");
-
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")
                         .HasColumnName("owner_id");
-
-                    b.Property<decimal>("PassFee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("pass_fee");
 
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
@@ -849,15 +821,6 @@ namespace Homeji.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("title");
-
-                    b.Property<int?>("TransferKind")
-                        .HasColumnType("integer")
-                        .HasColumnName("transfer_kind");
-
-                    b.Property<string>("TransferReason")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("transfer_reason");
 
                     b.Property<int>("Type")
                         .HasColumnType("integer")

@@ -8,7 +8,7 @@ public sealed class ChatbotOptions
 
     public string Title { get; set; } = "Homeji Assistant";
 
-    public string Greeting { get; set; } = "Xin chào, mình là Homeji Assistant. Bạn cần tìm phòng, hỏi về bài đăng hay thanh toán Premium?";
+    public string Greeting { get; set; } = "Xin chào, mình là Homeji Assistant. Bạn có thể hỏi mình cách dùng bất kỳ tính năng nào trong Homeji.";
 
     public int MaxHistoryMessages { get; set; } = 12;
 
@@ -17,6 +17,7 @@ public sealed class ChatbotOptions
     public string[] SuggestedPrompts { get; set; } =
     [
         "Tìm phòng gần Đại học FPT dưới 2 triệu",
+        "Mua đồ ăn trên Homeji như thế nào?",
         "Premium có lợi ích gì?",
         "Cách thanh toán bằng PayOS như thế nào?",
     ];

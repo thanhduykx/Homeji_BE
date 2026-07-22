@@ -53,9 +53,35 @@ public sealed class PostConversationRepository : IPostConversationRepository
     {
         return await _dbContext.PostMessages
             .AsNoTracking()
+            .Include(message => message.Attachments)
             .Where(message => message.ConversationId == conversationId)
             .OrderBy(message => message.SentAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<PostMessageAttachment?> GetAttachmentAsync(
+        Guid conversationId,
+        Guid messageId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        return (
+            from attachment in _dbContext.PostMessageAttachments
+            join message in _dbContext.PostMessages on attachment.MessageId equals message.Id
+            where message.ConversationId == conversationId
+                && attachment.MessageId == messageId
+                && attachment.Id == attachmentId
+            select attachment).SingleOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<int> CountAttachmentsByUploaderSinceAsync(
+        Guid uploaderId,
+        DateTimeOffset since,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.PostMessageAttachments.CountAsync(
+            attachment => attachment.UploaderId == uploaderId && attachment.CreatedAt >= since,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyDictionary<Guid, ConversationLastMessageDto>> GetLatestByConversationIdsAsync(

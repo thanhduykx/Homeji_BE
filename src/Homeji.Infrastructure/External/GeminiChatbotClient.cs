@@ -6,6 +6,7 @@ using System.Globalization;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Chatbot;
 using Homeji.Application.IServices.Chatbot;
+using Homeji.Application.Services.Chatbot;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -177,7 +178,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
     {
         var builder = new StringBuilder();
         builder.AppendLine("Bạn là Homeji Assistant trong popup chat của web/app Homeji.");
-        builder.AppendLine("Nhiệm vụ: hỗ trợ người dùng tìm phòng, hiểu nhu cầu thuê trọ, giải thích Premium, thanh toán MoMo/PayOS, tài khoản và cách dùng app.");
+        builder.AppendLine("Nhiệm vụ: giải đáp cách dùng tất cả tính năng thật của Homeji và hướng người dùng tới đúng chức năng trong ứng dụng.");
         builder.AppendLine("Quy tắc trả lời:");
         builder.AppendLine("- Trả lời bằng tiếng Việt, ngắn gọn, thực tế, thân thiện.");
         builder.AppendLine("- Nếu người dùng hỏi tìm phòng, hãy hỏi thêm khu vực/ngân sách/tiện ích nếu thiếu.");
@@ -191,6 +192,8 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         builder.AppendLine("- Do not use HTML or Markdown tables. Avoid a heading when the answer is only one short sentence.");
         builder.AppendLine();
         builder.AppendLine(HomejiLocationKnowledge.GroundingPrompt);
+        builder.AppendLine();
+        builder.AppendLine(ChatbotNavigationCatalog.FeaturePrompt);
         builder.AppendLine();
         builder.AppendLine("Lịch sử chat gần nhất:");
 

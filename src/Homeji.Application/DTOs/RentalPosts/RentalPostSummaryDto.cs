@@ -17,4 +17,9 @@ public sealed record RentalPostSummaryDto(
     bool IsOwnerPremium,
     string? OwnerBadge,
     decimal BoostScore,
-    string? HighlightTag);
+    string? HighlightTag,
+    RoomTransferKind? TransferKind = null,
+    DateOnly? OriginalLeaseEndsOn = null,
+    decimal PassFee = 0,
+    bool OwnerConsentVerified = false,
+    string? OwnerConsentContact = null);

@@ -27,6 +27,15 @@ public sealed class RentalPostConfiguration : IEntityTypeConfiguration<RentalPos
         builder.Property(post => post.AvailableSlots).HasColumnName("available_slots").IsRequired();
         builder.Property(post => post.HouseRules).HasColumnName("house_rules").HasMaxLength(RentalPost.MaxHouseRulesLength);
         builder.Property(post => post.AvailableFrom).HasColumnName("available_from");
+        builder.Property(post => post.TransferKind).HasColumnName("transfer_kind").HasConversion<int?>();
+        builder.Property(post => post.OriginalLeaseEndsOn).HasColumnName("original_lease_ends_on");
+        builder.Property(post => post.PassFee).HasColumnName("pass_fee").HasPrecision(18, 2).IsRequired();
+        builder.Property(post => post.TransferReason).HasColumnName("transfer_reason").HasMaxLength(RentalPost.MaxTransferReasonLength);
+        builder.Property(post => post.OwnerConsentConfirmed).HasColumnName("owner_consent_confirmed").IsRequired();
+        builder.Property(post => post.OwnerConsentContact).HasColumnName("owner_consent_contact").HasMaxLength(RentalPost.MaxOwnerConsentContactLength);
+        builder.Property(post => post.OwnerConsentVerifiedAt).HasColumnName("owner_consent_verified_at");
+        builder.Property(post => post.OwnerConsentVerifiedBy).HasColumnName("owner_consent_verified_by");
+        builder.Property(post => post.OwnerConsentVerificationNote).HasColumnName("owner_consent_verification_note").HasMaxLength(RentalPost.MaxOwnerConsentVerificationNoteLength);
         builder.Property(post => post.Address).HasColumnName("address").HasMaxLength(RentalPost.MaxAddressLength).IsRequired();
         builder.Property(post => post.Latitude).HasColumnName("latitude").HasPrecision(10, 7).IsRequired();
         builder.Property(post => post.Longitude).HasColumnName("longitude").HasPrecision(10, 7).IsRequired();

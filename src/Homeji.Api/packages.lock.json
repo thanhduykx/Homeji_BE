@@ -448,7 +448,8 @@
           "Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions": "[9.0.17, )",
           "Microsoft.Extensions.Http": "[9.0.17, )",
           "Microsoft.Extensions.Options.ConfigurationExtensions": "[9.0.17, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[9.0.4, )"
+          "Npgsql.EntityFrameworkCore.PostgreSQL": "[9.0.4, )",
+          "SixLabors.ImageSharp": "[3.1.12, )"
         }
       },
       "FluentValidation.DependencyInjectionExtensions": {
@@ -547,6 +548,12 @@
           "Microsoft.EntityFrameworkCore.Relational": "[9.0.1, 10.0.0)",
           "Npgsql": "9.0.3"
         }
+      },
+      "SixLabors.ImageSharp": {
+        "type": "CentralTransitive",
+        "requested": "[3.1.12, )",
+        "resolved": "3.1.12",
+        "contentHash": "iAg6zifihXEFS/t7fiHhZBGAdCp3FavsF4i2ZIDp0JfeYeDVzvmlbY1CNhhIKimaIzrzSi5M/NBFcWvZT2rB/A=="
       }
     }
   }

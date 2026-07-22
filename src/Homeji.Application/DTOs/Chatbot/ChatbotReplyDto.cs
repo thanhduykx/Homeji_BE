@@ -6,4 +6,5 @@ public sealed record ChatbotReplyDto(
     Guid ConversationId,
     ChatbotMessageDto UserMessage,
     ChatbotMessageDto AssistantMessage,
-    AiHighlightResponseDto? SearchUpdate);
+    AiHighlightResponseDto? SearchUpdate,
+    IReadOnlyCollection<ChatbotNavigationActionDto> Actions);

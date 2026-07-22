@@ -10,4 +10,19 @@ public interface IPostConversationService
     Task<IReadOnlyList<PostConversationDto>> GetMineAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostMessageDto>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken = default);
     Task<PostMessageDto> SendMessageAsync(Guid conversationId, SendPostMessageDto request, CancellationToken cancellationToken = default);
+    Task<PostMessageDto> SendImagesAsync(
+        Guid conversationId,
+        string? body,
+        IReadOnlyList<ConversationImageUpload> images,
+        CancellationToken cancellationToken = default);
+    Task<PostMessageAttachmentContentDto> GetAttachmentContentAsync(
+        Guid conversationId,
+        Guid messageId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default);
+    Task DeleteAttachmentAsync(
+        Guid conversationId,
+        Guid messageId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default);
 }

@@ -4,4 +4,5 @@ public enum RentalPostType
 {
     VacantRoom = 1,
     RoommateShare = 2,
+    RoomTransfer = 3,
 }

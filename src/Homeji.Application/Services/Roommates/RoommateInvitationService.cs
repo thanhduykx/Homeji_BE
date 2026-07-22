@@ -2,6 +2,7 @@ using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Roommates;
 using Homeji.Application.IRepositories.Notifications;
+using Homeji.Application.IRepositories.Conversations;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Roommates;
 using Homeji.Application.IRepositories.RoommateChats;
@@ -22,6 +23,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
     private readonly IRentalPostRepository _posts;
     private readonly INotificationRepository _notifications;
     private readonly IRoommateConversationRepository _conversations;
+    private readonly IPostConversationRepository _directConversations;
     private readonly TimeProvider _timeProvider;
     private readonly INotificationRealtimePublisher _realtimePublisher;
 
@@ -32,6 +34,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         IRentalPostRepository posts,
         INotificationRepository notifications,
         IRoommateConversationRepository conversations,
+        IPostConversationRepository directConversations,
         TimeProvider timeProvider,
         INotificationRealtimePublisher realtimePublisher)
     {
@@ -41,6 +44,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         _posts = posts;
         _notifications = notifications;
         _conversations = conversations;
+        _directConversations = directConversations;
         _timeProvider = timeProvider;
         _realtimePublisher = realtimePublisher;
     }
@@ -144,6 +148,22 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
                 {
                     await _conversations.AddConversationAsync(new RoommateConversation(
                         invitation.Id,
+                        invitation.RentalPostId,
+                        invitation.SenderId,
+                        invitation.ReceiverId,
+                        _timeProvider.GetUtcNow()), cancellationToken);
+                }
+
+                var directConversation = await _directConversations.FindAsync(
+                    ConversationSubjectType.RentalPost,
+                    invitation.RentalPostId,
+                    invitation.SenderId,
+                    invitation.ReceiverId,
+                    cancellationToken);
+                if (directConversation is null)
+                {
+                    await _directConversations.AddConversationAsync(new PostConversation(
+                        ConversationSubjectType.RentalPost,
                         invitation.RentalPostId,
                         invitation.SenderId,
                         invitation.ReceiverId,

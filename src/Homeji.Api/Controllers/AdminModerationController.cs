@@ -27,9 +27,15 @@ public sealed class AdminModerationController : ControllerBase
 
     [HttpPost("rental-posts/{postId:guid}/approve")]
     [ProducesResponseType<RentalPostDto>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<RentalPostDto>> ApproveRentalPost(Guid postId, CancellationToken cancellationToken)
+    public async Task<ActionResult<RentalPostDto>> ApproveRentalPost(
+        Guid postId,
+        [FromBody] ApproveRentalPostDto? request,
+        CancellationToken cancellationToken)
     {
-        return Ok(await _moderationService.ApproveRentalPostAsync(postId, cancellationToken));
+        return Ok(await _moderationService.ApproveRentalPostAsync(
+            postId,
+            request ?? new ApproveRentalPostDto(null),
+            cancellationToken));
     }
 
     [HttpPost("rental-posts/{postId:guid}/reject")]
