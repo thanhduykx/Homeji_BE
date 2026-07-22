@@ -54,6 +54,8 @@ builder.Services.AddSupabaseAuthentication(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<IOnlineUserTracker, OnlineUserTracker>();
+builder.Services.AddSingleton<IUserSessionRevocationCache, MemoryUserSessionRevocationCache>();
+builder.Services.AddSingleton<IUserSessionRealtimePublisher, SignalRUserSessionPublisher>();
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
 

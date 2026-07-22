@@ -9,6 +9,7 @@ public sealed record AdminReportDto(
     ReportTargetType TargetType,
     Guid TargetId,
     string TargetDisplayName,
+    string? TargetImagePath,
     Guid? RelatedRentalPostId,
     string Reason,
     string? Description,

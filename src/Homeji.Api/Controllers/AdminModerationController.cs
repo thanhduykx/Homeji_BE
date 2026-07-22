@@ -26,6 +26,19 @@ public sealed class AdminModerationController : ControllerBase
         return Ok(await _moderationService.GetActiveUsersAsync(cancellationToken));
     }
 
+    [HttpPost("active-users/{userId:guid}/terminate")]
+    [ProducesResponseType<TerminateUserSessionResultDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TerminateUserSessionResultDto>> TerminateUserSession(
+        Guid userId,
+        [FromBody] TerminateUserSessionRequestDto? request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _moderationService.TerminateUserSessionAsync(
+            userId,
+            request ?? new TerminateUserSessionRequestDto(null),
+            cancellationToken));
+    }
+
     [HttpGet("rental-posts/pending")]
     [ProducesResponseType<IReadOnlyList<RentalPostSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RentalPostSummaryDto>>> GetPendingRentalPosts(CancellationToken cancellationToken)

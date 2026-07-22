@@ -10,6 +10,11 @@ public interface IAdminModerationService
     Task<IReadOnlyList<AdminActiveUserDto>> GetActiveUsersAsync(
         CancellationToken cancellationToken = default);
 
+    Task<TerminateUserSessionResultDto> TerminateUserSessionAsync(
+        Guid userId,
+        TerminateUserSessionRequestDto request,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default);
 
     Task<RentalPostDto> ApproveRentalPostAsync(

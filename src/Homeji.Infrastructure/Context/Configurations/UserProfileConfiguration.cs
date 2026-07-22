@@ -77,6 +77,9 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
             .HasConversion<int>()
             .IsRequired();
 
+        builder.Property(profile => profile.SessionsRevokedBefore)
+            .HasColumnName("sessions_revoked_before");
+
         builder.Property(profile => profile.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();
