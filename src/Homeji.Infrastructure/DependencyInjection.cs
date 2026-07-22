@@ -95,7 +95,6 @@ public static class DependencyInjection
         services.AddScoped<IMarketplaceOrderRepository, MarketplaceOrderRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IWalletWithdrawalRepository, WalletWithdrawalRepository>();
-        services.AddScoped<IMarketplaceSellerSubscriptionRepository, MarketplaceSellerSubscriptionRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));

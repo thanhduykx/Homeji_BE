@@ -1,12 +1,10 @@
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Abstractions.Notifications;
-using Homeji.Application.DTOs.Marketplace;
 using Homeji.Application.DTOs.MarketplaceOrders;
 using Homeji.Application.IRepositories.Marketplace;
 using Homeji.Application.IRepositories.MarketplaceOrders;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.Wallets;
-using Homeji.Application.IServices.Marketplace;
 using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Marketplace;
 using Homeji.Application.Services.MarketplaceOrders;
@@ -47,7 +45,6 @@ public sealed class MarketplaceCartOrderServiceTests
             publisher,
             timeProvider,
             walletRepository,
-            new StubSellerPlanService(),
             new CreateMarketplaceOrderDtoValidator(timeProvider),
             new CreateMarketplaceCartOrderDtoValidator(timeProvider),
             Options.Create(new MarketplaceFinanceOptions
@@ -64,6 +61,7 @@ public sealed class MarketplaceCartOrderServiceTests
             null));
 
         Assert.Equal(2, result.Count);
+        Assert.All(result, order => Assert.Equal(0.10m, order.PlatformFeeRate));
         Assert.Equal(165_000, buyerWallet.Balance);
         Assert.All(posts, post => Assert.Equal(1, post.ReservedQuantity));
         Assert.Equal(2, walletRepository.AddedTransactions.Count);
@@ -99,7 +97,6 @@ public sealed class MarketplaceCartOrderServiceTests
             publisher,
             timeProvider,
             walletRepository,
-            new StubSellerPlanService(),
             new CreateMarketplaceOrderDtoValidator(timeProvider),
             new CreateMarketplaceCartOrderDtoValidator(timeProvider),
             Options.Create(new MarketplaceFinanceOptions
@@ -158,7 +155,6 @@ public sealed class MarketplaceCartOrderServiceTests
             publisher,
             timeProvider,
             walletRepository,
-            new StubSellerPlanService(),
             new CreateMarketplaceOrderDtoValidator(timeProvider),
             new CreateMarketplaceCartOrderDtoValidator(timeProvider),
             Options.Create(new MarketplaceFinanceOptions
@@ -328,23 +324,6 @@ public sealed class MarketplaceCartOrderServiceTests
         }
 
         public Task SaveChangesAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-    }
-
-    private sealed class StubSellerPlanService : IMarketplaceSellerPlanService
-    {
-        public Task<decimal> ResolveCommissionRateAsync(
-            Guid sellerId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
-            Task.FromResult(0.10m);
-
-        public Task<IReadOnlyList<MarketplaceSellerPlanDto>> GetPlansAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<MarketplaceSellerSubscriptionDto> GetMineAsync(CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
-
-        public Task<MarketplaceSellerSubscriptionDto> PurchaseAsync(
-            string packageCode, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
     }
 
     private sealed class StubNotificationRepository : INotificationRepository

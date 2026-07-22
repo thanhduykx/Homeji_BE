@@ -48,7 +48,6 @@ public sealed class MarketplaceOrderExpirationServiceTests
             publisher,
             new StubTimeProvider(),
             wallets,
-            sellerPlans: null!,
             validator: null!,
             cartValidator: null!,
             Options.Create(new MarketplaceFinanceOptions { OrderRequestTimeoutMinutes = 30 }),

@@ -82,7 +82,6 @@ public static class DependencyInjection
         services.AddScoped<IMarketplaceOrderExpirationService>(provider => provider.GetRequiredService<MarketplaceOrderService>());
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IWalletWithdrawalService, WalletWithdrawalService>();
-        services.AddScoped<IMarketplaceSellerPlanService, MarketplaceSellerPlanService>();
         services.AddSingleton(TimeProvider.System);
 
         return services;
