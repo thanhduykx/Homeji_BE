@@ -96,6 +96,9 @@ public sealed class RentalPostSearchTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<UserProfile>>([]);
 
+        public Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
+
         public Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
             string address,
             decimal price,

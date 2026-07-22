@@ -1,3 +1,4 @@
+using System.Globalization;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Abstractions.Presence;
 using Homeji.Application.Abstractions.Authentication;
@@ -140,6 +141,105 @@ public sealed class AdminModerationService : IAdminModerationService
             target.DisplayName,
             reason,
             terminatedAt);
+    }
+
+    public async Task<MaintenanceAnnouncementResultDto> SendMaintenanceAnnouncementAsync(
+        MaintenanceAnnouncementRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureAdminAsync(cancellationToken);
+
+        var title = string.IsNullOrWhiteSpace(request.Title)
+            ? "Bảo trì hệ thống Homeji"
+            : request.Title.Trim();
+        var message = string.IsNullOrWhiteSpace(request.Message)
+            ? "Homeji sẽ tạm gián đoạn để bảo trì. Vui lòng quay lại sau khi hoàn tất."
+            : request.Message.Trim();
+        var errors = new Dictionary<string, string[]>();
+        if (title.Length > Notification.MaxTitleLength)
+        {
+            errors["title"] = [$"Tiêu đề không được vượt quá {Notification.MaxTitleLength} ký tự."];
+        }
+
+        if (message.Length > Notification.MaxMessageLength)
+        {
+            errors["message"] = [$"Nội dung không được vượt quá {Notification.MaxMessageLength} ký tự."];
+        }
+
+        if (request.ScheduledStartAt.HasValue
+            && request.ScheduledEndAt.HasValue
+            && request.ScheduledEndAt.Value <= request.ScheduledStartAt.Value)
+        {
+            errors["scheduledEndAt"] = ["Thời điểm kết thúc phải sau thời điểm bắt đầu."];
+        }
+
+        if (request.ScheduledEndAt.HasValue && !request.ScheduledStartAt.HasValue)
+        {
+            errors["scheduledStartAt"] = ["Cần chọn thời điểm bắt đầu trước khi chọn thời điểm kết thúc."];
+        }
+
+        var scheduleSuffix = BuildMaintenanceScheduleSuffix(request);
+        var deliveryMessage = string.IsNullOrEmpty(scheduleSuffix)
+            ? message
+            : $"{message}\n\n{scheduleSuffix}";
+        if (deliveryMessage.Length > Notification.MaxMessageLength)
+        {
+            errors["message"] = [$"Nội dung kèm lịch bảo trì không được vượt quá {Notification.MaxMessageLength} ký tự."];
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new RequestValidationException(errors);
+        }
+
+        var recipientIds = await _profiles.GetAllUserIdsAsync(cancellationToken);
+        var sentAt = _timeProvider.GetUtcNow();
+        var onlineIds = _onlineUsers.GetOnlineUsers().Keys.ToHashSet();
+        const int batchSize = 500;
+        for (var offset = 0; offset < recipientIds.Count; offset += batchSize)
+        {
+            var batch = recipientIds
+                .Skip(offset)
+                .Take(batchSize)
+                .Select(recipientId => new Notification(
+                    recipientId,
+                    NotificationType.MaintenanceAnnouncement,
+                    title,
+                    deliveryMessage,
+                    null,
+                    sentAt))
+                .ToArray();
+            await _notifications.AddRangeAndSaveAsync(batch, cancellationToken);
+
+            foreach (var notification in batch.Where(item => onlineIds.Contains(item.RecipientId)))
+            {
+                await _realtimePublisher.PublishAsync(notification, cancellationToken);
+            }
+        }
+
+        return new MaintenanceAnnouncementResultDto(
+            title,
+            deliveryMessage,
+            request.ScheduledStartAt,
+            request.ScheduledEndAt,
+            recipientIds.Count,
+            recipientIds.Count(onlineIds.Contains),
+            sentAt);
+    }
+
+    private static string? BuildMaintenanceScheduleSuffix(MaintenanceAnnouncementRequestDto request)
+    {
+        if (!request.ScheduledStartAt.HasValue && !request.ScheduledEndAt.HasValue)
+        {
+            return null;
+        }
+
+        static string Format(DateTimeOffset value) =>
+            value.ToOffset(TimeSpan.FromHours(7)).ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture);
+
+        return request.ScheduledStartAt.HasValue && request.ScheduledEndAt.HasValue
+            ? $"Thời gian dự kiến: {Format(request.ScheduledStartAt.Value)} – {Format(request.ScheduledEndAt.Value)} (GMT+7)."
+            : $"Thời điểm dự kiến: {Format(request.ScheduledStartAt ?? request.ScheduledEndAt!.Value)} (GMT+7).";
     }
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default)

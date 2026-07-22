@@ -133,6 +133,9 @@ public sealed class UserProfileServiceTests
             return Task.FromResult(profiles);
         }
 
+        public Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Guid>>(Profile is null ? [] : [Profile.Id]);
+
         public Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
             string address,
             decimal price,

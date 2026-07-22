@@ -15,4 +15,5 @@ public enum NotificationType
     SavedPostChanged = 11,
     NewMatchingRentalPost = 12,
     MarketplaceOrderUpdated = 13,
+    MaintenanceAnnouncement = 14,
 }
