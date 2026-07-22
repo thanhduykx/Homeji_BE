@@ -389,12 +389,6 @@ public sealed class SupabaseAccountService : IAccountService
     {
         ValidateEmailAndPassword(request.Email, request.Password);
 
-        var normalizedEmail = NormalizeEmail(request.Email!);
-        if (!Regex.IsMatch(normalizedEmail, "^[^\\s@]+@gmail\\.com$", RegexOptions.CultureInvariant))
-        {
-            throw Validation("email", "Registration requires a Gmail address (@gmail.com).");
-        }
-
         var normalizedName = Regex.Replace(request.DisplayName?.Trim() ?? string.Empty, "\\s+", " ");
         if (normalizedName.Length is < 2 or > 60)
         {
@@ -412,7 +406,14 @@ public sealed class SupabaseAccountService : IAccountService
 
     private static void ValidateEmail(string? email)
     {
-        if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw Validation("email", "Email không hợp lệ.");
+        }
+
+        var normalized = NormalizeEmail(email);
+        if (normalized.Length > 254
+            || !Regex.IsMatch(normalized, @"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.CultureInvariant))
         {
             throw Validation("email", "Email không hợp lệ.");
         }
