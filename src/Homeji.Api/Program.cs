@@ -96,7 +96,7 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
-if (builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", false))
+if (builder.Configuration.GetValue("Database:ApplyMigrationsOnStartup", builder.Environment.IsProduction()))
 {
     await using var migrationScope = app.Services.CreateAsyncScope();
     var database = migrationScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

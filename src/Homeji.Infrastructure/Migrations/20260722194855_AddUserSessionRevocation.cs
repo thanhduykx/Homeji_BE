@@ -11,12 +11,7 @@ namespace Homeji.Infrastructure.Migrations;
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "sessions_revoked_before",
-                schema: "homeji",
-                table: "user_profiles",
-                type: "timestamp with time zone",
-                nullable: true);
+            migrationBuilder.Sql("ALTER TABLE homeji.user_profiles ADD COLUMN IF NOT EXISTS sessions_revoked_before timestamp with time zone NULL;");
         }
 
         /// <inheritdoc />
