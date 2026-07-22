@@ -95,7 +95,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         await _notifications.AddAsync(notification, cancellationToken);
         await _invitations.SaveChangesAsync(cancellationToken);
         await _realtimePublisher.PublishAsync(notification, cancellationToken);
-        return RoommateInvitationMapper.ToDto(invitation);
+        return RoommateInvitationMapper.ToDto(invitation, post.Title);
     }
 
     public async Task<IReadOnlyList<RoommateInvitationDto>> GetMineAsync(CancellationToken cancellationToken = default)
@@ -103,7 +103,23 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         var renter = await GetRequiredRenterAsync(cancellationToken);
         var userId = renter.Id;
         var invitations = await _invitations.GetForUserAsync(userId, cancellationToken);
-        return invitations.Select(RoommateInvitationMapper.ToDto).ToArray();
+        var postIds = invitations.Select(invitation => invitation.RentalPostId).Distinct().ToArray();
+        var posts = await _posts.GetByIdsAsync(postIds, cancellationToken);
+        var postTitles = posts.ToDictionary(post => post.Id, post => post.Title);
+        var directConversations = await _directConversations.GetForUserAsync(userId, cancellationToken);
+
+        return invitations.Select(invitation =>
+        {
+            var conversationId = directConversations.FirstOrDefault(conversation =>
+                conversation.SubjectType == ConversationSubjectType.RentalPost
+                && conversation.SubjectId == invitation.RentalPostId
+                && conversation.Includes(invitation.SenderId)
+                && conversation.Includes(invitation.ReceiverId))?.Id;
+            return RoommateInvitationMapper.ToDto(
+                invitation,
+                postTitles.GetValueOrDefault(invitation.RentalPostId) ?? "Tin đăng không còn khả dụng",
+                conversationId);
+        }).ToArray();
     }
 
     public Task<RoommateInvitationDto> AcceptAsync(Guid invitationId, CancellationToken cancellationToken = default)
@@ -130,8 +146,10 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         var renter = await GetRequiredRenterAsync(cancellationToken);
         var userId = renter.Id;
         Notification? notification = null;
+        PostConversation? directConversation = null;
         var invitation = await _invitations.GetByIdAsync(invitationId, cancellationToken)
             ?? throw new NotFoundException(nameof(RoommateInvitation), invitationId);
+        var post = await _posts.GetByIdAsync(invitation.RentalPostId, cancellationToken);
 
         if (cancel)
         {
@@ -154,7 +172,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
                         _timeProvider.GetUtcNow()), cancellationToken);
                 }
 
-                var directConversation = await _directConversations.FindAsync(
+                directConversation = await _directConversations.FindAsync(
                     ConversationSubjectType.RentalPost,
                     invitation.RentalPostId,
                     invitation.SenderId,
@@ -162,12 +180,13 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
                     cancellationToken);
                 if (directConversation is null)
                 {
-                    await _directConversations.AddConversationAsync(new PostConversation(
+                    directConversation = new PostConversation(
                         ConversationSubjectType.RentalPost,
                         invitation.RentalPostId,
                         invitation.SenderId,
                         invitation.ReceiverId,
-                        _timeProvider.GetUtcNow()), cancellationToken);
+                        _timeProvider.GetUtcNow());
+                    await _directConversations.AddConversationAsync(directConversation, cancellationToken);
                 }
 
                 notification = new Notification(
@@ -191,7 +210,16 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
             await _realtimePublisher.PublishAsync(notification, cancellationToken);
         }
 
-        return RoommateInvitationMapper.ToDto(invitation);
+        directConversation ??= await _directConversations.FindAsync(
+            ConversationSubjectType.RentalPost,
+            invitation.RentalPostId,
+            invitation.SenderId,
+            invitation.ReceiverId,
+            cancellationToken);
+        return RoommateInvitationMapper.ToDto(
+            invitation,
+            post?.Title ?? "Tin đăng không còn khả dụng",
+            directConversation?.Id);
     }
 
     private async Task<UserProfile> GetRequiredRenterAsync(CancellationToken cancellationToken)
