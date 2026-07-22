@@ -110,13 +110,17 @@ public sealed class CloudinaryImageUploadService : IImageUploadService
         using var doc = JsonDocument.Parse(json);
         var root = doc.RootElement;
 
+
+        var originalUrl = root.GetProperty("secure_url").GetString()!;
+        var optimizedUrl = originalUrl.Replace("/upload/", "/upload/f_webp/q_auto/");
+
         var result = new UploadImageResultDto(
-            Url: root.GetProperty("secure_url").GetString()!,
+            Url: optimizedUrl,
             PublicId: root.GetProperty("public_id").GetString()!,
             Width: root.GetProperty("width").GetInt32(),
             Height: root.GetProperty("height").GetInt32(),
             Bytes: root.GetProperty("bytes").GetInt64(),
-            Format: root.GetProperty("format").GetString()!);
+            Format: "webp");
 
         UploadSucceeded(_logger, result.PublicId, result.Url, null);
 
