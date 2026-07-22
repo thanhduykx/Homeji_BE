@@ -33,8 +33,8 @@ public sealed class UploadController : ControllerBase
         {
             return BadRequest(new ProblemDetails
             {
-                Title = "No files provided",
-                Detail = "Please select at least one image file to upload.",
+                Title = "Chưa chọn tệp",
+                Detail = "Vui lòng chọn ít nhất một ảnh để tải lên.",
                 Status = StatusCodes.Status400BadRequest,
             });
         }
@@ -43,8 +43,8 @@ public sealed class UploadController : ControllerBase
         {
             return BadRequest(new ProblemDetails
             {
-                Title = "Too many files",
-                Detail = "Maximum 10 images can be uploaded at once.",
+                Title = "Quá nhiều tệp",
+                Detail = "Mỗi lần chỉ được tải lên tối đa 10 ảnh.",
                 Status = StatusCodes.Status400BadRequest,
             });
         }

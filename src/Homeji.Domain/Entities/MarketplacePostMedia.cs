@@ -18,17 +18,17 @@ public sealed class MarketplacePostMedia
             || !Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var parsedUrl)
             || parsedUrl.Scheme is not ("http" or "https"))
         {
-            throw new DomainException("Marketplace media URL must be an absolute HTTP or HTTPS URL.");
+            throw new DomainException("URL ảnh chợ đồ phải là HTTP/HTTPS tuyệt đối.");
         }
 
         if (normalizedUrl.Length > MaxUrlLength)
         {
-            throw new DomainException($"Marketplace media URL must not exceed {MaxUrlLength} characters.");
+            throw new DomainException($"URL ảnh chợ đồ không được vượt quá {MaxUrlLength} ký tự.");
         }
 
         if (sortOrder < 0)
         {
-            throw new DomainException("Marketplace media sort order must not be negative.");
+            throw new DomainException("Thứ tự ảnh chợ đồ không được âm.");
         }
 
         Id = Guid.NewGuid();

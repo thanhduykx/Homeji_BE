@@ -54,7 +54,7 @@ public sealed class ReportService : IReportService
         var reporterId = _userContext.GetRequiredUserId();
         if (request.TargetType == ReportTargetType.User && request.TargetId == reporterId)
         {
-            throw new ForbiddenAccessException("You cannot report your own account.");
+            throw new ForbiddenAccessException("Bạn không thể tự báo cáo tài khoản của mình.");
         }
 
         if (!await TargetExistsAsync(request.TargetType, request.TargetId, cancellationToken))
@@ -66,7 +66,7 @@ public sealed class ReportService : IReportService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["reason"] = ["Reason is required."],
+                ["reason"] = ["Lý do là bắt buộc."],
             });
         }
 

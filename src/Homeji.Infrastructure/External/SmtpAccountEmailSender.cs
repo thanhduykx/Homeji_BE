@@ -40,7 +40,7 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
     {
         if (!_options.Enabled)
         {
-            return new EmailSendResultDto(false, "SMTP registration confirmation email is disabled by configuration.");
+            return new EmailSendResultDto(false, "Email xác nhận đăng ký đang tắt theo cấu hình SMTP.");
         }
 
         try
@@ -51,12 +51,22 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
             using var smtpClient = CreateClient();
 
             await smtpClient.SendMailAsync(mailMessage, cancellationToken);
-            return new EmailSendResultDto(true, "SMTP registration confirmation email was sent.");
+            return new EmailSendResultDto(true, "Đã gửi email xác nhận đăng ký qua SMTP.");
+        }
+        catch (InvalidOperationException exception)
+        {
+            InvalidSmtpConfiguration(_logger, email, exception);
+            return new EmailSendResultDto(false, "Không gửi được email xác nhận đăng ký qua SMTP.");
+        }
+        catch (FormatException exception)
+        {
+            InvalidSmtpConfiguration(_logger, email, exception);
+            return new EmailSendResultDto(false, "Không gửi được email xác nhận đăng ký qua SMTP.");
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             FailedToSendRegistrationEmail(_logger, email, exception);
-            return new EmailSendResultDto(false, "SMTP registration confirmation email could not be sent.");
+            return new EmailSendResultDto(false, "Không gửi được email xác nhận đăng ký qua SMTP.");
         }
     }
 

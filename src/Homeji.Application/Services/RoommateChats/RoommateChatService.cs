@@ -114,7 +114,7 @@ public sealed class RoommateChatService : IRoommateChatService
             ?? throw new NotFoundException(nameof(RoommateConversation), conversationId);
         if (!conversation.Includes(userId))
         {
-            throw new ForbiddenAccessException("You are not a participant in this roommate conversation.");
+            throw new ForbiddenAccessException("Bạn không phải thành viên của cuộc trò chuyện ở ghép này.");
         }
 
         return conversation;
@@ -132,11 +132,11 @@ public sealed class RoommateChatService : IRoommateChatService
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(body))
         {
-            errors["body"] = ["Message body is required."];
+            errors["body"] = ["Nội dung tin nhắn là bắt buộc."];
         }
         else if (body.Trim().Length > RoommateMessage.MaxBodyLength)
         {
-            errors["body"] = [$"Message body must not exceed {RoommateMessage.MaxBodyLength} characters."];
+            errors["body"] = [$"Nội dung tin nhắn không được vượt quá {RoommateMessage.MaxBodyLength} ký tự."];
         }
 
         if (errors.Count > 0)

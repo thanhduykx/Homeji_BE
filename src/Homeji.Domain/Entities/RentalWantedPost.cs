@@ -83,8 +83,8 @@ public sealed class RentalWantedPost
         Title = Normalize(title, MaxTitleLength, nameof(Title));
         Description = Normalize(description, MaxDescriptionLength, nameof(Description));
         PreferredArea = Normalize(preferredArea, MaxPreferredAreaLength, nameof(PreferredArea));
-        MaxBudget = maxBudget > 0 ? maxBudget : throw new DomainException("Max budget must be greater than zero.");
-        OccupantCount = occupantCount > 0 ? occupantCount : throw new DomainException("Occupant count must be greater than zero.");
+        MaxBudget = maxBudget > 0 ? maxBudget : throw new DomainException("Ngân sách tối đa phải lớn hơn 0.");
+        OccupantCount = occupantCount > 0 ? occupantCount : throw new DomainException("Số người ở phải lớn hơn 0.");
         AmenityCodes = amenityCodes
             .Where(code => !string.IsNullOrWhiteSpace(code))
             .Select(code => Normalize(code, MaxAmenityLength, "Amenity").ToUpperInvariant())
@@ -97,7 +97,7 @@ public sealed class RentalWantedPost
     {
         if (Status != WantedPostStatus.Active)
         {
-            throw new DomainException("Only active wanted posts can be changed.");
+            throw new DomainException("Chỉ tin tìm phòng đang hoạt động mới được sửa.");
         }
     }
 
@@ -106,7 +106,7 @@ public sealed class RentalWantedPost
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} is required and must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} là bắt buộc và không quá {maxLength} ký tự.");
         }
 
         return normalized;

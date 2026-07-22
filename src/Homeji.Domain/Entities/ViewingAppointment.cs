@@ -21,7 +21,7 @@ public sealed class ViewingAppointment
     {
         if (scheduledAt <= createdAt)
         {
-            throw new DomainException("The viewing time must be in the future.");
+            throw new DomainException("Thời gian xem phòng phải ở tương lai.");
         }
 
         Id = Guid.NewGuid();
@@ -63,7 +63,7 @@ public sealed class ViewingAppointment
     {
         if (Status is ViewingAppointmentStatus.Rejected or ViewingAppointmentStatus.Cancelled or ViewingAppointmentStatus.Completed)
         {
-            throw new DomainException("This viewing appointment can no longer be cancelled.");
+            throw new DomainException("Lịch xem phòng này không còn hủy được nữa.");
         }
 
         Status = ViewingAppointmentStatus.Cancelled;
@@ -74,12 +74,12 @@ public sealed class ViewingAppointment
     {
         if (Status is ViewingAppointmentStatus.Rejected or ViewingAppointmentStatus.Cancelled or ViewingAppointmentStatus.Completed)
         {
-            throw new DomainException("This viewing appointment can no longer be rescheduled.");
+            throw new DomainException("Lịch xem phòng này không còn đổi giờ được nữa.");
         }
 
         if (scheduledAt <= updatedAt)
         {
-            throw new DomainException("The viewing time must be in the future.");
+            throw new DomainException("Thời gian xem phòng phải ở tương lai.");
         }
 
         ScheduledAt = scheduledAt;
@@ -91,7 +91,7 @@ public sealed class ViewingAppointment
     {
         if (Status != ViewingAppointmentStatus.Confirmed)
         {
-            throw new DomainException("Only confirmed viewing appointments can be completed.");
+            throw new DomainException("Chỉ lịch xem phòng đã xác nhận mới có thể hoàn tất.");
         }
 
         Status = ViewingAppointmentStatus.Completed;
@@ -102,7 +102,7 @@ public sealed class ViewingAppointment
     {
         if (Status != ViewingAppointmentStatus.Pending)
         {
-            throw new DomainException("Only pending viewing appointments can be updated by the owner.");
+            throw new DomainException("Chỉ lịch xem phòng đang chờ mới được chủ tin cập nhật.");
         }
     }
 
@@ -116,7 +116,7 @@ public sealed class ViewingAppointment
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;

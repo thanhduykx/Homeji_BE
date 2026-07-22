@@ -16,7 +16,7 @@ public sealed class PostMessage
         var normalized = body?.Trim();
         if (string.IsNullOrWhiteSpace(normalized) || normalized.Length > MaxBodyLength)
         {
-            throw new DomainException($"Message body is required and must not exceed {MaxBodyLength} characters.");
+            throw new DomainException($"Nội dung tin nhắn là bắt buộc và không quá {MaxBodyLength} ký tự.");
         }
 
         Id = Guid.NewGuid();

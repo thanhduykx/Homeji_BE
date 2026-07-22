@@ -61,7 +61,7 @@ public sealed class GeminiChatbotClientTests
 
         Assert.Equal("Gemini", exception.ServiceName);
         Assert.Equal(
-            "Chatbot AI quota is temporarily exhausted. Please try again later.",
+            "Chatbot tạm hết hạn mức. Vui lòng thử lại sau.",
             exception.Message);
         Assert.Equal(3, handler.RequestCount);
     }

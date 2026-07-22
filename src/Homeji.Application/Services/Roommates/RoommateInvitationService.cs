@@ -55,7 +55,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         var senderId = sender.Id;
         if (senderId == request.ReceiverId)
         {
-            throw new ForbiddenAccessException("Cannot invite yourself.");
+            throw new ForbiddenAccessException("Bạn không thể mời chính mình.");
         }
 
         var post = await _posts.GetByIdAsync(postId, cancellationToken)
@@ -68,14 +68,14 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         if (!await _savedPosts.ExistsAsync(senderId, postId, cancellationToken)
             || !await _savedPosts.ExistsAsync(request.ReceiverId, postId, cancellationToken))
         {
-            throw new ForbiddenAccessException("Both users must save this rental post before creating a roommate invitation.");
+            throw new ForbiddenAccessException("Cả hai người phải lưu tin đăng này trước khi gửi lời mời ở ghép.");
         }
 
         if (await _invitations.HasPendingAsync(postId, senderId, request.ReceiverId, cancellationToken))
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["receiverId"] = ["A pending invitation already exists."],
+                ["receiverId"] = ["Đã có lời mời đang chờ xử lý."],
             });
         }
 

@@ -129,14 +129,14 @@ public sealed class RentalWantedPostService : IRentalWantedPostService
     private async Task ValidateAsync(UpsertRentalWantedPostDto request, CancellationToken cancellationToken)
     {
         var errors = new Dictionary<string, string[]>();
-        if (string.IsNullOrWhiteSpace(request.Title)) errors["title"] = ["Title is required."];
-        if (string.IsNullOrWhiteSpace(request.Description)) errors["description"] = ["Description is required."];
-        if (string.IsNullOrWhiteSpace(request.PreferredArea)) errors["preferredArea"] = ["Preferred area is required."];
-        if (request.MaxBudget <= 0) errors["maxBudget"] = ["Max budget must be greater than zero."];
-        if (request.OccupantCount <= 0) errors["occupantCount"] = ["Occupant count must be greater than zero."];
+        if (string.IsNullOrWhiteSpace(request.Title)) errors["title"] = ["Tiêu đề là bắt buộc."];
+        if (string.IsNullOrWhiteSpace(request.Description)) errors["description"] = ["Mô tả là bắt buộc."];
+        if (string.IsNullOrWhiteSpace(request.PreferredArea)) errors["preferredArea"] = ["Khu vực mong muốn là bắt buộc."];
+        if (request.MaxBudget <= 0) errors["maxBudget"] = ["Ngân sách tối đa phải lớn hơn 0."];
+        if (request.OccupantCount <= 0) errors["occupantCount"] = ["Số người ở phải lớn hơn 0."];
         if (request.DesiredMoveInDate < DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime))
         {
-            errors["desiredMoveInDate"] = ["Desired move-in date cannot be in the past."];
+            errors["desiredMoveInDate"] = ["Ngày muốn chuyển vào không được ở quá khứ."];
         }
 
         if (errors.Count > 0)

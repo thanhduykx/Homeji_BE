@@ -13,7 +13,7 @@ public sealed class RoommateInvitation
     {
         if (senderId == receiverId)
         {
-            throw new DomainException("Cannot send roommate invitation to yourself.");
+            throw new DomainException("Không thể gửi lời mời ở ghép cho chính mình.");
         }
 
         Id = Guid.NewGuid();
@@ -64,7 +64,7 @@ public sealed class RoommateInvitation
     {
         if (Status != RoommateInvitationStatus.Pending)
         {
-            throw new DomainException("Only pending roommate invitations can be updated.");
+            throw new DomainException("Chỉ lời mời ở ghép đang chờ mới có thể cập nhật.");
         }
     }
 }

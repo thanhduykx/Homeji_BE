@@ -17,7 +17,7 @@ public sealed class RentalReviewTests
             null,
             DateTimeOffset.UtcNow));
 
-        Assert.Equal("Rating must be between 1 and 5.", exception.Message);
+        Assert.Equal("Điểm đánh giá phải từ 1 đến 5.", exception.Message);
     }
 
     [Fact]

@@ -85,12 +85,12 @@ public sealed class RentalPost
     {
         if (ownerId == Guid.Empty)
         {
-            throw new DomainException("Owner id must not be empty.");
+            throw new DomainException("Mã chủ tin không được để trống.");
         }
 
         if (!Enum.IsDefined(type))
         {
-            throw new DomainException("Rental post type is invalid.");
+            throw new DomainException("Loại tin đăng không hợp lệ.");
         }
 
         return new RentalPost(Guid.NewGuid(), ownerId, type, createdAt);
@@ -122,14 +122,14 @@ public sealed class RentalPost
         Title = NormalizeRequired(title, MaxTitleLength, nameof(Title));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
         Price = RequirePositive(price, nameof(Price));
-        Deposit = deposit < 0 ? throw new DomainException("Deposit must not be negative.") : deposit;
+        Deposit = deposit < 0 ? throw new DomainException("Tiền cọc không được âm.") : deposit;
         Area = RequirePositive(area, nameof(Area));
         ElectricityPrice = RequireNonNegative(electricityPrice, nameof(ElectricityPrice));
         WaterPrice = RequireNonNegative(waterPrice, nameof(WaterPrice));
         InternetPrice = RequireNonNegative(internetPrice, nameof(InternetPrice));
         if (maxOccupants <= 0 || availableSlots <= 0 || availableSlots > maxOccupants)
         {
-            throw new DomainException("Available slots must be between 1 and the maximum occupants.");
+            throw new DomainException("Số chỗ trống phải từ 1 đến số người tối đa.");
         }
 
         MaxOccupants = maxOccupants;
@@ -182,7 +182,7 @@ public sealed class RentalPost
         var media = _media.SingleOrDefault(item => item.Id == mediaId);
         if (media is null)
         {
-            throw new DomainException("Media was not found on this rental post.");
+            throw new DomainException("Không tìm thấy ảnh/media trên tin đăng này.");
         }
 
         _media.Remove(media);
@@ -198,12 +198,12 @@ public sealed class RentalPost
         EnsureEditable();
         if (string.IsNullOrWhiteSpace(Title) || string.IsNullOrWhiteSpace(Description) || string.IsNullOrWhiteSpace(Address))
         {
-            throw new DomainException("Rental post details must be completed before submitting.");
+            throw new DomainException("Cần hoàn thiện thông tin tin đăng trước khi gửi duyệt.");
         }
 
         if (_media.Count(item => item.MediaType == MediaType.Image) < MinimumImageCountForSubmit)
         {
-            throw new DomainException($"Rental post requires at least {MinimumImageCountForSubmit} images.");
+            throw new DomainException($"Tin đăng cần ít nhất {MinimumImageCountForSubmit} ảnh.");
         }
 
         Status = RentalPostStatus.Pending;
@@ -215,7 +215,7 @@ public sealed class RentalPost
     {
         if (Status != RentalPostStatus.Pending)
         {
-            throw new DomainException("Only pending rental posts can be approved.");
+            throw new DomainException("Chỉ tin đang chờ duyệt mới được phê duyệt.");
         }
 
         Status = RentalPostStatus.Active;
@@ -227,7 +227,7 @@ public sealed class RentalPost
     {
         if (Status != RentalPostStatus.Pending)
         {
-            throw new DomainException("Only pending rental posts can be rejected.");
+            throw new DomainException("Chỉ tin đang chờ duyệt mới bị từ chối.");
         }
 
         Status = RentalPostStatus.Rejected;
@@ -250,7 +250,7 @@ public sealed class RentalPost
     {
         if (Status != RentalPostStatus.Active)
         {
-            throw new DomainException("Only active rental posts can be marked as rented.");
+            throw new DomainException("Chỉ tin đang hoạt động mới đánh dấu đã thuê.");
         }
 
         Status = RentalPostStatus.Rented;
@@ -268,7 +268,7 @@ public sealed class RentalPost
     {
         if (Status is RentalPostStatus.Archived or RentalPostStatus.Rented)
         {
-            throw new DomainException("Rental post is not editable in its current status.");
+            throw new DomainException("Tin đăng không thể chỉnh sửa ở trạng thái hiện tại.");
         }
     }
 
@@ -277,12 +277,12 @@ public sealed class RentalPost
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException($"{fieldName} is required.");
+            throw new DomainException($"{fieldName} là bắt buộc.");
         }
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;
@@ -295,12 +295,12 @@ public sealed class RentalPost
 
     private static decimal RequirePositive(decimal value, string fieldName)
     {
-        return value <= 0 ? throw new DomainException($"{fieldName} must be greater than zero.") : value;
+        return value <= 0 ? throw new DomainException($"{fieldName} phải lớn hơn 0.") : value;
     }
 
     private static decimal RequireNonNegative(decimal value, string fieldName)
     {
-        return value < 0 ? throw new DomainException($"{fieldName} must not be negative.") : value;
+        return value < 0 ? throw new DomainException($"{fieldName} không được âm.") : value;
     }
 
     private static string? NormalizeOptional(string? value, int maxLength, string fieldName)
@@ -313,13 +313,13 @@ public sealed class RentalPost
 
         return normalized.Length <= maxLength
             ? normalized
-            : throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            : throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
     }
 
     private static decimal ValidateCoordinate(decimal value, decimal min, decimal max, string fieldName)
     {
         return value < min || value > max
-            ? throw new DomainException($"{fieldName} is out of range.")
+            ? throw new DomainException($"{fieldName} nằm ngoài phạm vi cho phép.")
             : value;
     }
 }

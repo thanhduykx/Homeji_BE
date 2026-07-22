@@ -85,7 +85,7 @@ public sealed class SavedPostService : ISavedPostService
         UserContext.EnsureRenter(current);
         if (!await _savedPosts.ExistsAsync(current.Id, postId, cancellationToken))
         {
-            throw new ForbiddenAccessException("Save this rental post before viewing roommate candidates.");
+            throw new ForbiddenAccessException("Hãy lưu tin đăng này trước khi xem ứng viên ở ghép.");
         }
 
         _ = await GetActivePostAsync(postId, cancellationToken);

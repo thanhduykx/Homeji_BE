@@ -90,7 +90,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["postId"] = ["You already have an active purchase request for this item."],
+                ["postId"] = ["Bạn đã có yêu cầu mua đang hoạt động cho sản phẩm này."],
             });
         }
 

@@ -72,7 +72,7 @@ public sealed class SupabaseAccountServiceTests
         var exception = await Assert.ThrowsAsync<ConflictException>(
             () => service.RegisterAsync(request));
 
-        Assert.Equal("An account with this email already exists.", exception.Message);
+        Assert.Equal("Email này đã được đăng ký tài khoản.", exception.Message);
         Assert.Equal(0, handler.RequestCount);
     }
 

@@ -25,39 +25,39 @@ public sealed class UserContext
     public Guid GetRequiredUserId()
     {
         return TryGetUserId()
-            ?? throw new UnauthorizedAccessException("The authenticated token does not contain a valid subject.");
+            ?? throw new UnauthorizedAccessException("Token đăng nhập không chứa thông tin người dùng hợp lệ.");
     }
 
     public async Task<UserProfile> GetRequiredProfileAsync(CancellationToken cancellationToken)
     {
         var userId = GetRequiredUserId();
         return await _profiles.GetByIdAsync(userId, cancellationToken)
-            ?? throw new ForbiddenAccessException("Complete your profile before using this feature.");
+            ?? throw new ForbiddenAccessException("Vui lòng hoàn thiện hồ sơ trước khi dùng tính năng này.");
     }
 
     public static void EnsureAdmin(UserProfile profile)
     {
         if (profile.Role != UserRole.Admin)
         {
-            throw new ForbiddenAccessException("Admin role is required.");
+            throw new ForbiddenAccessException("Cần quyền quản trị viên.");
         }
     }
 
     public static void EnsureRenter(UserProfile profile)
     {
-        EnsureRole(profile, UserRole.Renter, "Renter role is required.");
+        EnsureRole(profile, UserRole.Renter, "Cần vai trò người thuê.");
     }
 
     public static void EnsureLandlord(UserProfile profile)
     {
-        EnsureRole(profile, UserRole.Landlord, "Landlord role is required.");
+        EnsureRole(profile, UserRole.Landlord, "Cần vai trò chủ trọ.");
     }
 
     public static void EnsureOwner(Guid currentUserId, Guid ownerId)
     {
         if (currentUserId != ownerId)
         {
-            throw new ForbiddenAccessException("You can only modify your own resource.");
+            throw new ForbiddenAccessException("Bạn chỉ có thể sửa tài nguyên của chính mình.");
         }
     }
 

@@ -167,7 +167,7 @@ public sealed class PostConversationService : IPostConversationService
         var requesterId = _userContext.GetRequiredUserId();
         if (requesterId == ownerId)
         {
-            throw new ForbiddenAccessException("You cannot start a conversation with yourself.");
+            throw new ForbiddenAccessException("Bạn không thể tự nhắn tin với chính mình.");
         }
 
         var conversation = await _conversations.FindAsync(subjectType, subjectId, requesterId, ownerId, cancellationToken);
@@ -189,7 +189,7 @@ public sealed class PostConversationService : IPostConversationService
             ?? throw new NotFoundException(nameof(PostConversation), id);
         if (!conversation.Includes(userId))
         {
-            throw new ForbiddenAccessException("You are not a participant in this conversation.");
+            throw new ForbiddenAccessException("Bạn không phải thành viên của cuộc trò chuyện này.");
         }
 
         return conversation;
@@ -201,7 +201,7 @@ public sealed class PostConversationService : IPostConversationService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["body"] = [$"Message body is required and must not exceed {PostMessage.MaxBodyLength} characters."],
+                ["body"] = [$"Nội dung tin nhắn là bắt buộc và không quá {PostMessage.MaxBodyLength} ký tự."],
             });
         }
     }

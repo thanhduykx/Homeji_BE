@@ -134,10 +134,10 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
         var content = await response.Content.ReadAsStringAsync();
         using var problem = JsonDocument.Parse(content);
         Assert.Equal(
-            "An account with this email already exists.",
+            "Email này đã được đăng ký tài khoản.",
             problem.RootElement.GetProperty("detail").GetString());
         Assert.Equal(
-            "An account with this email already exists.",
+            "Email này đã được đăng ký tài khoản.",
             problem.RootElement
                 .GetProperty("errors")
                 .GetProperty("email")[0]
@@ -187,7 +187,7 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
             RegisterAccountDto request,
             CancellationToken cancellationToken = default)
         {
-            throw new ConflictException("An account with this email already exists.");
+            throw new ConflictException("Email này đã được đăng ký tài khoản.");
         }
 
         public Task<AuthSessionDto> LoginAsync(

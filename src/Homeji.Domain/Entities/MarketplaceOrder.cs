@@ -27,12 +27,12 @@ public sealed class MarketplaceOrder
     {
         if (buyerId == sellerId)
         {
-            throw new DomainException("Seller cannot buy their own marketplace item.");
+            throw new DomainException("Người bán không thể mua sản phẩm của chính mình.");
         }
 
         if (pickupAt <= createdAt)
         {
-            throw new DomainException("Pickup time must be in the future.");
+            throw new DomainException("Thời gian nhận hàng phải ở tương lai.");
         }
 
         Id = Guid.NewGuid();
@@ -126,7 +126,7 @@ public sealed class MarketplaceOrder
     {
         if (Status != expected)
         {
-            throw new DomainException($"Only {expected} marketplace orders can become {target}.");
+            throw new DomainException($"Chỉ đơn chợ đồ ở trạng thái {expected} mới chuyển sang {target}.");
         }
 
         Status = target;
@@ -136,7 +136,7 @@ public sealed class MarketplaceOrder
     private static string Normalize(string value, int maxLength, string fieldName)
     {
         return NormalizeOptional(value, maxLength, fieldName)
-            ?? throw new DomainException($"{fieldName} is required.");
+            ?? throw new DomainException($"{fieldName} là bắt buộc.");
     }
 
     private static string? NormalizeOptional(string? value, int maxLength, string fieldName)
@@ -145,6 +145,6 @@ public sealed class MarketplaceOrder
         if (string.IsNullOrWhiteSpace(normalized)) return null;
         return normalized.Length <= maxLength
             ? normalized
-            : throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            : throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
     }
 }

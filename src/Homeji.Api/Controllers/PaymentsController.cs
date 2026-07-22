@@ -109,7 +109,7 @@ public sealed class PaymentsController : ControllerBase
     {
         var payment = await _paymentService.HandlePayOsWebhookAsync(PaymentViewMapper.ToDto(request), cancellationToken);
         return payment is null
-            ? Ok(new { message = "PayOS webhook accepted. Matching payment was not found." })
+            ? Ok(new { message = "Đã nhận webhook PayOS. Không tìm thấy giao dịch tương ứng." })
             : Ok(payment);
     }
 

@@ -17,17 +17,17 @@ public sealed class RoommateConversation
     {
         if (invitationId == Guid.Empty || rentalPostId == Guid.Empty)
         {
-            throw new DomainException("Invitation id and rental post id must not be empty.");
+            throw new DomainException("Mã lời mời và mã tin đăng không được trống.");
         }
 
         if (firstParticipantId == Guid.Empty || secondParticipantId == Guid.Empty)
         {
-            throw new DomainException("Conversation participant ids must not be empty.");
+            throw new DomainException("Mã người tham gia không được trống.");
         }
 
         if (firstParticipantId == secondParticipantId)
         {
-            throw new DomainException("A roommate conversation requires two different participants.");
+            throw new DomainException("Cuộc trò chuyện ở ghép cần hai người khác nhau.");
         }
 
         Id = Guid.NewGuid();
@@ -70,7 +70,7 @@ public sealed class RoommateConversation
             return FirstParticipantId;
         }
 
-        throw new DomainException("User is not a participant in this roommate conversation.");
+        throw new DomainException("Người dùng không thuộc cuộc trò chuyện ở ghép này.");
     }
 
     public void Touch(DateTimeOffset updatedAt)
