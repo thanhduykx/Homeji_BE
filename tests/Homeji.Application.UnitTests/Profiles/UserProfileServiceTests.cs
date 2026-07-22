@@ -45,6 +45,8 @@ public sealed class UserProfileServiceTests
     [InlineData("1234567890")]
     [InlineData("090123456")]
     [InlineData("09012abc67")]
+    [InlineData("0123456789")]
+    [InlineData("0551234567")]
     public async Task UpsertMyProfileAsync_WhenPhoneIsInvalid_DoesNotPersist(string phone)
     {
         var repository = new InMemoryUserProfileRepository();
