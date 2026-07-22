@@ -38,7 +38,7 @@ public sealed class LandlordVerificationRequest
     {
         if (Status != LandlordVerificationStatus.Pending)
         {
-            throw new DomainException("Only pending landlord verification can be reviewed.");
+            throw new DomainException("Chỉ yêu cầu xác minh đang chờ mới có thể duyệt.");
         }
 
         Status = approved ? LandlordVerificationStatus.Verified : LandlordVerificationStatus.Rejected;
@@ -50,7 +50,7 @@ public sealed class LandlordVerificationRequest
     private static string NormalizeRequired(string value, int maxLength, string fieldName)
     {
         return NormalizeOptional(value, maxLength, fieldName)
-            ?? throw new DomainException($"{fieldName} is required.");
+            ?? throw new DomainException($"{fieldName} là bắt buộc.");
     }
 
     private static string? NormalizeOptional(string? value, int maxLength, string fieldName)
@@ -63,7 +63,7 @@ public sealed class LandlordVerificationRequest
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;

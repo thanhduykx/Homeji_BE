@@ -53,14 +53,14 @@ public sealed class ViewingAppointmentService : IViewingAppointmentService
 
         if (post.OwnerId == requesterId)
         {
-            throw new ForbiddenAccessException("Rental post owners cannot request a viewing for their own post.");
+            throw new ForbiddenAccessException("Chủ tin đăng không thể tự đặt lịch xem phòng cho tin của mình.");
         }
 
         if (await _appointments.HasActiveAsync(rentalPostId, requesterId, cancellationToken))
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["rentalPostId"] = ["You already have an active viewing appointment for this rental post."],
+                ["rentalPostId"] = ["Bạn đã có lịch xem phòng đang hoạt động cho tin đăng này."],
             });
         }
 
@@ -126,7 +126,7 @@ public sealed class ViewingAppointmentService : IViewingAppointmentService
             ?? throw new NotFoundException(nameof(ViewingAppointment), id);
         if (userId != appointment.RequesterId && userId != appointment.OwnerId)
         {
-            throw new ForbiddenAccessException("Only appointment participants can propose another viewing time.");
+            throw new ForbiddenAccessException("Chỉ người tham gia lịch hẹn mới có thể đề xuất giờ xem khác.");
         }
 
         var post = await _posts.GetByIdAsync(appointment.RentalPostId, cancellationToken)

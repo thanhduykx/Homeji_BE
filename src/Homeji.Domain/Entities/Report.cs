@@ -72,12 +72,12 @@ public sealed class Report
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException($"{fieldName} is required.");
+            throw new DomainException($"{fieldName} là bắt buộc.");
         }
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;
@@ -93,7 +93,7 @@ public sealed class Report
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;

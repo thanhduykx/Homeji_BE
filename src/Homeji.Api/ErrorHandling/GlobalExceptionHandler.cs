@@ -73,24 +73,24 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 validationException.Errors)
             {
                 Status = StatusCodes.Status400BadRequest,
-                Title = "Validation failed",
+                Title = "Dữ liệu không hợp lệ",
             },
             ExternalDependencyException => new ProblemDetails
             {
                 Status = StatusCodes.Status503ServiceUnavailable,
-                Title = "Dependency unavailable",
+                Title = "Dịch vụ phụ thuộc tạm thời không khả dụng",
                 Detail = exception.Message,
             },
             NotFoundException => new ProblemDetails
             {
                 Status = StatusCodes.Status404NotFound,
-                Title = "Resource not found",
+                Title = "Không tìm thấy tài nguyên",
                 Detail = exception.Message,
             },
             ConflictException => new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "Resource conflict",
+                Title = "Xung đột dữ liệu",
                 Detail = exception.Message,
                 Extensions =
                 {
@@ -103,19 +103,19 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             UnauthorizedAccessException => new ProblemDetails
             {
                 Status = StatusCodes.Status401Unauthorized,
-                Title = "Unauthorized",
+                Title = "Chưa xác thực",
                 Detail = exception.Message,
             },
             ForbiddenAccessException => new ProblemDetails
             {
                 Status = StatusCodes.Status403Forbidden,
-                Title = "Forbidden",
+                Title = "Không có quyền truy cập",
                 Detail = exception.Message,
             },
             ExternalServiceUnavailableException serviceException => new ProblemDetails
             {
                 Status = StatusCodes.Status503ServiceUnavailable,
-                Title = "External service unavailable",
+                Title = "Dịch vụ bên ngoài tạm thời không khả dụng",
                 Detail = serviceException.Message,
                 Extensions =
                 {
@@ -125,7 +125,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             DomainException => new ProblemDetails
             {
                 Status = StatusCodes.Status422UnprocessableEntity,
-                Title = "Business rule violation",
+                Title = "Vi phạm quy tắc nghiệp vụ",
                 Detail = exception.Message,
             },
             DbUpdateConcurrencyException => new ProblemDetails
@@ -137,7 +137,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             _ => new ProblemDetails
             {
                 Status = StatusCodes.Status500InternalServerError,
-                Title = "An unexpected error occurred",
+                Title = "Đã xảy ra lỗi không mong muốn",
             },
         };
 
@@ -154,7 +154,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             if (exception is DbUpdateException or DbException)
             {
                 problemDetails.Extensions["dbHint"] =
-                    "Likely schema/migration drift. Run: dotnet ef database update";
+                    "Có thể schema/migration lệch. Chạy: dotnet ef database update";
             }
         }
 

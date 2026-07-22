@@ -26,12 +26,12 @@ public sealed class RentalReview
     {
         if (rentalPostId == Guid.Empty)
         {
-            throw new DomainException("Rental post id must not be empty.");
+            throw new DomainException("Mã tin đăng không được để trống.");
         }
 
         if (reviewerId == Guid.Empty)
         {
-            throw new DomainException("Reviewer id must not be empty.");
+            throw new DomainException("Mã người đánh giá không được để trống.");
         }
 
         Id = Guid.NewGuid();
@@ -110,7 +110,7 @@ public sealed class RentalReview
     {
         if (rating is < 1 or > 5)
         {
-            throw new DomainException("Rating must be between 1 and 5.");
+            throw new DomainException("Điểm đánh giá phải từ 1 đến 5.");
         }
 
         var normalizedComment = comment?.Trim();
@@ -121,7 +121,7 @@ public sealed class RentalReview
 
         if (normalizedComment?.Length > MaxCommentLength)
         {
-            throw new DomainException($"Comment must not exceed {MaxCommentLength} characters.");
+            throw new DomainException($"Bình luận không được vượt quá {MaxCommentLength} ký tự.");
         }
 
         Rating = rating;
@@ -139,6 +139,6 @@ public sealed class RentalReview
     {
         return value is null or >= 1 and <= 5
             ? value
-            : throw new DomainException($"{fieldName} must be between 1 and 5.");
+            : throw new DomainException($"{fieldName} phải từ 1 đến 5.");
     }
 }

@@ -84,7 +84,7 @@ public sealed class RentalReviewService : IRentalReviewService
         var post = await GetActivePostAsync(rentalPostId, cancellationToken);
         if (post.OwnerId == reviewer.Id)
         {
-            throw new ForbiddenAccessException("Rental post owners cannot review their own rental post.");
+            throw new ForbiddenAccessException("Chủ tin đăng không thể tự đánh giá tin của mình.");
         }
 
         var violations = await _moderation.ValidateAsync(request.Comment ?? string.Empty, cancellationToken);
@@ -102,7 +102,7 @@ public sealed class RentalReviewService : IRentalReviewService
         {
             if (!await _appointments.HasCompletedAsync(rentalPostId, reviewer.Id, cancellationToken))
             {
-                throw new ForbiddenAccessException("Complete a viewing appointment before reviewing this rental post.");
+                throw new ForbiddenAccessException("Hãy hoàn tất lịch xem phòng trước khi đánh giá tin này.");
             }
 
             review = new RentalReview(
@@ -164,12 +164,12 @@ public sealed class RentalReviewService : IRentalReviewService
         var errors = new Dictionary<string, string[]>();
         if (request.Rating is < 1 or > 5)
         {
-            errors["rating"] = ["Rating must be between 1 and 5."];
+            errors["rating"] = ["Điểm đánh giá phải từ 1 đến 5."];
         }
 
         if (request.Comment?.Trim().Length > RentalReview.MaxCommentLength)
         {
-            errors["comment"] = [$"Comment must not exceed {RentalReview.MaxCommentLength} characters."];
+            errors["comment"] = [$"Bình luận không được vượt quá {RentalReview.MaxCommentLength} ký tự."];
         }
 
         ValidateOptionalRating(request.LocationRating, "locationRating", errors);
@@ -211,7 +211,7 @@ public sealed class RentalReviewService : IRentalReviewService
     {
         if (value is not null and (< 1 or > 5))
         {
-            errors[field] = ["Rating must be between 1 and 5."];
+            errors[field] = ["Điểm đánh giá phải từ 1 đến 5."];
         }
     }
 

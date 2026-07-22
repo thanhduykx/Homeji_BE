@@ -216,12 +216,12 @@ public sealed class MarketplacePostService : IMarketplacePostService
 
         if (request.Latitude is < -90 or > 90)
         {
-            errors["latitude"] = ["Latitude must be between -90 and 90."];
+            errors["latitude"] = ["Vĩ độ phải nằm trong khoảng -90 đến 90."];
         }
 
         if (request.Longitude is < -180 or > 180)
         {
-            errors["longitude"] = ["Longitude must be between -180 and 180."];
+            errors["longitude"] = ["Kinh độ phải nằm trong khoảng -180 đến 180."];
         }
 
         if (!HomejiServiceArea.Contains(request.Latitude, request.Longitude))
@@ -232,7 +232,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         if (request.MediaUrls is null
             || request.MediaUrls.Count is < 1 or > MarketplacePost.MaxMediaCount)
         {
-            errors["mediaUrls"] = [$"Provide between 1 and {MarketplacePost.MaxMediaCount} images."];
+            errors["mediaUrls"] = [$"Cần cung cấp từ 1 đến {MarketplacePost.MaxMediaCount} ảnh."];
         }
 
         if (errors.Count > 0)
@@ -286,7 +286,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["price"] = ["Price range is invalid."],
+                ["price"] = ["Khoảng giá không hợp lệ."],
             });
         }
 
@@ -317,7 +317,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["location"] = ["Latitude and longitude must be provided together."],
+                ["location"] = ["Vĩ độ và kinh độ phải được cung cấp cùng lúc."],
             });
         }
 
@@ -331,7 +331,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
             {
                 throw new RequestValidationException(new Dictionary<string, string[]>
                 {
-                    ["location"] = ["Coordinates are out of range."],
+                    ["location"] = ["Tọa độ nằm ngoài phạm vi cho phép."],
                 });
             }
 
@@ -420,11 +420,11 @@ public sealed class MarketplacePostService : IMarketplacePostService
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            errors[field] = [$"{field} is required."];
+            errors[field] = [$"{field} là bắt buộc."];
         }
         else if (value.Trim().Length > maxLength)
         {
-            errors[field] = [$"{field} must not exceed {maxLength} characters."];
+            errors[field] = [$"{field} không được vượt quá {maxLength} ký tự."];
         }
     }
 

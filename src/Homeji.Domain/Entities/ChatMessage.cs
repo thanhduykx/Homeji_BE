@@ -60,12 +60,12 @@ public sealed class ChatMessage
     {
         if (conversationId == Guid.Empty)
         {
-            throw new DomainException("Conversation id must not be empty.");
+            throw new DomainException("Mã cuộc trò chuyện không được trống.");
         }
 
         if (!Enum.IsDefined(sender))
         {
-            throw new DomainException("Chat message sender is invalid.");
+            throw new DomainException("Người gửi tin nhắn không hợp lệ.");
         }
 
         return new ChatMessage(Guid.NewGuid(), conversationId, sender, content, createdAt);
@@ -76,12 +76,12 @@ public sealed class ChatMessage
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException("Message content is required.");
+            throw new DomainException("Nội dung tin nhắn là bắt buộc.");
         }
 
         if (normalized.Length > MaxContentLength)
         {
-            throw new DomainException($"Message content must not exceed {MaxContentLength} characters.");
+            throw new DomainException($"Nội dung tin nhắn không được vượt quá {MaxContentLength} ký tự.");
         }
 
         return normalized;

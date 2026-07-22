@@ -36,7 +36,7 @@ public sealed class GlobalExceptionHandlerTests
 
         var handled = await handler.TryHandleAsync(
             context,
-            new ForbiddenAccessException("Save this rental post before viewing roommate candidates."),
+            new ForbiddenAccessException("Hãy lưu tin đăng này trước khi xem ứng viên ở ghép."),
             CancellationToken.None);
 
         Assert.True(handled);
@@ -46,9 +46,9 @@ public sealed class GlobalExceptionHandlerTests
         using var body = await JsonDocument.ParseAsync(
             context.Response.Body,
             cancellationToken: CancellationToken.None);
-        Assert.Equal("Forbidden", body.RootElement.GetProperty("title").GetString());
+        Assert.Equal("Không có quyền truy cập", body.RootElement.GetProperty("title").GetString());
         Assert.Equal(
-            "Save this rental post before viewing roommate candidates.",
+            "Hãy lưu tin đăng này trước khi xem ứng viên ở ghép.",
             body.RootElement.GetProperty("detail").GetString());
     }
 
@@ -76,7 +76,7 @@ public sealed class GlobalExceptionHandlerTests
             context,
             new ExternalServiceUnavailableException(
                 "Gemini",
-                "Chatbot AI quota is temporarily exhausted. Please try again later.",
+                "Chatbot tạm hết hạn mức. Vui lòng thử lại sau.",
                 TimeSpan.FromSeconds(15)),
             CancellationToken.None);
 
@@ -88,7 +88,7 @@ public sealed class GlobalExceptionHandlerTests
         using var body = await JsonDocument.ParseAsync(
             context.Response.Body,
             cancellationToken: CancellationToken.None);
-        Assert.Equal("External service unavailable", body.RootElement.GetProperty("title").GetString());
+        Assert.Equal("Dịch vụ bên ngoài tạm thời không khả dụng", body.RootElement.GetProperty("title").GetString());
         Assert.Equal("Gemini", body.RootElement.GetProperty("service").GetString());
     }
 

@@ -66,7 +66,7 @@ public sealed class UserProfile
     {
         if (userId == Guid.Empty)
         {
-            throw new DomainException("User id must not be empty.");
+            throw new DomainException("Mã người dùng không được để trống.");
         }
 
         return new UserProfile(userId, displayName, createdAt);
@@ -109,12 +109,12 @@ public sealed class UserProfile
     {
         if (!Enum.IsDefined(role) || role == UserRole.Admin)
         {
-            throw new DomainException("User role must be renter or landlord.");
+            throw new DomainException("Vai trò phải là người thuê hoặc chủ trọ.");
         }
 
         if (maxBudget is <= 0)
         {
-            throw new DomainException("Max budget must be greater than zero.");
+            throw new DomainException("Ngân sách tối đa phải lớn hơn 0.");
         }
 
         Role = role;
@@ -137,17 +137,17 @@ public sealed class UserProfile
     {
         if (Role != UserRole.Landlord)
         {
-            throw new DomainException("Only landlord profiles can submit verification.");
+            throw new DomainException("Chỉ hồ sơ chủ trọ mới gửi được yêu cầu xác minh.");
         }
 
         if (LandlordVerificationStatus == LandlordVerificationStatus.Pending)
         {
-            throw new DomainException("A landlord verification request is already pending.");
+            throw new DomainException("Đã có yêu cầu xác minh chủ trọ đang chờ xử lý.");
         }
 
         if (LandlordVerificationStatus == LandlordVerificationStatus.Verified)
         {
-            throw new DomainException("This landlord profile is already verified.");
+            throw new DomainException("Hồ sơ chủ trọ này đã được xác minh.");
         }
 
         LandlordVerificationStatus = LandlordVerificationStatus.Pending;
@@ -158,7 +158,7 @@ public sealed class UserProfile
     {
         if (LandlordVerificationStatus != LandlordVerificationStatus.Pending)
         {
-            throw new DomainException("Only pending landlord verification can be reviewed.");
+            throw new DomainException("Chỉ yêu cầu xác minh đang chờ mới có thể duyệt.");
         }
 
         LandlordVerificationStatus = approved
@@ -173,12 +173,12 @@ public sealed class UserProfile
 
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException("Display name is required.");
+            throw new DomainException("Tên hiển thị là bắt buộc.");
         }
 
         if (normalized.Length > MaxDisplayNameLength)
         {
-            throw new DomainException($"Display name must not exceed {MaxDisplayNameLength} characters.");
+            throw new DomainException($"Tên hiển thị không được vượt quá {MaxDisplayNameLength} ký tự.");
         }
 
         return normalized;
@@ -194,7 +194,7 @@ public sealed class UserProfile
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;

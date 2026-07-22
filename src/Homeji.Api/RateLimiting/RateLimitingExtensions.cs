@@ -58,7 +58,7 @@ public static class RateLimitingExtensions
                     new ProblemDetails
                     {
                         Status = StatusCodes.Status429TooManyRequests,
-                        Title = "Too Many Requests",
+                        Title = "Quá nhiều yêu cầu",
                         Detail = "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
                         Instance = context.HttpContext.Request.Path,
                     },

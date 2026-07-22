@@ -1,3 +1,4 @@
+using System.Globalization;
 using FluentValidation;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.IServices.AI;
@@ -51,6 +52,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApplication(this IServiceCollection services)
     {
+        // FluentValidation default messages (NotEmpty, GreaterThan, …) in Vietnamese.
+        ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("vi");
+
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddScoped<UserContext>();
         services.AddScoped<ContentModerationService>();

@@ -111,7 +111,7 @@ public sealed class LandlordVerificationService : ILandlordVerificationService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["documentUrl"] = ["A valid HTTPS document URL is required."],
+                ["documentUrl"] = ["Cần URL giấy tờ HTTPS hợp lệ."],
             });
         }
     }

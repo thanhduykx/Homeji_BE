@@ -98,12 +98,12 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
                 throw new ExternalServiceUnavailableException(
                     "Gemini",
                     response.StatusCode == HttpStatusCode.TooManyRequests
-                        ? "Chatbot AI quota is temporarily exhausted. Please try again later."
-                        : "Chatbot AI is temporarily unavailable. Please try again later.",
+                        ? "Chatbot tạm hết hạn mức. Vui lòng thử lại sau."
+                        : "Chatbot tạm thời không khả dụng. Vui lòng thử lại sau.",
                     retryAfter);
             }
 
-            throw Validation("chatbot", "Chatbot is temporarily unavailable.");
+            throw Validation("chatbot", "Chatbot tạm thời không khả dụng.");
         }
 
         throw new InvalidOperationException("Gemini retry loop completed unexpectedly.");
@@ -213,7 +213,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         var candidates = document.RootElement.GetProperty("candidates");
         if (candidates.ValueKind != JsonValueKind.Array || candidates.GetArrayLength() == 0)
         {
-            throw Validation("chatbot", "Chatbot returned no candidates.");
+            throw Validation("chatbot", "Chatbot không trả về kết quả.");
         }
 
         var parts = candidates[0]
@@ -222,13 +222,13 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
 
         if (parts.ValueKind != JsonValueKind.Array || parts.GetArrayLength() == 0)
         {
-            throw Validation("chatbot", "Chatbot returned no content.");
+            throw Validation("chatbot", "Chatbot không trả về nội dung.");
         }
 
         var text = parts[0].GetProperty("text").GetString();
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw Validation("chatbot", "Chatbot returned empty content.");
+            throw Validation("chatbot", "Chatbot trả về nội dung trống.");
         }
 
         return text;
@@ -248,7 +248,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             || string.IsNullOrWhiteSpace(_options.ApiKey)
             || _options.ApiKey.Equals("REPLACE_WITH_GEMINI_API_KEY", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Gemini AI settings are not configured.");
+            throw new InvalidOperationException("Chưa cấu hình Gemini AI.");
         }
     }
 

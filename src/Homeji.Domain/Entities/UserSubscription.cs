@@ -72,12 +72,12 @@ public sealed class UserSubscription
     {
         if (userId == Guid.Empty)
         {
-            throw new DomainException("User id must not be empty.");
+            throw new DomainException("Mã người dùng không được để trống.");
         }
 
         if (durationDays <= 0)
         {
-            throw new DomainException("Premium duration must be greater than zero.");
+            throw new DomainException("Thời hạn Premium phải lớn hơn 0.");
         }
 
         return new UserSubscription(
@@ -117,12 +117,12 @@ public sealed class UserSubscription
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException($"{fieldName} is required.");
+            throw new DomainException($"{fieldName} là bắt buộc.");
         }
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;

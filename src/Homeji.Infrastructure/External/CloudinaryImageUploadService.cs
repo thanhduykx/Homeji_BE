@@ -65,19 +65,19 @@ public sealed class CloudinaryImageUploadService : IImageUploadService
     {
         if (string.IsNullOrWhiteSpace(fileName))
         {
-            throw new ArgumentException("File name is required.", nameof(fileName));
+            throw new ArgumentException("Tên tệp là bắt buộc.", nameof(fileName));
         }
 
         if (!AllowedContentTypes.Contains(contentType))
         {
             throw new InvalidOperationException(
-                $"Content type '{contentType}' is not allowed. Accepted types: {string.Join(", ", AllowedContentTypes)}.");
+                $"Loại tệp '{contentType}' không được phép. Các loại chấp nhận: {string.Join(", ", AllowedContentTypes)}.");
         }
 
         if (fileStream.Length > _options.MaxFileSizeBytes)
         {
             throw new InvalidOperationException(
-                $"File size exceeds the maximum allowed size of {_options.MaxFileSizeBytes / (1024 * 1024)} MB.");
+                $"Kích thước tệp vượt quá giới hạn {_options.MaxFileSizeBytes / (1024 * 1024)} MB.");
         }
 
         var uploadUrl = $"https://api.cloudinary.com/v1_1/{_options.CloudName}/image/upload";
@@ -103,7 +103,7 @@ public sealed class CloudinaryImageUploadService : IImageUploadService
             UploadFailed(_logger, (int)response.StatusCode, errorBody, null);
 
             throw new InvalidOperationException(
-                $"Cloudinary upload failed ({(int)response.StatusCode}): {errorBody}");
+                $"Tải ảnh lên Cloudinary thất bại ({(int)response.StatusCode}): {errorBody}");
         }
 
         var json = await response.Content.ReadAsStringAsync(cancellationToken);

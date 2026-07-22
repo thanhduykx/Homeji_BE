@@ -52,7 +52,7 @@ public sealed class PostConversationServiceTests
         var exception = await Assert.ThrowsAsync<ForbiddenAccessException>(() =>
             service.StartWantedPostConversationAsync(wantedPost.Id));
 
-        Assert.Equal("You cannot start a conversation with yourself.", exception.Message);
+        Assert.Equal("Bạn không thể tự nhắn tin với chính mình.", exception.Message);
         Assert.Null(conversations.AddedConversation);
     }
 

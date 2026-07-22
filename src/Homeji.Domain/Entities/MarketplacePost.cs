@@ -45,7 +45,7 @@ public sealed class MarketplacePost
     {
         if (sellerId == Guid.Empty)
         {
-            throw new DomainException("Seller id must not be empty.");
+            throw new DomainException("Mã người bán không được để trống.");
         }
 
         Id = Guid.NewGuid();
@@ -208,7 +208,7 @@ public sealed class MarketplacePost
     {
         Title = NormalizeRequired(title, MaxTitleLength, nameof(Title));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
-        Price = price > 0 ? price : throw new DomainException("Marketplace price must be greater than zero.");
+        Price = price > 0 ? price : throw new DomainException("Giá sản phẩm phải lớn hơn 0.");
         Condition = NormalizeRequired(condition, MaxConditionLength, nameof(Condition));
         Category = NormalizeRequired(category, MaxCategoryLength, nameof(Category));
         Address = NormalizeRequired(address, MaxAddressLength, nameof(Address));
@@ -246,7 +246,7 @@ public sealed class MarketplacePost
             .ToArray();
         if (normalizedUrls.Length is < 1 or > MaxMediaCount)
         {
-            throw new DomainException($"Marketplace post requires between 1 and {MaxMediaCount} images.");
+            throw new DomainException($"Tin chợ đồ cần từ 1 đến {MaxMediaCount} ảnh.");
         }
 
         _media.Clear();
@@ -260,7 +260,7 @@ public sealed class MarketplacePost
     {
         if (Status != MarketplacePostStatus.Active)
         {
-            throw new DomainException("Only active marketplace posts can be changed.");
+            throw new DomainException("Chỉ tin chợ đồ đang bán mới được sửa.");
         }
     }
 
@@ -269,18 +269,18 @@ public sealed class MarketplacePost
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException($"{fieldName} is required.");
+            throw new DomainException($"{fieldName} là bắt buộc.");
         }
 
         return normalized.Length <= maxLength
             ? normalized
-            : throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            : throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
     }
 
     private static decimal ValidateCoordinate(decimal value, decimal min, decimal max, string fieldName)
     {
         return value >= min && value <= max
             ? value
-            : throw new DomainException($"{fieldName} is out of range.");
+            : throw new DomainException($"{fieldName} nằm ngoài phạm vi cho phép.");
     }
 }

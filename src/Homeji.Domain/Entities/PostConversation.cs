@@ -18,12 +18,12 @@ public sealed class PostConversation
     {
         if (!Enum.IsDefined(subjectType))
         {
-            throw new DomainException("Conversation subject type is invalid.");
+            throw new DomainException("Loại chủ đề cuộc trò chuyện không hợp lệ.");
         }
 
         if (participantAId == Guid.Empty || participantBId == Guid.Empty || participantAId == participantBId)
         {
-            throw new DomainException("A direct conversation requires two different participants.");
+            throw new DomainException("Cuộc trò chuyện trực tiếp cần hai người khác nhau.");
         }
 
         Id = Guid.NewGuid();
@@ -55,14 +55,14 @@ public sealed class PostConversation
             ? ParticipantBId
             : ParticipantBId == userId
                 ? ParticipantAId
-                : throw new DomainException("User is not a participant in this conversation.");
+                : throw new DomainException("Người dùng không thuộc cuộc trò chuyện này.");
     }
 
     public DateTimeOffset? GetLastReadAt(Guid userId)
     {
         if (userId == ParticipantAId) return ParticipantALastReadAt;
         if (userId == ParticipantBId) return ParticipantBLastReadAt;
-        throw new DomainException("User is not a participant in this conversation.");
+        throw new DomainException("Người dùng không thuộc cuộc trò chuyện này.");
     }
 
     public void MarkRead(Guid userId, DateTimeOffset readAt)
@@ -79,7 +79,7 @@ public sealed class PostConversation
             return;
         }
 
-        throw new DomainException("User is not a participant in this conversation.");
+        throw new DomainException("Người dùng không thuộc cuộc trò chuyện này.");
     }
 
     public void Touch(DateTimeOffset updatedAt)

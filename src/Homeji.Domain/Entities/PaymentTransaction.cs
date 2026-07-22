@@ -31,17 +31,17 @@ public sealed class PaymentTransaction
     {
         if (userId == Guid.Empty)
         {
-            throw new DomainException("User id must not be empty.");
+            throw new DomainException("Mã người dùng không được để trống.");
         }
 
         if (amount <= 0)
         {
-            throw new DomainException("Payment amount must be greater than zero.");
+            throw new DomainException("Số tiền thanh toán phải lớn hơn 0.");
         }
 
         if (!Enum.IsDefined(purpose))
         {
-            throw new DomainException("Payment purpose is invalid.");
+            throw new DomainException("Mục đích thanh toán không hợp lệ.");
         }
 
         Id = Guid.NewGuid();
@@ -171,12 +171,12 @@ public sealed class PaymentTransaction
         var normalized = value?.Trim();
         if (string.IsNullOrWhiteSpace(normalized))
         {
-            throw new DomainException($"{fieldName} is required.");
+            throw new DomainException($"{fieldName} là bắt buộc.");
         }
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;
@@ -192,7 +192,7 @@ public sealed class PaymentTransaction
 
         if (normalized.Length > maxLength)
         {
-            throw new DomainException($"{fieldName} must not exceed {maxLength} characters.");
+            throw new DomainException($"{fieldName} không được vượt quá {maxLength} ký tự.");
         }
 
         return normalized;

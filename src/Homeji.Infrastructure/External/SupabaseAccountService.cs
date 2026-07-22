@@ -53,7 +53,7 @@ public sealed class SupabaseAccountService : IAccountService
         var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
         if (emailAvailability.Exists)
         {
-            throw new ConflictException("An account with this email already exists.");
+            throw new ConflictException("Email này đã được đăng ký tài khoản.");
         }
 
         var redirectTo = ResolveRedirectUrl(request.RedirectTo, _options.RegistrationRedirectUrl);
@@ -158,7 +158,7 @@ public sealed class SupabaseAccountService : IAccountService
             });
 
         var json = await SendAsync(httpRequest, cancellationToken);
-        return ParseAuthSession(json, emailConfirmationMessage: "Login succeeded.");
+        return ParseAuthSession(json, emailConfirmationMessage: "Đăng nhập thành công.");
     }
 
     public async Task<AccountMessageDto> ForgotPasswordAsync(
@@ -172,7 +172,7 @@ public sealed class SupabaseAccountService : IAccountService
         var endpoint = BuildAuthUri("recover", redirectTo);
         using var httpRequest = CreateJsonRequest(HttpMethod.Post, endpoint, new { email = request.Email });
         _ = await SendAsync(httpRequest, cancellationToken);
-        return new AccountMessageDto("Password recovery email has been requested.");
+        return new AccountMessageDto("Đã gửi email khôi phục mật khẩu.");
     }
 
     public async Task<AccountMessageDto> ResetPasswordAsync(
@@ -181,12 +181,12 @@ public sealed class SupabaseAccountService : IAccountService
     {
         if (string.IsNullOrWhiteSpace(request.AccessToken))
         {
-            throw Validation("accessToken", "Access token is required.");
+            throw Validation("accessToken", "Thiếu access token.");
         }
 
         if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 6)
         {
-            throw Validation("newPassword", "New password must contain at least 6 characters.");
+            throw Validation("newPassword", "Mật khẩu mới phải có ít nhất 6 ký tự.");
         }
 
         EnsureConfigured();
@@ -194,7 +194,7 @@ public sealed class SupabaseAccountService : IAccountService
         using var httpRequest = CreateJsonRequest(HttpMethod.Put, new Uri("auth/v1/user", UriKind.Relative), new { password = request.NewPassword });
         httpRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", request.AccessToken);
         _ = await SendAsync(httpRequest, cancellationToken, addBearerApiKey: false);
-        return new AccountMessageDto("Password has been updated.");
+        return new AccountMessageDto("Đã cập nhật mật khẩu.");
     }
 
     public AuthUrlDto CreateGoogleLoginUrl(string? redirectTo)
@@ -308,7 +308,7 @@ public sealed class SupabaseAccountService : IAccountService
         {
             throw new ExternalServiceUnavailableException(
                 "Supabase Auth",
-                "Supabase did not return an email confirmation link.");
+                "Supabase không trả về liên kết xác nhận email.");
         }
 
         var user = root.TryGetProperty("user", out var userElement) ? userElement : default;
@@ -381,7 +381,7 @@ public sealed class SupabaseAccountService : IAccountService
         ValidateEmail(email);
         if (string.IsNullOrWhiteSpace(password) || password.Length < 6)
         {
-            throw Validation("password", "Password must contain at least 6 characters.");
+            throw Validation("password", "Mật khẩu phải có ít nhất 6 ký tự.");
         }
     }
 
@@ -414,7 +414,7 @@ public sealed class SupabaseAccountService : IAccountService
     {
         if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
         {
-            throw Validation("email", "A valid email is required.");
+            throw Validation("email", "Email không hợp lệ.");
         }
     }
 
@@ -435,7 +435,7 @@ public sealed class SupabaseAccountService : IAccountService
     {
         if (string.IsNullOrWhiteSpace(content))
         {
-            return "Supabase Auth request failed.";
+            return "Yêu cầu xác thực Supabase thất bại.";
         }
 
         try
@@ -446,7 +446,7 @@ public sealed class SupabaseAccountService : IAccountService
                 ?? GetString(root, "message")
                 ?? GetString(root, "error_description")
                 ?? GetString(root, "error")
-                ?? "Supabase Auth request failed.";
+                ?? "Yêu cầu xác thực Supabase thất bại.";
         }
         catch (JsonException)
         {

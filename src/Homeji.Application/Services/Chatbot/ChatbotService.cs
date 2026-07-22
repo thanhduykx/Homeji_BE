@@ -83,7 +83,7 @@ public sealed class ChatbotService : IChatbotService
     {
         if (!_options.Enabled)
         {
-            throw new ForbiddenAccessException("Chatbot is disabled.");
+            throw new ForbiddenAccessException("Chatbot hiện đang tắt.");
         }
 
         var message = ValidateMessage(request.Message);
@@ -183,7 +183,7 @@ public sealed class ChatbotService : IChatbotService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["message"] = ["Message is required."],
+                ["message"] = ["Tin nhắn là bắt buộc."],
             });
         }
 
@@ -191,7 +191,7 @@ public sealed class ChatbotService : IChatbotService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["message"] = [$"Message must not exceed {MaxUserMessageLength} characters."],
+                ["message"] = [$"Tin nhắn không được vượt quá {MaxUserMessageLength} ký tự."],
             });
         }
 

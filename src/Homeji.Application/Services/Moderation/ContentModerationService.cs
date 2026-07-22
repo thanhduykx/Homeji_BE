@@ -18,7 +18,7 @@ public sealed class ContentModerationService
         var violations = new List<string>();
         if (HiddenPhoneRegex.IsMatch(content))
         {
-            violations.Add("Description must not contain hidden phone numbers.");
+            violations.Add("Mô tả không được chứa số điện thoại ẩn.");
         }
 
         var normalized = content.ToLowerInvariant();
@@ -27,7 +27,7 @@ public sealed class ContentModerationService
         {
             if (normalized.Contains(badWord, StringComparison.OrdinalIgnoreCase))
             {
-                violations.Add("Description contains prohibited words.");
+                violations.Add("Mô tả chứa từ ngữ bị cấm.");
                 break;
             }
         }

@@ -19,7 +19,7 @@ public sealed class SmtpAccountEmailSenderTests
             "https://project.supabase.co/auth/v1/verify?token=test&type=signup");
 
         Assert.False(result.Sent);
-        Assert.Contains("disabled", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("đang tắt", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -40,6 +40,6 @@ public sealed class SmtpAccountEmailSenderTests
             "https://project.supabase.co/auth/v1/verify?token=test&type=signup");
 
         Assert.False(result.Sent);
-        Assert.Contains("could not be sent", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Không gửi được", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

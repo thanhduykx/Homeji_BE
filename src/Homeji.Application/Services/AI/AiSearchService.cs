@@ -141,7 +141,7 @@ public sealed class AiSearchService : IAiSearchService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["text"] = ["Search text is required."],
+                ["text"] = ["Nội dung tìm kiếm là bắt buộc."],
             });
         }
 
@@ -149,7 +149,7 @@ public sealed class AiSearchService : IAiSearchService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["text"] = [$"Search text must not exceed {MaxSearchTextLength} characters."],
+                ["text"] = [$"Nội dung tìm kiếm không được vượt quá {MaxSearchTextLength} ký tự."],
             });
         }
 

@@ -74,7 +74,7 @@ public sealed class PaymentService : IPaymentService
     {
         if (string.IsNullOrWhiteSpace(orderCode))
         {
-            throw Validation("orderCode", "Order code is required.");
+            throw Validation("orderCode", "Mã đơn hàng là bắt buộc.");
         }
 
         var userId = _userContext.GetRequiredUserId();
@@ -181,13 +181,13 @@ public sealed class PaymentService : IPaymentService
         var root = document.RootElement;
         if (!TryGetInt32(root, "resultCode", out var resultCode) || resultCode != 0)
         {
-            throw ProviderFailure("MoMo", GetString(root, "message") ?? "Payment request was rejected.");
+            throw ProviderFailure("MoMo", GetString(root, "message") ?? "Yêu cầu thanh toán bị từ chối.");
         }
 
         var payUrl = GetString(root, "payUrl");
         if (!IsAbsoluteHttpsUrl(payUrl))
         {
-            throw ProviderFailure("MoMo", "Successful response did not contain a valid payment URL.");
+            throw ProviderFailure("MoMo", "Phản hồi thành công nhưng không có đường dẫn thanh toán hợp lệ.");
         }
 
         var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
@@ -223,7 +223,7 @@ public sealed class PaymentService : IPaymentService
         EnsureMomoConfigured();
         if (string.IsNullOrWhiteSpace(request.OrderId) || string.IsNullOrWhiteSpace(request.RequestId))
         {
-            throw Validation("orderId", "MoMo orderId and requestId are required.");
+            throw Validation("orderId", "Cần có orderId và requestId từ MoMo.");
         }
 
         var rawSignature = string.Join(
@@ -248,18 +248,18 @@ public sealed class PaymentService : IPaymentService
             ?? throw new NotFoundException(nameof(PaymentTransaction), request.OrderId);
         if (payment.Method != PaymentMethod.Momo)
         {
-            throw Validation("orderId", "The matching transaction is not a MoMo payment.");
+            throw Validation("orderId", "Giao dịch tương ứng không phải thanh toán MoMo.");
         }
 
         if (!string.Equals(request.PartnerCode, _momoOptions.PartnerCode, StringComparison.Ordinal)
             || !string.Equals(request.RequestId, payment.RequestId, StringComparison.Ordinal))
         {
-            throw Validation("requestId", "MoMo callback does not match the payment request.");
+            throw Validation("requestId", "Callback MoMo không khớp với yêu cầu thanh toán.");
         }
 
         if (request.Amount != payment.Amount)
         {
-            throw Validation("amount", "MoMo callback amount does not match the payment transaction.");
+            throw Validation("amount", "Số tiền callback MoMo không khớp giao dịch.");
         }
 
         if (payment.Status == PaymentStatus.Paid)
@@ -371,7 +371,7 @@ public sealed class PaymentService : IPaymentService
         {
             throw ProviderFailure(
                 "PayOS",
-                $"Payment link request was rejected (code {providerCode ?? "unknown"}): {providerMessage ?? "No details returned."}");
+                $"Payment link request was rejected (code {providerCode ?? "unknown"}): {providerMessage ?? "Không có chi tiết trả về."}");
         }
 
         var checkoutUrl = GetString(data, "checkoutUrl");
@@ -385,7 +385,7 @@ public sealed class PaymentService : IPaymentService
             || !IsAbsoluteHttpsUrl(checkoutUrl)
             || string.IsNullOrWhiteSpace(qrCode))
         {
-            throw ProviderFailure("PayOS", "Successful response contained invalid payment link data.");
+            throw ProviderFailure("PayOS", "Phản hồi thành công nhưng dữ liệu link thanh toán không hợp lệ.");
         }
 
         var payment = new PaymentTransaction(
@@ -432,7 +432,7 @@ public sealed class PaymentService : IPaymentService
         EnsurePayOsConfigured();
         if (request.Data is null)
         {
-            throw Validation("data", "PayOS webhook data is required.");
+            throw Validation("data", "Dữ liệu webhook PayOS là bắt buộc.");
         }
 
         var rawSignature = BuildPayOsWebhookSignaturePayload(request.Data);
@@ -447,17 +447,17 @@ public sealed class PaymentService : IPaymentService
 
         if (payment.Method != PaymentMethod.PayOs)
         {
-            throw Validation("orderCode", "The matching transaction is not a PayOS payment.");
+            throw Validation("orderCode", "Giao dịch tương ứng không phải thanh toán PayOS.");
         }
 
         if (request.Data.Amount != payment.Amount)
         {
-            throw Validation("amount", "PayOS webhook amount does not match the payment transaction.");
+            throw Validation("amount", "Số tiền webhook PayOS không khớp giao dịch.");
         }
 
         if (!string.Equals(request.Data.Currency, "VND", StringComparison.OrdinalIgnoreCase))
         {
-            throw Validation("currency", "PayOS webhook currency must be VND.");
+            throw Validation("currency", "Tiền tệ webhook PayOS phải là VND.");
         }
 
         if (payment.Status == PaymentStatus.Paid)
@@ -604,7 +604,7 @@ public sealed class PaymentService : IPaymentService
     {
         if (amount <= 0 || decimal.Truncate(amount) != amount)
         {
-            throw Validation("amount", "Amount must be a positive whole VND value.");
+            throw Validation("amount", "Số tiền phải là số nguyên VND dương.");
         }
 
         return decimal.ToInt64(amount);
@@ -657,7 +657,7 @@ public sealed class PaymentService : IPaymentService
     {
         if (string.IsNullOrWhiteSpace(packageCode))
         {
-            throw Validation("packageCode", "Premium package code is required.");
+            throw Validation("packageCode", "Mã gói Premium là bắt buộc.");
         }
 
         var plan = _premiumOptions.GetPlans().SingleOrDefault(candidate =>
@@ -665,7 +665,7 @@ public sealed class PaymentService : IPaymentService
 
         if (plan is null)
         {
-            throw Validation("packageCode", "Premium package was not found.");
+            throw Validation("packageCode", "Không tìm thấy gói Premium.");
         }
 
         if (string.IsNullOrWhiteSpace(plan.Code)
@@ -674,7 +674,7 @@ public sealed class PaymentService : IPaymentService
             || decimal.Truncate(plan.Price) != plan.Price
             || plan.DurationDays <= 0)
         {
-            throw new InvalidOperationException("Premium subscription settings are not configured.");
+            throw new InvalidOperationException("Chưa cấu hình gói Premium.");
         }
 
         return plan;
@@ -688,7 +688,7 @@ public sealed class PaymentService : IPaymentService
             || string.IsNullOrWhiteSpace(_momoOptions.RedirectUrl)
             || string.IsNullOrWhiteSpace(_momoOptions.IpnUrl))
         {
-            throw new InvalidOperationException("MoMo payment settings are not configured.");
+            throw new InvalidOperationException("Chưa cấu hình thanh toán MoMo.");
         }
     }
 
@@ -700,7 +700,7 @@ public sealed class PaymentService : IPaymentService
             || string.IsNullOrWhiteSpace(_payOsOptions.ReturnUrl)
             || string.IsNullOrWhiteSpace(_payOsOptions.CancelUrl))
         {
-            throw new InvalidOperationException("PayOS payment settings are not configured.");
+            throw new InvalidOperationException("Chưa cấu hình thanh toán PayOS.");
         }
     }
 
@@ -711,7 +711,7 @@ public sealed class PaymentService : IPaymentService
                 Encoding.UTF8.GetBytes(expectedSignature),
                 Encoding.UTF8.GetBytes(actualSignature ?? string.Empty)))
         {
-            throw Validation(field, "Payment signature is invalid.");
+            throw Validation(field, "Chữ ký thanh toán không hợp lệ.");
         }
     }
 
@@ -760,7 +760,7 @@ public sealed class PaymentService : IPaymentService
         }
         catch (JsonException exception)
         {
-            throw new ExternalDependencyException($"{provider} returned an invalid response.", exception);
+            throw new ExternalDependencyException($"{provider} trả về phản hồi không hợp lệ.", exception);
         }
     }
 
@@ -775,25 +775,25 @@ public sealed class PaymentService : IPaymentService
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new ExternalServiceUnavailableException(provider, $"{provider} payment request timed out.", TimeSpan.FromSeconds(5));
+            throw new ExternalServiceUnavailableException(provider, $"{provider} hết thời gian chờ yêu cầu thanh toán.", TimeSpan.FromSeconds(5));
         }
         catch (HttpRequestException exception)
         {
-            throw new ExternalDependencyException($"Unable to communicate with {provider}.", exception);
+            throw new ExternalDependencyException($"Không thể kết nối tới {provider}.", exception);
         }
     }
 
     private static ExternalDependencyException ProviderFailure(string provider, string details)
     {
         var normalizedDetails = string.IsNullOrWhiteSpace(details)
-            ? "No details returned."
+            ? "Không có chi tiết trả về."
             : details.Trim();
         if (normalizedDetails.Length > PaymentTransaction.MaxProviderMessageLength)
         {
             normalizedDetails = normalizedDetails[..PaymentTransaction.MaxProviderMessageLength];
         }
 
-        return new ExternalDependencyException($"{provider} payment request failed: {normalizedDetails}");
+        return new ExternalDependencyException($"{provider} thanh toán thất bại: {normalizedDetails}");
     }
 
     private static RequestValidationException Validation(string field, string message)

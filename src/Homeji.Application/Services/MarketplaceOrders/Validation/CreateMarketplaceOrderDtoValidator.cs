@@ -10,7 +10,7 @@ public sealed class CreateMarketplaceOrderDtoValidator : AbstractValidator<Creat
     {
         RuleFor(request => request.PickupAt)
             .GreaterThan(_ => timeProvider.GetUtcNow())
-            .WithMessage("Pickup time must be in the future.");
+            .WithMessage("Thời gian nhận hàng phải ở tương lai.");
         RuleFor(request => request.PickupAddress)
             .NotEmpty()
             .MaximumLength(MarketplaceOrder.MaxPickupAddressLength);

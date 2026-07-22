@@ -108,7 +108,7 @@ public sealed class UserProfileService : IUserProfileService
 
         var userId = GetRequiredUserId();
         var profile = await _repository.GetByIdAsync(userId, cancellationToken)
-            ?? throw new ForbiddenAccessException("Complete your profile before updating lifestyle.");
+            ?? throw new ForbiddenAccessException("Vui lòng hoàn thiện hồ sơ trước khi cập nhật lối sống.");
 
         profile.UpdateLifestyle(
             request.Role,
@@ -127,6 +127,6 @@ public sealed class UserProfileService : IUserProfileService
     {
         return _currentUser.UserId is { } userId && userId != Guid.Empty
             ? userId
-            : throw new UnauthorizedAccessException("The authenticated token does not contain a valid subject.");
+            : throw new UnauthorizedAccessException("Token đăng nhập không chứa thông tin người dùng hợp lệ.");
     }
 }

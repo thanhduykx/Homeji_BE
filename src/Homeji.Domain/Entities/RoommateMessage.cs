@@ -15,18 +15,18 @@ public sealed class RoommateMessage
     {
         if (conversationId == Guid.Empty || senderId == Guid.Empty)
         {
-            throw new DomainException("Conversation id and sender id must not be empty.");
+            throw new DomainException("Mã cuộc trò chuyện và người gửi không được trống.");
         }
 
         var normalizedBody = body?.Trim();
         if (string.IsNullOrWhiteSpace(normalizedBody))
         {
-            throw new DomainException("Message body is required.");
+            throw new DomainException("Nội dung tin nhắn là bắt buộc.");
         }
 
         if (normalizedBody.Length > MaxBodyLength)
         {
-            throw new DomainException($"Message body must not exceed {MaxBodyLength} characters.");
+            throw new DomainException($"Nội dung tin nhắn không được vượt quá {MaxBodyLength} ký tự.");
         }
 
         Id = Guid.NewGuid();

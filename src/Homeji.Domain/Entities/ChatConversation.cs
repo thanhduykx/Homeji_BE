@@ -38,7 +38,7 @@ public sealed class ChatConversation
     {
         if (userId == Guid.Empty)
         {
-            throw new DomainException("User id must not be empty.");
+            throw new DomainException("Mã người dùng không được để trống.");
         }
 
         return new ChatConversation(Guid.NewGuid(), userId, title, createdAt);

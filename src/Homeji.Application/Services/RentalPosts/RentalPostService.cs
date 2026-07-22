@@ -114,7 +114,7 @@ public sealed class RentalPostService : IRentalPostService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["path"] = [$"Storage path must start with '{expectedPrefix}'."],
+                ["path"] = [$"Đường dẫn lưu trữ phải bắt đầu bằng '{expectedPrefix}'."],
             });
         }
 
@@ -334,14 +334,14 @@ public sealed class RentalPostService : IRentalPostService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["postIds"] = ["Select between 2 and 4 different rental posts to compare."],
+                ["postIds"] = ["Chọn từ 2 đến 4 tin đăng khác nhau để so sánh."],
             });
         }
 
         var posts = await _posts.GetByIdsWithMediaAsync(ids, cancellationToken);
         if (posts.Count != ids.Length || posts.Any(post => post.Status != RentalPostStatus.Active))
         {
-            throw new NotFoundException(nameof(RentalPost), "comparison selection");
+            throw new NotFoundException(nameof(RentalPost), "lựa chọn so sánh");
         }
 
         var reviews = await _reviews.GetByPostIdsAsync(ids, cancellationToken);
