@@ -5,7 +5,6 @@ using Homeji.Application.IRepositories.Marketplace;
 using Homeji.Application.IRepositories.MarketplaceOrders;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.Wallets;
-using Homeji.Application.IServices.Marketplace;
 using Homeji.Application.IServices.MarketplaceOrders;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
@@ -28,7 +27,6 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
     private readonly INotificationRealtimePublisher _realtimePublisher;
     private readonly TimeProvider _timeProvider;
     private readonly IWalletRepository _wallets;
-    private readonly IMarketplaceSellerPlanService _sellerPlans;
     private readonly IValidator<CreateMarketplaceOrderDto> _validator;
     private readonly IValidator<CreateMarketplaceCartOrderDto> _cartValidator;
     private readonly MarketplaceFinanceOptions _financeOptions;
@@ -42,7 +40,6 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         INotificationRealtimePublisher realtimePublisher,
         TimeProvider timeProvider,
         IWalletRepository wallets,
-        IMarketplaceSellerPlanService sellerPlans,
         IValidator<CreateMarketplaceOrderDto> validator,
         IValidator<CreateMarketplaceCartOrderDto> cartValidator,
         IOptions<MarketplaceFinanceOptions> financeOptions,
@@ -55,7 +52,6 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         _realtimePublisher = realtimePublisher;
         _timeProvider = timeProvider;
         _wallets = wallets;
-        _sellerPlans = sellerPlans;
         _validator = validator;
         _cartValidator = cartValidator;
         _financeOptions = financeOptions.Value;
@@ -120,7 +116,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             });
         }
 
-        var commissionRate = await _sellerPlans.ResolveCommissionRateAsync(post.SellerId, now, cancellationToken);
+        var commissionRate = _financeOptions.CommissionRate;
         var order = new MarketplaceOrder(
             post.Id,
             buyerId,
@@ -232,7 +228,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         }
 
         var now = _timeProvider.GetUtcNow();
-        var commissionRate = await _sellerPlans.ResolveCommissionRateAsync(sellerId, now, cancellationToken);
+        var commissionRate = _financeOptions.CommissionRate;
         var createdOrders = new List<(MarketplaceOrder Order, MarketplacePost Post)>(posts.Count);
         var notifications = new List<Notification>(posts.Count);
         foreach (var post in posts)
