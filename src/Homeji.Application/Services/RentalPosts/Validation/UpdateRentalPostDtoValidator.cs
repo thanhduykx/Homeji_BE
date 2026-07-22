@@ -2,6 +2,7 @@ using FluentValidation;
 using Homeji.Application.Common;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Application.Services.RentalPosts.Validation;
 
@@ -47,5 +48,26 @@ public sealed class UpdateRentalPostDtoValidator : AbstractValidator<UpdateRenta
             .LessThanOrEqualTo(request => request.MaxOccupants);
         RuleFor(request => request.HouseRules)
             .MaximumLength(RentalPost.MaxHouseRulesLength);
+
+        When(request => request.Type == RentalPostType.RoomTransfer, () =>
+        {
+            RuleFor(request => request.TransferKind)
+                .NotNull()
+                .Must(kind => kind.HasValue && Enum.IsDefined(kind.Value));
+            RuleFor(request => request.AvailableFrom).NotNull();
+            RuleFor(request => request.OriginalLeaseEndsOn)
+                .NotNull()
+                .GreaterThan(request => request.AvailableFrom);
+            RuleFor(request => request.PassFee).GreaterThanOrEqualTo(0);
+            RuleFor(request => request.TransferReason)
+                .NotEmpty()
+                .MaximumLength(RentalPost.MaxTransferReasonLength);
+            RuleFor(request => request.OwnerConsentConfirmed)
+                .Equal(true)
+                .WithMessage("You must confirm that the property owner has agreed to the transfer.");
+            RuleFor(request => request.OwnerConsentContact)
+                .NotEmpty()
+                .MaximumLength(RentalPost.MaxOwnerConsentContactLength);
+        });
     }
 }

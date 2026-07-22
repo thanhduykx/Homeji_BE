@@ -20,7 +20,21 @@ public sealed record PostMessageDto(
     Guid ConversationId,
     Guid SenderId,
     string Body,
-    DateTimeOffset SentAt);
+    DateTimeOffset SentAt,
+    IReadOnlyList<PostMessageAttachmentDto>? Attachments = null);
+
+public sealed record PostMessageAttachmentDto(
+    Guid Id,
+    Guid UploaderId,
+    MessageAttachmentContext Context,
+    MessageAttachmentStatus Status,
+    string MimeType,
+    long Bytes,
+    int Width,
+    int Height,
+    string ContentPath,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DeletedAt);
 
 public sealed record SendPostMessageDto(string? Body);
 

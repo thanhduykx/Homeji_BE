@@ -63,9 +63,17 @@ public sealed class RentalPostService : IRentalPostService
 
     public async Task<RentalPostDto> CreateDraftAsync(CreateRentalPostDraftDto request, CancellationToken cancellationToken = default)
     {
-        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        UserContext.EnsureLandlord(landlord);
-        var post = RentalPost.CreateDraft(landlord.Id, request.Type, _timeProvider.GetUtcNow());
+        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        if (request.Type == RentalPostType.RoomTransfer)
+        {
+            UserContext.EnsureRenter(profile);
+        }
+        else
+        {
+            UserContext.EnsureLandlord(profile);
+        }
+
+        var post = RentalPost.CreateDraft(profile.Id, request.Type, _timeProvider.GetUtcNow());
         await _posts.AddAsync(post, cancellationToken);
         await _posts.SaveChangesAsync(cancellationToken);
         return RentalPostMapper.ToDto(post);
@@ -74,6 +82,13 @@ public sealed class RentalPostService : IRentalPostService
     public async Task<RentalPostDto> UpdateAsync(Guid postId, UpdateRentalPostDto request, CancellationToken cancellationToken = default)
     {
         var post = await GetOwnedPostAsync(postId, cancellationToken);
+        if ((post.Type == RentalPostType.RoomTransfer) != (request.Type == RentalPostType.RoomTransfer))
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["type"] = ["A room-transfer draft cannot be converted to or from a landlord rental listing."],
+            });
+        }
         await ValidateAsync(_updateValidator, request, cancellationToken);
         var violations = await _moderation.ValidateAsync(request.Description ?? string.Empty, cancellationToken);
         if (violations.Count > 0)
@@ -99,7 +114,13 @@ public sealed class RentalPostService : IRentalPostService
             request.MaxOccupants,
             request.AvailableSlots,
             request.HouseRules,
-            request.AvailableFrom);
+            request.AvailableFrom,
+            request.TransferKind,
+            request.OriginalLeaseEndsOn,
+            request.PassFee,
+            request.TransferReason,
+            request.OwnerConsentConfirmed,
+            request.OwnerConsentContact);
         await _posts.SaveChangesAsync(cancellationToken);
         return RentalPostMapper.ToDto(post);
     }
@@ -109,12 +130,12 @@ public sealed class RentalPostService : IRentalPostService
         var post = await GetOwnedPostAsync(postId, cancellationToken);
         await ValidateAsync(_mediaValidator, request, cancellationToken);
 
-        var expectedPrefix = $"rental-posts/{post.OwnerId:D}/{postId:D}/";
-        if (!request.Path!.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
+        if (!RentalPostMediaPathPolicy.IsOwnedPath(request.Path!, post.OwnerId, postId))
         {
+            var expectedPrefix = $"rental-posts/{post.OwnerId:D}/{postId:D}/";
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["path"] = [$"Đường dẫn lưu trữ phải bắt đầu bằng '{expectedPrefix}'."],
+                ["path"] = [$"Media must be an uploaded Homeji image in '{expectedPrefix}'."],
             });
         }
 
@@ -208,6 +229,19 @@ public sealed class RentalPostService : IRentalPostService
             IsOwnerPremium = ownerIsPremium,
             OwnerBadge = ownerIsPremium ? "Premium" : null,
         };
+        if (!isOwner)
+        {
+            dto = dto with { OwnerConsentContact = null };
+            if (post.Type == RentalPostType.RoomTransfer)
+            {
+                dto = dto with
+                {
+                    Address = ApproximateTransferAddress(post.Address),
+                    Latitude = Math.Round(post.Latitude, 3),
+                    Longitude = Math.Round(post.Longitude, 3),
+                };
+            }
+        }
         // Guests: hide internal moderation notes (Active posts usually null anyway).
         if (currentUserId is null)
         {
@@ -254,7 +288,15 @@ public sealed class RentalPostService : IRentalPostService
             {
                 var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
                 var boostScore = CalculateBoostScore(post, isPremium, now);
-                return RentalPostMapper.ToSummaryDto(post, isPremium, boostScore);
+                var summary = RentalPostMapper.ToSummaryDto(post, isPremium, boostScore);
+                return post.Type == RentalPostType.RoomTransfer
+                    ? summary with
+                    {
+                        Address = ApproximateTransferAddress(post.Address),
+                        Latitude = Math.Round(post.Latitude, 3),
+                        Longitude = Math.Round(post.Longitude, 3),
+                    }
+                    : summary;
             })
             .OrderByDescending(post => post.IsOwnerPremium)
             .ThenByDescending(post => post.BoostScore)
@@ -290,9 +332,8 @@ public sealed class RentalPostService : IRentalPostService
     public async Task<RentalPostOwnerStatsDto> GetOwnerStatsAsync(
         CancellationToken cancellationToken = default)
     {
-        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        UserContext.EnsureLandlord(landlord);
-        var ownerId = landlord.Id;
+        var owner = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        var ownerId = owner.Id;
         var posts = await _posts.GetByOwnerAsync(ownerId, cancellationToken);
         var postIds = posts.Select(post => post.Id).ToArray();
         var contactCounts = await _conversations.CountBySubjectsAsync(
@@ -334,14 +375,14 @@ public sealed class RentalPostService : IRentalPostService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["postIds"] = ["Chọn từ 2 đến 4 tin đăng khác nhau để so sánh."],
+                ["postIds"] = ["Select between 2 and 4 different rental posts to compare."],
             });
         }
 
         var posts = await _posts.GetByIdsWithMediaAsync(ids, cancellationToken);
         if (posts.Count != ids.Length || posts.Any(post => post.Status != RentalPostStatus.Active))
         {
-            throw new NotFoundException(nameof(RentalPost), "lựa chọn so sánh");
+            throw new NotFoundException(nameof(RentalPost), "comparison selection");
         }
 
         var reviews = await _reviews.GetByPostIdsAsync(ids, cancellationToken);
@@ -389,13 +430,32 @@ public sealed class RentalPostService : IRentalPostService
             || search.AvailableFromBefore.HasValue;
     }
 
+    private static string ApproximateTransferAddress(string address)
+    {
+        var segments = address
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (segments.Length < 2)
+        {
+            return "Khu vực " + address;
+        }
+
+        return "Khu vực " + string.Join(", ", segments.TakeLast(Math.Min(2, segments.Length)));
+    }
+
     private async Task<RentalPost> GetOwnedPostAsync(Guid postId, CancellationToken cancellationToken)
     {
-        var landlord = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        UserContext.EnsureLandlord(landlord);
+        var owner = await _userContext.GetRequiredProfileAsync(cancellationToken);
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
-        UserContext.EnsureOwner(landlord.Id, post.OwnerId);
+        UserContext.EnsureOwner(owner.Id, post.OwnerId);
+        if (post.Type == RentalPostType.RoomTransfer)
+        {
+            UserContext.EnsureRenter(owner);
+        }
+        else
+        {
+            UserContext.EnsureLandlord(owner);
+        }
         return post;
     }
 

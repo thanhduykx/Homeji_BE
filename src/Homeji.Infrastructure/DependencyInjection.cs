@@ -117,6 +117,7 @@ public static class DependencyInjection
 
         services.Configure<CloudinaryOptions>(configuration.GetSection(CloudinaryOptions.SectionName));
         services.AddHttpClient<IImageUploadService, CloudinaryImageUploadService>();
+        services.AddScoped<IConversationImageProcessor, ConversationImageProcessor>();
 
         return services;
     }

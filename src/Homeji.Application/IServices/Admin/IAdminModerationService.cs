@@ -9,7 +9,10 @@ public interface IAdminModerationService
 {
     Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default);
 
-    Task<RentalPostDto> ApproveRentalPostAsync(Guid postId, CancellationToken cancellationToken = default);
+    Task<RentalPostDto> ApproveRentalPostAsync(
+        Guid postId,
+        ApproveRentalPostDto request,
+        CancellationToken cancellationToken = default);
 
     Task<RentalPostDto> RejectRentalPostAsync(Guid postId, RejectRentalPostDto request, CancellationToken cancellationToken = default);
 

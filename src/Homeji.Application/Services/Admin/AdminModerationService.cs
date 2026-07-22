@@ -52,15 +52,23 @@ public sealed class AdminModerationService : IAdminModerationService
     {
         await EnsureAdminAsync(cancellationToken);
         var posts = await _posts.GetPendingAsync(cancellationToken);
-        return posts.Select(post => RentalPostMapper.ToSummaryDto(post)).ToArray();
+        return posts.Select(post => RentalPostMapper.ToSummaryDto(
+            post,
+            includePrivateTransferReview: true)).ToArray();
     }
 
-    public async Task<RentalPostDto> ApproveRentalPostAsync(Guid postId, CancellationToken cancellationToken = default)
+    public async Task<RentalPostDto> ApproveRentalPostAsync(
+        Guid postId,
+        ApproveRentalPostDto request,
+        CancellationToken cancellationToken = default)
     {
-        await EnsureAdminAsync(cancellationToken);
+        var admin = await EnsureAdminAsync(cancellationToken);
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
-        post.Approve(_timeProvider.GetUtcNow());
+        post.Approve(
+            _timeProvider.GetUtcNow(),
+            post.Type == RentalPostType.RoomTransfer ? admin.Id : null,
+            request.OwnerConsentVerificationNote);
         var notifications = new List<Notification>();
         var notification = new Notification(
             post.OwnerId,
@@ -176,9 +184,10 @@ public sealed class AdminModerationService : IAdminModerationService
         return ReportMapper.ToDto(report);
     }
 
-    private async Task EnsureAdminAsync(CancellationToken cancellationToken)
+    private async Task<UserProfile> EnsureAdminAsync(CancellationToken cancellationToken)
     {
         var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
         UserContext.EnsureAdmin(profile);
+        return profile;
     }
 }

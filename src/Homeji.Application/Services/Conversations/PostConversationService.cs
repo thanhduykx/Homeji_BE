@@ -8,6 +8,7 @@ using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.WantedPosts;
 using Homeji.Application.IServices.Conversations;
+using Homeji.Application.IServices.Upload;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
@@ -25,6 +26,7 @@ public sealed class PostConversationService : IPostConversationService
     private readonly INotificationRealtimePublisher _realtimePublisher;
     private readonly TimeProvider _timeProvider;
     private readonly IRentalWantedPostRepository _wantedPosts;
+    private readonly IConversationImageProcessor _imageProcessor;
 
     public PostConversationService(
         UserContext userContext,
@@ -35,7 +37,8 @@ public sealed class PostConversationService : IPostConversationService
         IUserProfileRepository profiles,
         INotificationRepository notifications,
         INotificationRealtimePublisher realtimePublisher,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IConversationImageProcessor imageProcessor)
     {
         _userContext = userContext;
         _conversations = conversations;
@@ -46,6 +49,7 @@ public sealed class PostConversationService : IPostConversationService
         _notifications = notifications;
         _realtimePublisher = realtimePublisher;
         _timeProvider = timeProvider;
+        _imageProcessor = imageProcessor;
     }
 
     public async Task<PostConversationDto> StartRentalConversationAsync(
@@ -158,6 +162,138 @@ public sealed class PostConversationService : IPostConversationService
         return ToDto(message);
     }
 
+    public async Task<PostMessageDto> SendImagesAsync(
+        Guid conversationId,
+        string? body,
+        IReadOnlyList<ConversationImageUpload> images,
+        CancellationToken cancellationToken = default)
+    {
+        if (images is null || images.Count is < 1 or > 5)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["files"] = ["Select between 1 and 5 images."],
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            ValidateBody(body);
+        }
+
+        var senderId = _userContext.GetRequiredUserId();
+        var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        var now = _timeProvider.GetUtcNow();
+        var recentCount = await _conversations.CountAttachmentsByUploaderSinceAsync(
+            senderId,
+            now.AddHours(-24),
+            cancellationToken);
+        if (recentCount + images.Count > 30)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["files"] = ["You can send at most 30 chat images in 24 hours."],
+            });
+        }
+
+        var processed = new List<(ConversationImageUpload Upload, ProcessedConversationImage Image)>(images.Count);
+        foreach (var image in images)
+        {
+            if (!Enum.IsDefined(image.Context))
+            {
+                throw new RequestValidationException(new Dictionary<string, string[]>
+                {
+                    ["context"] = ["Image context is invalid."],
+                });
+            }
+
+            try
+            {
+                processed.Add((image, await _imageProcessor.ProcessAsync(image, cancellationToken)));
+            }
+            catch (InvalidOperationException exception)
+            {
+                throw new RequestValidationException(new Dictionary<string, string[]>
+                {
+                    ["files"] = [exception.Message],
+                });
+            }
+        }
+
+        var messageBody = string.IsNullOrWhiteSpace(body)
+            ? $"Đã gửi {images.Count} ảnh"
+            : body.Trim();
+        var message = new PostMessage(conversation.Id, senderId, messageBody, now);
+        foreach (var item in processed)
+        {
+            message.AddImage(
+                senderId,
+                item.Upload.Context,
+                item.Image.MimeType,
+                item.Image.Content,
+                item.Image.Width,
+                item.Image.Height,
+                item.Image.Sha256,
+                now);
+        }
+
+        conversation.Touch(now);
+        conversation.MarkRead(senderId, now);
+        await _conversations.AddMessageAsync(message, cancellationToken);
+        var notification = CreateMessageNotification(conversation.GetOtherParticipantId(senderId), conversation.Id, now);
+        await _notifications.AddAsync(notification, cancellationToken);
+        await _conversations.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        return ToDto(message);
+    }
+
+    public async Task<PostMessageAttachmentContentDto> GetAttachmentContentAsync(
+        Guid conversationId,
+        Guid messageId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        await GetAuthorizedAsync(conversationId, cancellationToken);
+        var attachment = await _conversations.GetAttachmentAsync(
+            conversationId,
+            messageId,
+            attachmentId,
+            cancellationToken)
+            ?? throw new NotFoundException(nameof(PostMessageAttachment), attachmentId);
+        if (attachment.Status != MessageAttachmentStatus.Ready || attachment.Content.Length == 0)
+        {
+            throw new NotFoundException(nameof(PostMessageAttachment), attachmentId);
+        }
+
+        return new PostMessageAttachmentContentDto(
+            attachment.MimeType,
+            attachment.Content,
+            attachment.Sha256);
+    }
+
+    public async Task DeleteAttachmentAsync(
+        Guid conversationId,
+        Guid messageId,
+        Guid attachmentId,
+        CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        await GetAuthorizedAsync(conversationId, cancellationToken);
+        var attachment = await _conversations.GetAttachmentAsync(
+            conversationId,
+            messageId,
+            attachmentId,
+            cancellationToken)
+            ?? throw new NotFoundException(nameof(PostMessageAttachment), attachmentId);
+        if (attachment.UploaderId != userId)
+        {
+            throw new ForbiddenAccessException("Only the uploader can delete this attachment.");
+        }
+
+        attachment.Delete(userId, _timeProvider.GetUtcNow());
+        await _conversations.SaveChangesAsync(cancellationToken);
+    }
+
     private async Task<PostConversationDto> StartAsync(
         ConversationSubjectType subjectType,
         Guid subjectId,
@@ -230,6 +366,41 @@ public sealed class PostConversationService : IPostConversationService
 
     private static PostMessageDto ToDto(PostMessage message)
     {
-        return new PostMessageDto(message.Id, message.ConversationId, message.SenderId, message.Body, message.SentAt);
+        var attachments = message.Attachments
+            .OrderBy(attachment => attachment.CreatedAt)
+            .Select(attachment => new PostMessageAttachmentDto(
+                attachment.Id,
+                attachment.UploaderId,
+                attachment.Context,
+                attachment.Status,
+                attachment.MimeType,
+                attachment.Bytes,
+                attachment.Width,
+                attachment.Height,
+                $"/api/conversations/{message.ConversationId:D}/messages/{message.Id:D}/attachments/{attachment.Id:D}/content",
+                attachment.CreatedAt,
+                attachment.DeletedAt))
+            .ToArray();
+        return new PostMessageDto(
+            message.Id,
+            message.ConversationId,
+            message.SenderId,
+            message.Body,
+            message.SentAt,
+            attachments);
+    }
+
+    private static Notification CreateMessageNotification(
+        Guid recipientId,
+        Guid conversationId,
+        DateTimeOffset createdAt)
+    {
+        return new Notification(
+            recipientId,
+            NotificationType.DirectMessage,
+            "Tin nhắn mới",
+            "Bạn có tin nhắn mới liên quan đến một bài đăng.",
+            conversationId,
+            createdAt);
     }
 }

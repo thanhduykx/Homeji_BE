@@ -87,7 +87,8 @@ public sealed class ChatbotService : IChatbotService
         }
 
         var message = ValidateMessage(request.Message);
-        var userId = _userContext.GetRequiredUserId();
+        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        var userId = profile.Id;
         var now = _timeProvider.GetUtcNow();
 
         var conversation = request.ConversationId.HasValue
@@ -110,6 +111,7 @@ public sealed class ChatbotService : IChatbotService
         var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
 
         var searchUpdate = await BuildSearchUpdateAsync(conversation, cancellationToken);
+        var actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
 
         await _conversations.SaveChangesAsync(cancellationToken);
 
@@ -117,7 +119,8 @@ public sealed class ChatbotService : IChatbotService
             conversation.Id,
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
-            searchUpdate);
+            searchUpdate,
+            actions);
     }
 
     private async Task<AiHighlightResponseDto?> BuildSearchUpdateAsync(

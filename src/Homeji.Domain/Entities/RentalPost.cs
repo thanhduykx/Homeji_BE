@@ -11,6 +11,9 @@ public sealed class RentalPost
     public const int MaxModerationReasonLength = 500;
     public const int MaxAmenityCodeLength = 60;
     public const int MaxHouseRulesLength = 2_000;
+    public const int MaxTransferReasonLength = 500;
+    public const int MaxOwnerConsentContactLength = 200;
+    public const int MaxOwnerConsentVerificationNoteLength = 500;
     public const int MinimumImageCountForSubmit = 3;
 
     private readonly List<RentalPostMedia> _media = [];
@@ -60,6 +63,15 @@ public sealed class RentalPost
     public int AvailableSlots { get; private set; } = 1;
     public string? HouseRules { get; private set; }
     public DateOnly? AvailableFrom { get; private set; }
+    public RoomTransferKind? TransferKind { get; private set; }
+    public DateOnly? OriginalLeaseEndsOn { get; private set; }
+    public decimal PassFee { get; private set; }
+    public string? TransferReason { get; private set; }
+    public bool OwnerConsentConfirmed { get; private set; }
+    public string? OwnerConsentContact { get; private set; }
+    public DateTimeOffset? OwnerConsentVerifiedAt { get; private set; }
+    public Guid? OwnerConsentVerifiedBy { get; private set; }
+    public string? OwnerConsentVerificationNote { get; private set; }
 
     public string Address { get; private set; }
 
@@ -114,7 +126,13 @@ public sealed class RentalPost
         int maxOccupants = 1,
         int availableSlots = 1,
         string? houseRules = null,
-        DateOnly? availableFrom = null)
+        DateOnly? availableFrom = null,
+        RoomTransferKind? transferKind = null,
+        DateOnly? originalLeaseEndsOn = null,
+        decimal passFee = 0,
+        string? transferReason = null,
+        bool ownerConsentConfirmed = false,
+        string? ownerConsentContact = null)
     {
         EnsureEditable();
         var wasActive = Status == RentalPostStatus.Active;
@@ -136,6 +154,43 @@ public sealed class RentalPost
         AvailableSlots = availableSlots;
         HouseRules = NormalizeOptional(houseRules, MaxHouseRulesLength, nameof(HouseRules));
         AvailableFrom = availableFrom;
+        if (type == RentalPostType.RoomTransfer)
+        {
+            if (transferKind is null || !Enum.IsDefined(transferKind.Value))
+            {
+                throw new DomainException("Room transfer kind is required.");
+            }
+
+            if (originalLeaseEndsOn is null || availableFrom is null || originalLeaseEndsOn <= availableFrom)
+            {
+                throw new DomainException("Original lease end date must be after the available date.");
+            }
+
+            TransferKind = transferKind;
+            OriginalLeaseEndsOn = originalLeaseEndsOn;
+            PassFee = RequireNonNegative(passFee, nameof(PassFee));
+            TransferReason = NormalizeRequired(transferReason!, MaxTransferReasonLength, nameof(TransferReason));
+            OwnerConsentConfirmed = ownerConsentConfirmed;
+            OwnerConsentContact = NormalizeRequired(
+                ownerConsentContact!,
+                MaxOwnerConsentContactLength,
+                nameof(OwnerConsentContact));
+            OwnerConsentVerifiedAt = null;
+            OwnerConsentVerifiedBy = null;
+            OwnerConsentVerificationNote = null;
+        }
+        else
+        {
+            TransferKind = null;
+            OriginalLeaseEndsOn = null;
+            PassFee = 0;
+            TransferReason = null;
+            OwnerConsentConfirmed = false;
+            OwnerConsentContact = null;
+            OwnerConsentVerifiedAt = null;
+            OwnerConsentVerifiedBy = null;
+            OwnerConsentVerificationNote = null;
+        }
         Address = NormalizeRequired(address, MaxAddressLength, nameof(Address));
         Latitude = ValidateCoordinate(latitude, -90, 90, nameof(Latitude));
         Longitude = ValidateCoordinate(longitude, -180, 180, nameof(Longitude));
@@ -206,18 +261,41 @@ public sealed class RentalPost
             throw new DomainException($"Tin đăng cần ít nhất {MinimumImageCountForSubmit} ảnh.");
         }
 
+        if (Type == RentalPostType.RoomTransfer
+            && (!OwnerConsentConfirmed
+                || string.IsNullOrWhiteSpace(OwnerConsentContact)
+                || TransferKind is null
+                || OriginalLeaseEndsOn is null))
+        {
+            throw new DomainException("Room transfer requires owner consent details before submission.");
+        }
+
         Status = RentalPostStatus.Pending;
         ModerationReason = null;
         UpdatedAt = submittedAt;
     }
 
-    public void Approve(DateTimeOffset approvedAt)
+    public void Approve(DateTimeOffset approvedAt, Guid? reviewerId = null, string? ownerConsentVerificationNote = null)
     {
         if (Status != RentalPostStatus.Pending)
         {
             throw new DomainException("Chỉ tin đang chờ duyệt mới được phê duyệt.");
         }
 
+        if (Type == RentalPostType.RoomTransfer)
+        {
+            if (reviewerId is null || reviewerId == Guid.Empty)
+            {
+                throw new DomainException("Room transfer approval requires a reviewer.");
+            }
+
+            OwnerConsentVerifiedAt = approvedAt;
+            OwnerConsentVerifiedBy = reviewerId;
+            OwnerConsentVerificationNote = NormalizeRequired(
+                ownerConsentVerificationNote!,
+                MaxOwnerConsentVerificationNoteLength,
+                nameof(ownerConsentVerificationNote));
+        }
         Status = RentalPostStatus.Active;
         ModerationReason = null;
         UpdatedAt = approvedAt;

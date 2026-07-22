@@ -3,6 +3,7 @@ using System;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Homeji.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260721234915_AddRoomTransferRentalPosts")]
+    partial class AddRoomTransferRentalPosts
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -809,18 +812,9 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("owner_consent_contact");
 
-                    b.Property<string>("OwnerConsentVerificationNote")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)")
-                        .HasColumnName("owner_consent_verification_note");
-
                     b.Property<DateTimeOffset?>("OwnerConsentVerifiedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("owner_consent_verified_at");
-
-                    b.Property<Guid?>("OwnerConsentVerifiedBy")
-                        .HasColumnType("uuid")
-                        .HasColumnName("owner_consent_verified_by");
 
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid")

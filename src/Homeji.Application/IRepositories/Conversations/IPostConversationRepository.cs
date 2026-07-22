@@ -10,6 +10,8 @@ public interface IPostConversationRepository
     Task<PostConversation?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostConversation>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<PostMessage>> GetMessagesAsync(Guid conversationId, CancellationToken cancellationToken = default);
+    Task<PostMessageAttachment?> GetAttachmentAsync(Guid conversationId, Guid messageId, Guid attachmentId, CancellationToken cancellationToken = default);
+    Task<int> CountAttachmentsByUploaderSinceAsync(Guid uploaderId, DateTimeOffset since, CancellationToken cancellationToken = default);
     Task<IReadOnlyDictionary<Guid, ConversationLastMessageDto>> GetLatestByConversationIdsAsync(
         IReadOnlyCollection<Guid> conversationIds,
         CancellationToken cancellationToken = default);

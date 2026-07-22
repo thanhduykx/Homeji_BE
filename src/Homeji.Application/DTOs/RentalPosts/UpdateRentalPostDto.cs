@@ -19,4 +19,10 @@ public sealed record UpdateRentalPostDto(
     int MaxOccupants = 1,
     int AvailableSlots = 1,
     string? HouseRules = null,
-    DateOnly? AvailableFrom = null);
+    DateOnly? AvailableFrom = null,
+    RoomTransferKind? TransferKind = null,
+    DateOnly? OriginalLeaseEndsOn = null,
+    decimal PassFee = 0,
+    string? TransferReason = null,
+    bool OwnerConsentConfirmed = false,
+    string? OwnerConsentContact = null);

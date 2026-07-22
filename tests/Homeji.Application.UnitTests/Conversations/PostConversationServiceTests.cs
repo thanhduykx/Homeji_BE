@@ -86,7 +86,8 @@ public sealed class PostConversationServiceTests
             profiles,
             notifications: null!,
             realtimePublisher: null!,
-            new StubTimeProvider(UtcNow));
+            new StubTimeProvider(UtcNow),
+            imageProcessor: null!);
     }
 
     private static RentalWantedPost CreateWantedPost(Guid requesterId)
@@ -198,6 +199,23 @@ public sealed class PostConversationServiceTests
 
         public Task<IReadOnlyList<PostMessage>> GetMessagesAsync(
             Guid conversationId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<PostMessageAttachment?> GetAttachmentAsync(
+            Guid conversationId,
+            Guid messageId,
+            Guid attachmentId,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<int> CountAttachmentsByUploaderSinceAsync(
+            Guid uploaderId,
+            DateTimeOffset since,
             CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();

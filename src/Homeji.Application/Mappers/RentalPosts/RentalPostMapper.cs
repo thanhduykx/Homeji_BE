@@ -32,6 +32,13 @@ public static class RentalPostMapper
             post.AvailableSlots,
             post.HouseRules,
             post.AvailableFrom,
+            post.TransferKind,
+            post.OriginalLeaseEndsOn,
+            post.PassFee,
+            post.TransferReason,
+            post.OwnerConsentConfirmed,
+            post.OwnerConsentContact,
+            post.OwnerConsentVerifiedAt,
             post.ModerationReason,
             post.CreatedAt,
             post.UpdatedAt);
@@ -41,7 +48,8 @@ public static class RentalPostMapper
         RentalPost post,
         bool isOwnerPremium = false,
         decimal boostScore = 0,
-        string? highlightTag = null)
+        string? highlightTag = null,
+        bool includePrivateTransferReview = false)
     {
         return new RentalPostSummaryDto(
             post.Id,
@@ -61,7 +69,12 @@ public static class RentalPostMapper
             isOwnerPremium,
             isOwnerPremium ? "Premium" : null,
             boostScore,
-            highlightTag);
+            highlightTag,
+            post.TransferKind,
+            post.OriginalLeaseEndsOn,
+            post.PassFee,
+            post.OwnerConsentVerifiedAt.HasValue,
+            includePrivateTransferReview ? post.OwnerConsentContact : null);
     }
 
     private static RentalPostMediaDto ToDto(RentalPostMedia media)

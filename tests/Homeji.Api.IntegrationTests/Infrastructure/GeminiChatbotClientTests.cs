@@ -93,6 +93,32 @@ public sealed class GeminiChatbotClientTests
         Assert.Contains("hai mốc độc lập", prompt, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task GenerateReplyAsync_IncludesApplicationFeatureGroundingAndSafeButtonContract()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"candidates":[{"content":{"parts":[{"text":"Mở Chợ đồ để chọn món."}]}}]}"""),
+            });
+        var client = new GeminiChatbotClient(
+            new HttpClient(handler),
+            Options.Create(new GeminiOptions
+            {
+                ApiKey = "test-key",
+                TimeoutSeconds = 5,
+            }),
+            NullLogger<GeminiChatbotClient>.Instance);
+
+        await client.GenerateReplyAsync([], "Mua đồ ăn như nào?");
+
+        var prompt = ExtractPrompt(handler.RequestBodies.Single());
+        Assert.Contains("Chợ đồ: mua đồ ăn", prompt, StringComparison.Ordinal);
+        Assert.Contains("Không tự viết URL", prompt, StringComparison.Ordinal);
+        Assert.Contains("nút điều hướng phù hợp", prompt, StringComparison.Ordinal);
+    }
+
     private static HttpResponseMessage CreateRateLimitedResponse()
     {
         var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests)
