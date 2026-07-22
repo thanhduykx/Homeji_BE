@@ -5,10 +5,14 @@ using Homeji.Application.DTOs.Admin;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.DTOs.Reports;
 using Homeji.Application.IRepositories.Notifications;
+using Homeji.Application.IRepositories.Marketplace;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Reports;
+using Homeji.Application.IRepositories.Reviews;
+using Homeji.Application.IRepositories.Roommates;
 using Homeji.Application.IRepositories.SavedPosts;
 using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IRepositories.WantedPosts;
 using Homeji.Application.IServices.Admin;
 using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Application.Mappers.Reports;
@@ -29,6 +33,10 @@ public sealed class AdminModerationService : IAdminModerationService
     private readonly ISavedPostRepository _savedPosts;
     private readonly IUserProfileRepository _profiles;
     private readonly IOnlineUserTracker _onlineUsers;
+    private readonly IMarketplacePostRepository _marketplacePosts;
+    private readonly IRoommateInvitationRepository _roommateInvitations;
+    private readonly IRentalReviewRepository _reviews;
+    private readonly IRentalWantedPostRepository _wantedPosts;
 
     public AdminModerationService(
         UserContext userContext,
@@ -38,6 +46,10 @@ public sealed class AdminModerationService : IAdminModerationService
         ISavedPostRepository savedPosts,
         IUserProfileRepository profiles,
         IOnlineUserTracker onlineUsers,
+        IMarketplacePostRepository marketplacePosts,
+        IRoommateInvitationRepository roommateInvitations,
+        IRentalReviewRepository reviews,
+        IRentalWantedPostRepository wantedPosts,
         TimeProvider timeProvider,
         INotificationRealtimePublisher realtimePublisher)
     {
@@ -48,6 +60,10 @@ public sealed class AdminModerationService : IAdminModerationService
         _savedPosts = savedPosts;
         _profiles = profiles;
         _onlineUsers = onlineUsers;
+        _marketplacePosts = marketplacePosts;
+        _roommateInvitations = roommateInvitations;
+        _reviews = reviews;
+        _wantedPosts = wantedPosts;
         _timeProvider = timeProvider;
         _realtimePublisher = realtimePublisher;
     }
@@ -169,13 +185,75 @@ public sealed class AdminModerationService : IAdminModerationService
         return RentalPostMapper.ToDto(post);
     }
 
-    public async Task<IReadOnlyList<ReportDto>> GetReportsAsync(
+    public async Task<IReadOnlyList<AdminReportDto>> GetReportsAsync(
         ReportStatus? status,
         CancellationToken cancellationToken = default)
     {
         await EnsureAdminAsync(cancellationToken);
         var reports = await _reports.GetByStatusAsync(status, cancellationToken);
-        return reports.Select(ReportMapper.ToDto).ToArray();
+        if (reports.Count == 0) return [];
+
+        var profileIds = reports
+            .Select(report => report.ReporterId)
+            .Concat(reports
+                .Where(report => report.TargetType == ReportTargetType.User)
+                .Select(report => report.TargetId))
+            .Distinct()
+            .ToArray();
+        var profiles = (await _profiles.GetByIdsAsync(profileIds, cancellationToken))
+            .ToDictionary(profile => profile.Id);
+
+        var marketplaceIds = GetTargetIds(reports, ReportTargetType.MarketplacePost);
+        var marketplacePosts = (await _marketplacePosts.GetByIdsAsync(marketplaceIds, cancellationToken))
+            .ToDictionary(post => post.Id);
+
+        var invitationIds = GetTargetIds(reports, ReportTargetType.RoommateInvitation);
+        var invitations = (await _roommateInvitations.GetByIdsAsync(invitationIds, cancellationToken))
+            .ToDictionary(invitation => invitation.Id);
+
+        var reviewIds = GetTargetIds(reports, ReportTargetType.RentalReview);
+        var reviews = (await _reviews.GetByIdsAsync(reviewIds, cancellationToken))
+            .ToDictionary(review => review.Id);
+
+        var wantedIds = GetTargetIds(reports, ReportTargetType.RentalWantedPost);
+        var wantedPosts = (await _wantedPosts.GetByIdsAsync(wantedIds, cancellationToken))
+            .ToDictionary(post => post.Id);
+
+        var rentalPostIds = GetTargetIds(reports, ReportTargetType.RentalPost)
+            .Concat(invitations.Values.Select(invitation => invitation.RentalPostId))
+            .Concat(reviews.Values.Select(review => review.RentalPostId))
+            .Distinct()
+            .ToArray();
+        var rentalPosts = (await _posts.GetByIdsAsync(rentalPostIds, cancellationToken))
+            .ToDictionary(post => post.Id);
+
+        return reports.Select(report =>
+        {
+            var target = ResolveReportTarget(
+                report,
+                profiles,
+                rentalPosts,
+                marketplacePosts,
+                invitations,
+                reviews,
+                wantedPosts);
+            return new AdminReportDto(
+                report.Id,
+                report.ReporterId,
+                profiles.TryGetValue(report.ReporterId, out var reporter)
+                    ? reporter.DisplayName
+                    : "Tài khoản không còn tồn tại",
+                report.TargetType,
+                report.TargetId,
+                target.DisplayName,
+                target.RelatedRentalPostId,
+                report.Reason,
+                report.Description,
+                report.Status,
+                report.ResolutionNote,
+                report.CreatedAt,
+                report.UpdatedAt);
+        }).ToArray();
     }
 
     public async Task<ReportDto> ResolveReportAsync(
@@ -219,4 +297,45 @@ public sealed class AdminModerationService : IAdminModerationService
         UserContext.EnsureAdmin(profile);
         return profile;
     }
+
+    private static Guid[] GetTargetIds(IReadOnlyList<Report> reports, ReportTargetType targetType) =>
+        reports
+            .Where(report => report.TargetType == targetType)
+            .Select(report => report.TargetId)
+            .Distinct()
+            .ToArray();
+
+    private static ReportTargetDisplay ResolveReportTarget(
+        Report report,
+        Dictionary<Guid, UserProfile> profiles,
+        Dictionary<Guid, RentalPost> rentalPosts,
+        Dictionary<Guid, MarketplacePost> marketplacePosts,
+        Dictionary<Guid, RoommateInvitation> invitations,
+        Dictionary<Guid, RentalReview> reviews,
+        Dictionary<Guid, RentalWantedPost> wantedPosts)
+    {
+        switch (report.TargetType)
+        {
+            case ReportTargetType.RentalPost when rentalPosts.TryGetValue(report.TargetId, out var rentalPost):
+                return new ReportTargetDisplay(rentalPost.Title, rentalPost.Id);
+            case ReportTargetType.User when profiles.TryGetValue(report.TargetId, out var user):
+                return new ReportTargetDisplay(user.DisplayName, null);
+            case ReportTargetType.MarketplacePost when marketplacePosts.TryGetValue(report.TargetId, out var marketplacePost):
+                return new ReportTargetDisplay(marketplacePost.Title, marketplacePost.LinkedRentalPostId);
+            case ReportTargetType.RoommateInvitation when invitations.TryGetValue(report.TargetId, out var invitation):
+                return rentalPosts.TryGetValue(invitation.RentalPostId, out var invitationPost)
+                    ? new ReportTargetDisplay($"Lời mời ở ghép cho “{invitationPost.Title}”", invitationPost.Id)
+                    : new ReportTargetDisplay("Lời mời ở ghép", invitation.RentalPostId);
+            case ReportTargetType.RentalReview when reviews.TryGetValue(report.TargetId, out var review):
+                return rentalPosts.TryGetValue(review.RentalPostId, out var reviewPost)
+                    ? new ReportTargetDisplay($"Đánh giá {review.Rating} sao cho “{reviewPost.Title}”", reviewPost.Id)
+                    : new ReportTargetDisplay($"Đánh giá {review.Rating} sao", review.RentalPostId);
+            case ReportTargetType.RentalWantedPost when wantedPosts.TryGetValue(report.TargetId, out var wantedPost):
+                return new ReportTargetDisplay(wantedPost.Title, null);
+            default:
+                return new ReportTargetDisplay("Nội dung không còn tồn tại", null);
+        }
+    }
+
+    private sealed record ReportTargetDisplay(string DisplayName, Guid? RelatedRentalPostId);
 }

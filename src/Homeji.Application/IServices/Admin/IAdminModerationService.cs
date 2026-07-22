@@ -19,7 +19,7 @@ public interface IAdminModerationService
 
     Task<RentalPostDto> RejectRentalPostAsync(Guid postId, RejectRentalPostDto request, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<ReportDto>> GetReportsAsync(ReportStatus? status, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<AdminReportDto>> GetReportsAsync(ReportStatus? status, CancellationToken cancellationToken = default);
 
     Task<ReportDto> ResolveReportAsync(Guid reportId, ResolveReportDto request, CancellationToken cancellationToken = default);
 

@@ -19,6 +19,18 @@ public sealed class RentalReviewRepository : IRentalReviewRepository
         return _dbContext.RentalReviews.AsNoTracking().SingleOrDefaultAsync(review => review.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RentalReview>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0) return [];
+
+        return await _dbContext.RentalReviews
+            .AsNoTracking()
+            .Where(review => ids.Contains(review.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<RentalReview?> GetByPostAndReviewerAsync(
         Guid rentalPostId,
         Guid reviewerId,

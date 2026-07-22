@@ -20,6 +20,18 @@ public sealed class RentalWantedPostRepository : IRentalWantedPostRepository
         return _dbContext.RentalWantedPosts.SingleOrDefaultAsync(post => post.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RentalWantedPost>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0) return [];
+
+        return await _dbContext.RentalWantedPosts
+            .AsNoTracking()
+            .Where(post => ids.Contains(post.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<RentalWantedPost>> SearchActiveAsync(
         string? area,
         decimal? maxBudget,
