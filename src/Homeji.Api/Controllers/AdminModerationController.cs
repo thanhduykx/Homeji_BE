@@ -39,6 +39,17 @@ public sealed class AdminModerationController : ControllerBase
             cancellationToken));
     }
 
+    [HttpPost("maintenance-announcements")]
+    [ProducesResponseType<MaintenanceAnnouncementResultDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<MaintenanceAnnouncementResultDto>> SendMaintenanceAnnouncement(
+        [FromBody] MaintenanceAnnouncementRequestDto? request,
+        CancellationToken cancellationToken = default)
+    {
+        return Ok(await _moderationService.SendMaintenanceAnnouncementAsync(
+            request ?? new MaintenanceAnnouncementRequestDto(null, null, null, null),
+            cancellationToken));
+    }
+
     [HttpGet("rental-posts/pending")]
     [ProducesResponseType<IReadOnlyList<RentalPostSummaryDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RentalPostSummaryDto>>> GetPendingRentalPosts(CancellationToken cancellationToken)

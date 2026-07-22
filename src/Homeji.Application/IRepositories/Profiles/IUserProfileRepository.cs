@@ -14,6 +14,8 @@ public interface IUserProfileRepository
         IReadOnlyCollection<Guid> userIds,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
         string address,
         decimal price,

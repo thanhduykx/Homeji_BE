@@ -274,6 +274,9 @@ public sealed class PostConversationServiceTests
             return Task.FromResult(result);
         }
 
+        public Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<Guid>>(_profiles.Keys.ToArray());
+
         public Task<UserProfile> UpsertAsync(
             UserProfile profile,
             CancellationToken cancellationToken = default)

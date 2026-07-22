@@ -15,6 +15,10 @@ public interface IAdminModerationService
         TerminateUserSessionRequestDto request,
         CancellationToken cancellationToken = default);
 
+    Task<MaintenanceAnnouncementResultDto> SendMaintenanceAnnouncementAsync(
+        MaintenanceAnnouncementRequestDto request,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default);
 
     Task<RentalPostDto> ApproveRentalPostAsync(

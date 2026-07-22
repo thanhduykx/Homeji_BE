@@ -71,6 +71,15 @@ public sealed class UserProfileRepository : IUserProfileRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.UserProfiles
+            .AsNoTracking()
+            .OrderBy(profile => profile.Id)
+            .Select(profile => profile.Id)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(
         string address,
         decimal price,
