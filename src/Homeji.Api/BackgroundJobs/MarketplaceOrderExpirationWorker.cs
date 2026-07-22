@@ -15,6 +15,11 @@ public sealed class MarketplaceOrderExpirationWorker : BackgroundService
             LogLevel.Error,
             new EventId(2, nameof(MarketplaceOrderExpirationWorker)),
             "Marketplace order expiration sweep failed.");
+    private static readonly Action<ILogger, int, Exception?> LogReleasedOrders =
+        LoggerMessage.Define<int>(
+            LogLevel.Information,
+            new EventId(3, nameof(MarketplaceOrderExpirationWorker)),
+            "Released funds for {OrderCount} marketplace orders after the escrow hold.");
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MarketplaceOrderExpirationWorker> _logger;
@@ -41,6 +46,12 @@ public sealed class MarketplaceOrderExpirationWorker : BackgroundService
                 if (expiredCount > 0)
                 {
                     LogExpiredOrders(_logger, expiredCount, null);
+                }
+
+                var releasedCount = await expirationService.ReleaseOverdueFundsAsync(stoppingToken);
+                if (releasedCount > 0)
+                {
+                    LogReleasedOrders(_logger, releasedCount, null);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

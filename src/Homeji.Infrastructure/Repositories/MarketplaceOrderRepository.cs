@@ -63,6 +63,20 @@ public sealed class MarketplaceOrderRepository : IMarketplaceOrderRepository
             .Take(take)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<MarketplaceOrder>> GetFundsReleaseDueAsync(
+        DateTimeOffset deliveredCutoff,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.MarketplaceOrders
+            .Where(order => order.FundsReleasedAt == null
+                && order.DeliveredAt != null
+                && order.DeliveredAt <= deliveredCutoff
+                && (order.Status == MarketplaceOrderStatus.Delivered
+                    || order.Status == MarketplaceOrderStatus.Completed))
+            .OrderBy(order => order.DeliveredAt)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
     public async Task<IReadOnlyList<MarketplaceOrder>> GetForUserAsync(
         Guid userId,
         DateTimeOffset requestedCutoff,

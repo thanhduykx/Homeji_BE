@@ -11,6 +11,7 @@ public sealed class MarketplaceFinanceOptions
     public decimal MinimumFoodPrice { get; set; } = 10_000m;
     public decimal MinimumFoodOrder { get; set; } = 25_000m;
     public int OrderRequestTimeoutMinutes { get; set; } = 30;
+    public int EscrowHoldHours { get; set; } = 24;
     public bool IsValid()
     {
         return SellerReserve >= WalletAccount.MinimumWithdrawalReserve
@@ -18,6 +19,7 @@ public sealed class MarketplaceFinanceOptions
             && MinimumFoodPrice > 0
             && MinimumFoodOrder >= MinimumFoodPrice
             && OrderRequestTimeoutMinutes is >= 5 and <= 1_440
+            && EscrowHoldHours is >= 1 and <= 168
             && decimal.Truncate(SellerReserve) == SellerReserve
             && decimal.Truncate(MinimumFoodPrice) == MinimumFoodPrice
             && decimal.Truncate(MinimumFoodOrder) == MinimumFoodOrder;

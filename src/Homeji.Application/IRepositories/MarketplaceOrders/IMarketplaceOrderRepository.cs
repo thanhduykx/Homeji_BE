@@ -22,6 +22,11 @@ public interface IMarketplaceOrderRepository
         DateTimeOffset cutoff,
         int take,
         CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<MarketplaceOrder>> GetFundsReleaseDueAsync(
+        DateTimeOffset deliveredCutoff,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<MarketplaceOrder>>([]);
     Task<IReadOnlyList<MarketplaceOrder>> GetForUserAsync(
         Guid userId,
         DateTimeOffset requestedCutoff,

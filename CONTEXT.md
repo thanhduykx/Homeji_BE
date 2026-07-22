@@ -44,6 +44,10 @@ _Avoid_: Wallet debit, seller withdrawal
 The amount credited to the seller wallet after all applicable order fees have been withheld from the Marketplace Gross Amount.
 _Avoid_: Gross revenue, order total
 
+**Marketplace Escrow Hold**:
+The 24-hour period that starts when the seller marks the whole Marketplace Order as delivered. Buyer confirmation may close receipt early, but Seller Net Amount is released only after the hold expires; without buyer action, the order auto-completes at expiry.
+_Avoid_: Immediate seller credit, release on browser confirmation alone
+
 **Marketplace Order Refund**:
 A single wallet credit equal to the Marketplace Gross Amount of the whole checkout, even when that checkout contains multiple Marketplace Order Lines.
 _Avoid_: Per-item refund, line refund
