@@ -8,8 +8,6 @@ namespace Homeji.Application.IServices.Admin;
 public interface IAdminModerationService
 {
     Task<IReadOnlyList<AdminActiveUserDto>> GetActiveUsersAsync(
-        TimeSpan onlineWindow,
-        TimeSpan recentWindow,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RentalPostSummaryDto>> GetPendingRentalPostsAsync(CancellationToken cancellationToken = default);

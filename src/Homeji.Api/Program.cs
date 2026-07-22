@@ -8,6 +8,7 @@ using Homeji.Api.BackgroundJobs;
 using Homeji.Application;
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Abstractions.Notifications;
+using Homeji.Application.Abstractions.Presence;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Health;
@@ -52,6 +53,7 @@ builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSupabaseAuthentication(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
+builder.Services.AddSingleton<IOnlineUserTracker, OnlineUserTracker>();
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
 

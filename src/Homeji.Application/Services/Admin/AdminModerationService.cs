@@ -1,10 +1,10 @@
 using Homeji.Application.Abstractions.Notifications;
+using Homeji.Application.Abstractions.Presence;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Admin;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.DTOs.Reports;
 using Homeji.Application.IRepositories.Notifications;
-using Homeji.Application.IRepositories.Activities;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Reports;
 using Homeji.Application.IRepositories.SavedPosts;
@@ -28,7 +28,7 @@ public sealed class AdminModerationService : IAdminModerationService
     private readonly INotificationRealtimePublisher _realtimePublisher;
     private readonly ISavedPostRepository _savedPosts;
     private readonly IUserProfileRepository _profiles;
-    private readonly IUserActivityRepository _activities;
+    private readonly IOnlineUserTracker _onlineUsers;
 
     public AdminModerationService(
         UserContext userContext,
@@ -37,7 +37,7 @@ public sealed class AdminModerationService : IAdminModerationService
         INotificationRepository notifications,
         ISavedPostRepository savedPosts,
         IUserProfileRepository profiles,
-        IUserActivityRepository activities,
+        IOnlineUserTracker onlineUsers,
         TimeProvider timeProvider,
         INotificationRealtimePublisher realtimePublisher)
     {
@@ -47,35 +47,30 @@ public sealed class AdminModerationService : IAdminModerationService
         _notifications = notifications;
         _savedPosts = savedPosts;
         _profiles = profiles;
-        _activities = activities;
+        _onlineUsers = onlineUsers;
         _timeProvider = timeProvider;
         _realtimePublisher = realtimePublisher;
     }
 
     public async Task<IReadOnlyList<AdminActiveUserDto>> GetActiveUsersAsync(
-        TimeSpan onlineWindow,
-        TimeSpan recentWindow,
         CancellationToken cancellationToken = default)
     {
         await EnsureAdminAsync(cancellationToken);
-        var now = _timeProvider.GetUtcNow();
-        var activityByUser = await _activities.GetLatestByUserSinceAsync(
-            now.Subtract(recentWindow),
-            cancellationToken);
-        var profiles = await _profiles.GetByIdsAsync(activityByUser.Keys.ToArray(), cancellationToken);
+        var onlineByUser = _onlineUsers.GetOnlineUsers();
+        var profiles = await _profiles.GetByIdsAsync(onlineByUser.Keys.ToArray(), cancellationToken);
 
         return profiles
-            .Where(profile => activityByUser.ContainsKey(profile.Id))
+            .Where(profile => onlineByUser.ContainsKey(profile.Id))
             .Select(profile =>
             {
-                var lastSeenAt = activityByUser[profile.Id];
+                var lastSeenAt = onlineByUser[profile.Id];
                 return new AdminActiveUserDto(
                     profile.Id,
                     profile.DisplayName,
                     profile.Role,
                     profile.AvatarPath,
                     lastSeenAt,
-                    now - lastSeenAt <= onlineWindow);
+                    true);
             })
             .OrderByDescending(user => user.IsOnline)
             .ThenByDescending(user => user.LastSeenAt)
