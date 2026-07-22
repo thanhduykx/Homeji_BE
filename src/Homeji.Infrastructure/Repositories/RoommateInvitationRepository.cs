@@ -30,6 +30,18 @@ public sealed class RoommateInvitationRepository : IRoommateInvitationRepository
         return _dbContext.RoommateInvitations.SingleOrDefaultAsync(invitation => invitation.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<RoommateInvitation>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default)
+    {
+        if (ids.Count == 0) return [];
+
+        return await _dbContext.RoommateInvitations
+            .AsNoTracking()
+            .Where(invitation => ids.Contains(invitation.Id))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<RoommateInvitation>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.RoommateInvitations

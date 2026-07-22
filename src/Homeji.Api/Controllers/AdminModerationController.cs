@@ -57,8 +57,8 @@ public sealed class AdminModerationController : ControllerBase
     }
 
     [HttpGet("reports")]
-    [ProducesResponseType<IReadOnlyList<ReportDto>>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<IReadOnlyList<ReportDto>>> GetReports(
+    [ProducesResponseType<IReadOnlyList<AdminReportDto>>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<IReadOnlyList<AdminReportDto>>> GetReports(
         [FromQuery] ReportStatus? status,
         CancellationToken cancellationToken)
     {

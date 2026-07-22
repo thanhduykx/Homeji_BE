@@ -13,6 +13,11 @@ public interface IRoommateInvitationRepository
 
     Task<RoommateInvitation?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<RoommateInvitation>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> ids,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RoommateInvitation>>([]);
+
     Task<IReadOnlyList<RoommateInvitation>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
     Task AddAsync(RoommateInvitation invitation, CancellationToken cancellationToken = default);
