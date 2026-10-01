@@ -23,12 +23,6 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             new EventId(2002, nameof(LogGeminiChatFailed)),
             "Gemini chatbot request failed with status {StatusCode} on attempt {Attempt}/{MaxAttempts}.");
 
-    private static readonly Action<ILogger, string, Exception?> LogGeminiResponseBody =
-        LoggerMessage.Define<string>(
-            LogLevel.Warning,
-            new EventId(2003, nameof(LogGeminiResponseBody)),
-            "Gemini error response body: {ResponseBody}");
-
     private readonly HttpClient _httpClient;
     private readonly GeminiOptions _options;
     private readonly ILogger<GeminiChatbotClient> _logger;
@@ -89,7 +83,6 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             }
 
             LogGeminiChatFailed(_logger, (int)response.StatusCode, attempt, maxAttempts, null);
-            LogGeminiResponseBody(_logger, responseText.Length > 500 ? responseText[..500] : responseText, null);
             var retryAfter = GetRetryDelay(response, responseText, attempt);
             if (IsRetryable(response.StatusCode) && attempt < maxAttempts)
             {
@@ -111,7 +104,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
                     retryAfter);
             }
 
-            throw Validation("chatbot", $"Chatbot tạm thời không khả dụng (Gemini {(int)response.StatusCode}).");
+            throw Validation("chatbot", "Chatbot tạm thời không khả dụng.");
         }
 
         throw new InvalidOperationException("Gemini retry loop completed unexpectedly.");
