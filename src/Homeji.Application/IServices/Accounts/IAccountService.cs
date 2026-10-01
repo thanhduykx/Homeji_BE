@@ -15,4 +15,6 @@ public interface IAccountService
     Task<AccountMessageDto> ResetPasswordAsync(ResetPasswordDto request, CancellationToken cancellationToken = default);
 
     AuthUrlDto CreateGoogleLoginUrl(string? redirectTo);
+
+    Task<AuthSessionDto> LoginWithGoogleAsync(GoogleLoginDto request, CancellationToken cancellationToken = default);
 }

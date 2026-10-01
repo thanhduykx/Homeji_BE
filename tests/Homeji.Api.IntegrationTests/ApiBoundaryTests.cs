@@ -215,5 +215,12 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
         {
             throw new NotSupportedException();
         }
+
+        public Task<AuthSessionDto> LoginWithGoogleAsync(
+            GoogleLoginDto request,
+            CancellationToken cancellationToken = default)
+        {
+            throw new NotSupportedException();
+        }
     }
 }

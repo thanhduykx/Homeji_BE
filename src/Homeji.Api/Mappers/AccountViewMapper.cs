@@ -28,4 +28,9 @@ public static class AccountViewMapper
     {
         return new ResetPasswordDto(viewModel.AccessToken, viewModel.NewPassword);
     }
+
+    public static GoogleLoginDto ToDto(GoogleLoginViewModel viewModel)
+    {
+        return new GoogleLoginDto(viewModel.IdToken);
+    }
 }

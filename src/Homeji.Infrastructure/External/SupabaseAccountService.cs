@@ -208,6 +208,30 @@ public sealed class SupabaseAccountService : IAccountService
         return new AuthUrlDto($"{_options.ProjectUrl.TrimEnd('/')}/auth/v1/authorize?{query}");
     }
 
+    public async Task<AuthSessionDto> LoginWithGoogleAsync(
+        GoogleLoginDto request,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.IdToken))
+        {
+            throw Validation("idToken", "Thiếu Google ID token.");
+        }
+
+        EnsureConfigured();
+
+        using var httpRequest = CreateJsonRequest(
+            HttpMethod.Post,
+            new Uri("auth/v1/token?grant_type=id_token", UriKind.Relative),
+            new
+            {
+                provider = "google",
+                id_token = request.IdToken,
+            });
+
+        var json = await SendAsync(httpRequest, cancellationToken);
+        return ParseAuthSession(json, emailConfirmationMessage: "Đăng nhập Google thành công.");
+    }
+
     private async Task<(string Email, bool Exists)> CheckEmailAvailabilityAsync(
         string? email,
         CancellationToken cancellationToken)

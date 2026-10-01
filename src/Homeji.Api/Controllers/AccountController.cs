@@ -99,4 +99,16 @@ public sealed class AccountController : ControllerBase
     {
         return Redirect(_accountService.CreateGoogleLoginUrl(redirectTo).Url);
     }
+
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [HttpPost("google/id-token")]
+    [ProducesResponseType<AuthSessionDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+    public async Task<ActionResult<AuthSessionDto>> LoginWithGoogleIdToken(
+        [FromBody] GoogleLoginViewModel request,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _accountService.LoginWithGoogleAsync(AccountViewMapper.ToDto(request), cancellationToken));
+    }
 }

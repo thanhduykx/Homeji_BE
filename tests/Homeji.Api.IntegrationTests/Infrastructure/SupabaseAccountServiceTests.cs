@@ -111,7 +111,7 @@ public sealed class SupabaseAccountServiceTests
     }
 
     [Theory]
-    [InlineData("user@example.com", "New User", "email")]
+    [InlineData("userexample.com", "New User", "email")]
     [InlineData("user@gmail.com", "Duy", "displayName")]
     [InlineData("user@gmail.com", "Duy 123", "displayName")]
     public async Task RegisterAsync_WhenIdentityFieldsAreInvalid_DoesNotCallSupabase(
@@ -230,6 +230,57 @@ public sealed class SupabaseAccountServiceTests
             "redirect_to=https%3A%2F%2Fhomeji.example%2Fauth%2Fcallback",
             handler.LastRequestUri!.Query);
         Assert.Equal("Bearer test-key", handler.LastAuthorization);
+    }
+
+    [Fact]
+    public async Task LoginWithGoogleAsync_WhenIdTokenIsMissing_ThrowsValidationException()
+    {
+        var repository = new StubAccountEmailRepository(exists: false);
+        var handler = new CountingHttpMessageHandler();
+        var service = CreateService(repository, handler);
+
+        var exception = await Assert.ThrowsAsync<RequestValidationException>(() =>
+            service.LoginWithGoogleAsync(new GoogleLoginDto(string.Empty)));
+
+        Assert.Contains("idToken", exception.Errors.Keys);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task LoginWithGoogleAsync_WhenIdTokenIsValid_CallsSupabaseAndReturnsSession()
+    {
+        var repository = new StubAccountEmailRepository(exists: false);
+        var handler = new CountingHttpMessageHandler(
+            """
+            {
+              "access_token": "google-access-token",
+              "token_type": "bearer",
+              "expires_in": 3600,
+              "refresh_token": "google-refresh-token",
+              "user": {
+                "id": "c664dbea-992b-4ba7-8702-bf5740e82034",
+                "email": "user@gmail.com"
+              }
+            }
+            """);
+        var service = CreateService(repository, handler);
+
+        var result = await service.LoginWithGoogleAsync(new GoogleLoginDto("valid-id-token"));
+
+        Assert.Equal("google-access-token", result.AccessToken);
+        Assert.Equal("bearer", result.TokenType);
+        Assert.Equal(3600, result.ExpiresIn);
+        Assert.Equal("google-refresh-token", result.RefreshToken);
+        Assert.Equal(Guid.Parse("c664dbea-992b-4ba7-8702-bf5740e82034"), result.UserId);
+        Assert.Equal("user@gmail.com", result.Email);
+        Assert.False(result.EmailConfirmationRequired);
+        Assert.Equal("Đăng nhập Google thành công.", result.Message);
+
+        Assert.NotNull(handler.LastRequestUri);
+        Assert.Equal("/auth/v1/token", handler.LastRequestUri!.AbsolutePath);
+        Assert.Equal("?grant_type=id_token", handler.LastRequestUri!.Query);
+        Assert.Contains("\"provider\":\"google\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"id_token\":\"valid-id-token\"", handler.LastRequestBody, StringComparison.Ordinal);
     }
 
     private static SupabaseAccountService CreateService(
