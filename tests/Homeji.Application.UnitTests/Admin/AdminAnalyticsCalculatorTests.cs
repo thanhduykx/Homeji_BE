@@ -53,8 +53,8 @@ public sealed class AdminAnalyticsCalculatorTests
 
         var result = AdminAnalyticsCalculator.Calculate(source, localFrom, localNow, 30);
 
-        var hot = Assert.Single(result.Areas, area => area.AreaName == "phường Long Thạnh Mỹ");
-        var cold = Assert.Single(result.Areas, area => area.AreaName == "phường Linh Trung");
+        var hot = Assert.Single(result.Areas, area => area.AreaName == "phường Long Thạnh Mỹ, TP. Thủ Đức");
+        var cold = Assert.Single(result.Areas, area => area.AreaName == "phường Linh Trung, TP. Thủ Đức");
         Assert.Equal("test_increase", hot.PriceSignal);
         Assert.Equal("review_decrease", cold.PriceSignal);
         Assert.Equal("medium", hot.Confidence);
@@ -119,6 +119,23 @@ public sealed class AdminAnalyticsCalculatorTests
         var area = Assert.Single(result.Areas);
         Assert.Equal(0, area.ViewingRequests);
         Assert.Equal(100m, area.DemandIndex);
+    }
+
+    [Fact]
+    public void Calculate_DoesNotMergeSameWardNameInDifferentCities()
+    {
+        var now = new DateTimeOffset(2026, 10, 3, 9, 0, 0, VietnamOffset);
+        var first = Rental("12 Đường A, phường Bình An, TP. Thủ Đức", 2_000_000, 20, 0, 0, now);
+        var second = Rental("18 Đường B, phường Bình An, TP. Dĩ An", 4_000_000, 20, 0, 0, now);
+        var source = new AdminAnalyticsSource(0, [first, second], [], [], [], []);
+
+        var result = AdminAnalyticsCalculator.Calculate(source, now.AddDays(-6), now, 7);
+
+        Assert.Equal(2, result.Areas.Count);
+        Assert.Equal(2_000_000m, Assert.Single(result.Areas,
+            area => area.AreaName == "phường Bình An, TP. Thủ Đức").MedianMonthlyPrice);
+        Assert.Equal(4_000_000m, Assert.Single(result.Areas,
+            area => area.AreaName == "phường Bình An, TP. Dĩ An").MedianMonthlyPrice);
     }
 
     private static AdminAnalyticsRentalRow Rental(

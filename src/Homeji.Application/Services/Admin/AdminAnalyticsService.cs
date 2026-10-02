@@ -298,7 +298,13 @@ public static class AdminAnalyticsCalculator
             part.StartsWith("phường ", StringComparison.OrdinalIgnoreCase)
             || part.StartsWith("xã ", StringComparison.OrdinalIgnoreCase)
             || part.StartsWith("thị trấn ", StringComparison.OrdinalIgnoreCase));
-        if (!string.IsNullOrWhiteSpace(preferred)) return preferred;
+        if (!string.IsNullOrWhiteSpace(preferred))
+        {
+            // Ward names are not globally unique. Retain the administrative suffix
+            // rather than combining unrelated cities into one price/demand sample.
+            var wardIndex = Array.IndexOf(parts, preferred);
+            return string.Join(", ", parts.Skip(wardIndex));
+        }
 
         var district = parts.FirstOrDefault(part =>
             part.StartsWith("quận ", StringComparison.OrdinalIgnoreCase)
