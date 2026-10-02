@@ -15,6 +15,7 @@ public static class RateLimitingPolicyNames
 
     /// <summary>Login / register / email checks — stricter.</summary>
     public const string PublicAuth = "public-auth";
+    public const string WebsiteTraffic = "website-traffic";
 }
 
 public sealed class RateLimitingOptions
@@ -76,6 +77,8 @@ public static class RateLimitingExtensions
             options.AddPolicy(
                 RateLimitingPolicyNames.PublicAuth,
                 httpContext => CreateIpPartition(httpContext, settings.PublicAuth));
+            options.AddPolicy(RateLimitingPolicyNames.WebsiteTraffic,
+                httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 30, WindowSeconds = 60 }));
         });
 
         return services;

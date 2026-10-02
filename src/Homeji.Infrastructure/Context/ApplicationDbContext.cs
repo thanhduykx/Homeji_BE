@@ -31,6 +31,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ViewingAppointment> ViewingAppointments => Set<ViewingAppointment>();
     public DbSet<LandlordVerificationRequest> LandlordVerificationRequests => Set<LandlordVerificationRequest>();
     public DbSet<UserActivity> UserActivities => Set<UserActivity>();
+    public DbSet<WebsitePageView> WebsitePageViews => Set<WebsitePageView>();
     public DbSet<PostConversation> PostConversations => Set<PostConversation>();
     public DbSet<PostMessage> PostMessages => Set<PostMessage>();
     public DbSet<PostMessageAttachment> PostMessageAttachments => Set<PostMessageAttachment>();

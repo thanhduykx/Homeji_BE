@@ -97,6 +97,7 @@ public static class DependencyInjection
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IWalletWithdrawalRepository, WalletWithdrawalRepository>();
         services.AddScoped<IAdminAnalyticsRepository, AdminAnalyticsRepository>();
+        services.AddScoped<IWebsiteTrafficRepository, WebsiteTrafficRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));

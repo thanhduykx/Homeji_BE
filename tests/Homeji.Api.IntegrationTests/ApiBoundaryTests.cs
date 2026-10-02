@@ -69,6 +69,7 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [InlineData("/api/wallet/withdrawals")]
     [InlineData("/api/admin/wallet-withdrawals?status=1")]
     [InlineData("/api/admin/analytics/product?days=30")]
+    [InlineData("/api/admin/analytics/traffic?days=30")]
     [InlineData("/api/marketplace-seller-plans")]
     [InlineData("/api/marketplace-seller-plans/mine")]
     public async Task NewPrivateEndpoints_WithoutAccessToken_ReturnUnauthorized(string path)
@@ -76,6 +77,14 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
         var response = await _client.GetAsync(new Uri(path, UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task WebsiteTraffic_AnonymousInvalidPayload_ReturnsBadRequestWithoutDatabaseWrite()
+    {
+        var response = await _client.PostAsJsonAsync(new Uri("/api/analytics/page-views", UriKind.Relative),
+            new { eventId = Guid.NewGuid(), sessionId = Guid.NewGuid(), page = "/profile?email=private@example.com" });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
