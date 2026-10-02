@@ -26,18 +26,24 @@ public sealed class WebsiteTrafficRepository(ApplicationDbContext db) : IWebsite
         var active = await db.WebsitePageViews.Where(view => view.OccurredAt >= until.AddMinutes(-5) && view.OccurredAt <= until)
             .Select(view => view.SessionId).Distinct().CountAsync(cancellationToken);
         var started = await db.WebsitePageViews.Select(view => (DateTimeOffset?)view.OccurredAt).MinAsync(cancellationToken);
-        var daily = await query.GroupBy(view => view.OccurredAt.UtcDateTime.AddHours(7).Date)
-            .Select(group => new { Date = group.Key, Views = group.Count(), Sessions = group.Select(view => view.SessionId).Distinct().Count() })
-            .ToListAsync(cancellationToken);
-        var top = await query.GroupBy(view => view.Page)
-            .Select(group => new WebsiteTrafficPageDto(group.Key, group.Count(), group.Select(view => view.SessionId).Distinct().Count()))
-            .OrderByDescending(page => page.PageViews).Take(10).ToListAsync(cancellationToken);
+        // Explicit timezone conversion avoids provider DateTimeOffset/DateTime group-key coercion.
+        var daily = await db.Database.SqlQuery<WebsiteTrafficDayDto>($"""
+            SELECT ("OccurredAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')::date AS "Date",
+                   count(*)::int AS "PageViews", count(DISTINCT "SessionId")::int AS "Sessions"
+            FROM homeji.website_page_views
+            WHERE "OccurredAt" >= {from} AND "OccurredAt" <= {until}
+            GROUP BY ("OccurredAt" AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+            """).ToListAsync(cancellationToken);
+        var topRows = await query.GroupBy(view => view.Page)
+            .Select(group => new { Page = group.Key, PageViews = group.Count(), Sessions = group.Select(view => view.SessionId).Distinct().Count() })
+            .OrderByDescending(page => page.PageViews).ThenBy(page => page.Page).Take(10).ToListAsync(cancellationToken);
+        var top = topRows.Select(page => new WebsiteTrafficPageDto(page.Page, page.PageViews, page.Sessions)).ToArray();
         var localFrom = from.ToOffset(TimeSpan.FromHours(7));
         var trend = Enumerable.Range(0, days).Select(offset =>
         {
             var date = DateOnly.FromDateTime(localFrom.AddDays(offset).DateTime);
-            var point = daily.FirstOrDefault(row => DateOnly.FromDateTime(row.Date) == date);
-            return new WebsiteTrafficDayDto(date, point?.Views ?? 0, point?.Sessions ?? 0);
+            var point = daily.FirstOrDefault(row => row.Date == date);
+            return new WebsiteTrafficDayDto(date, point?.PageViews ?? 0, point?.Sessions ?? 0);
         }).ToArray();
         return new WebsiteTrafficReportDto(until, days, started, pageViews, sessions, active, trend, top);
     }
