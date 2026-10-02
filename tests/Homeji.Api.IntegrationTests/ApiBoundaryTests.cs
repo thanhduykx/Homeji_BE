@@ -68,6 +68,7 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [InlineData("/api/wallet/transactions")]
     [InlineData("/api/wallet/withdrawals")]
     [InlineData("/api/admin/wallet-withdrawals?status=1")]
+    [InlineData("/api/admin/analytics/product?days=30")]
     [InlineData("/api/marketplace-seller-plans")]
     [InlineData("/api/marketplace-seller-plans/mine")]
     public async Task NewPrivateEndpoints_WithoutAccessToken_ReturnUnauthorized(string path)

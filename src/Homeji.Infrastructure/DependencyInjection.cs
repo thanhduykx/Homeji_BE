@@ -19,6 +19,7 @@ using Homeji.Application.IRepositories.Activities;
 using Homeji.Application.IRepositories.Conversations;
 using Homeji.Application.IRepositories.WantedPosts;
 using Homeji.Application.IRepositories.MarketplaceOrders;
+using Homeji.Application.IRepositories.Admin;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Chatbot;
@@ -95,6 +96,7 @@ public static class DependencyInjection
         services.AddScoped<IMarketplaceOrderRepository, MarketplaceOrderRepository>();
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IWalletWithdrawalRepository, WalletWithdrawalRepository>();
+        services.AddScoped<IAdminAnalyticsRepository, AdminAnalyticsRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
