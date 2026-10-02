@@ -43,7 +43,7 @@ public sealed class ChatbotService : IChatbotService
     {
         return Task.FromResult(new ChatbotPopupConfigDto(
             _options.Enabled,
-            NormalizeText(_options.Title, "Homeji Assistant"),
+            NormalizeText(_options.Title, "Homeji"),
             NormalizeText(_options.Greeting, "Xin chào, mình có thể hỗ trợ gì cho bạn?"),
             _options.SuggestedPrompts
                 .Where(prompt => !string.IsNullOrWhiteSpace(prompt))
@@ -107,11 +107,11 @@ public sealed class ChatbotService : IChatbotService
             .Select(ChatbotMapper.ToMessageDto)
             .ToArray();
 
-        var assistantReply = await _aiClient.GenerateReplyAsync(history, message, cancellationToken);
+        var actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
+        var assistantReply = await GenerateReplyAsync(history, message, actions, cancellationToken);
         var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
 
         var searchUpdate = await BuildSearchUpdateAsync(conversation, cancellationToken);
-        var actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
 
         await _conversations.SaveChangesAsync(cancellationToken);
 
@@ -121,6 +121,34 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
             actions);
+    }
+
+    private async Task<string> GenerateReplyAsync(
+        IReadOnlyCollection<ChatbotMessageDto> history,
+        string message,
+        IReadOnlyCollection<ChatbotNavigationActionDto> actions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _aiClient.GenerateReplyAsync(history, message, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ExternalServiceUnavailableException)
+        {
+            return ChatbotFallbackReply.Create(actions);
+        }
+        catch (HttpRequestException)
+        {
+            return ChatbotFallbackReply.Create(actions);
+        }
+        catch (TaskCanceledException)
+        {
+            return ChatbotFallbackReply.Create(actions);
+        }
     }
 
     private async Task<AiHighlightResponseDto?> BuildSearchUpdateAsync(

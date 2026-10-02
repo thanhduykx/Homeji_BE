@@ -25,11 +25,20 @@ public static class ChatbotNavigationCatalog
         - Trả lời bằng các bước đúng với danh sách trên; không bịa màn hình hoặc chức năng chưa có.
         - Nếu có nút điều hướng phù hợp, kết thúc bằng một câu ngắn như “Bạn có thể bấm nút bên dưới để mở ngay”.
         - Không tự viết URL, đường dẫn Markdown hay tên route trong câu trả lời; hệ thống sẽ gắn button an toàn riêng.
+        - Chatbot không được tự đặt đơn, thêm món, thanh toán, nạp/rút tiền hoặc thực hiện hành động làm phát sinh chi phí.
+        - Với đồ ăn, chỉ hướng người dùng tới thực đơn hoặc giỏ hàng. Homeji phải cho người dùng xem lại món, số lượng và xác nhận tổng tiền trước khi API tạo đơn được gọi.
         """;
+
+    private static readonly ChatbotNavigationActionDto MarketplaceCartAction = new(
+        "marketplace-cart",
+        "Xem giỏ và xác nhận",
+        "Kiểm tra món, số lượng và tổng tiền; Homeji chỉ tạo đơn sau khi bạn xác nhận.",
+        ChatbotNavigationActionKind.OpenSection,
+        "marketplace:cart");
 
     private static readonly CatalogEntry[] CommonEntries =
     [
-        Entry("marketplace-food", "Mở Chợ đồ ăn", "Chọn món, thêm vào giỏ và đặt đơn.", ChatbotNavigationActionKind.OpenSection, "marketplace",
+        Entry("marketplace-food", "Mở Chợ đồ ăn", "Chọn món và thêm vào giỏ; chatbot không tự tạo đơn.", ChatbotNavigationActionKind.OpenSection, "marketplace:food",
             "mua đồ ăn", "đặt đồ ăn", "đặt món", "mua thức ăn", "đồ ăn"),
         Entry("marketplace-sell", "Mở Chợ đồ để đăng bán", "Đăng món ăn hoặc đồ dùng cho sinh viên.", ChatbotNavigationActionKind.OpenSection, "marketplace",
             "đăng bán", "bán đồ", "bán thức ăn", "bán món"),
@@ -62,10 +71,29 @@ public static class ChatbotNavigationCatalog
     public static IReadOnlyCollection<ChatbotNavigationActionDto> FindActions(string message, UserRole role)
     {
         var normalized = Normalize(message);
+        var hasCartIntent = ContainsAny(
+            normalized,
+            "gio hang",
+            "xem gio",
+            "kiem tra gio",
+            "xac nhan don",
+            "xac nhan dat mon",
+            "thanh toan gio");
         var matches = CommonEntries
+            .Where(entry => !hasCartIntent || entry.Action.Id != "marketplace-food")
             .Where(entry => entry.Terms.Any(normalized.Contains))
             .Select(entry => entry.Action)
             .ToList();
+
+        if (hasCartIntent)
+        {
+            matches.Insert(0, MarketplaceCartAction);
+        }
+
+        if (matches.Any(action => action.Id is "marketplace-food" or "marketplace-cart"))
+        {
+            matches.RemoveAll(action => action.Id == "marketplace");
+        }
 
         AddRoleSpecificActions(matches, normalized, role);
 

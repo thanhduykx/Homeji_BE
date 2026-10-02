@@ -6,9 +6,9 @@ public sealed class ChatbotOptions
 
     public bool Enabled { get; set; } = true;
 
-    public string Title { get; set; } = "Homeji Assistant";
+    public string Title { get; set; } = "Homeji";
 
-    public string Greeting { get; set; } = "Xin chào, mình là Homeji Assistant. Bạn có thể hỏi mình cách dùng bất kỳ tính năng nào trong Homeji.";
+    public string Greeting { get; set; } = "Xin chào, mình là trợ lý Homeji. Mình có thể tìm phòng, mở đúng tính năng và hỗ trợ bạn chọn đồ ăn an toàn.";
 
     public int MaxHistoryMessages { get; set; } = 12;
 

@@ -67,6 +67,53 @@ public sealed class GeminiChatbotClientTests
     }
 
     [Fact]
+    public async Task GenerateReplyAsync_WhenGeminiRejectsRequest_ThrowsServiceUnavailable()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(
+                    """{"error":{"code":400,"status":"INVALID_ARGUMENT"}}"""),
+            });
+        var client = new GeminiChatbotClient(
+            new HttpClient(handler),
+            Options.Create(new GeminiOptions
+            {
+                ApiKey = "test-key",
+                TimeoutSeconds = 5,
+            }),
+            NullLogger<GeminiChatbotClient>.Instance);
+
+        var exception = await Assert.ThrowsAsync<ExternalServiceUnavailableException>(
+            () => client.GenerateReplyAsync([], "Xin chào"));
+
+        Assert.Equal("Gemini", exception.ServiceName);
+        Assert.Equal("Chatbot tạm thời không khả dụng. Vui lòng thử lại sau.", exception.Message);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task GenerateReplyAsync_WhenGeminiReturnsMalformedSuccess_ThrowsServiceUnavailable()
+    {
+        var handler = new SequenceHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}"),
+            });
+        var client = new GeminiChatbotClient(
+            new HttpClient(handler),
+            Options.Create(new GeminiOptions
+            {
+                ApiKey = "test-key",
+                TimeoutSeconds = 5,
+            }),
+            NullLogger<GeminiChatbotClient>.Instance);
+
+        await Assert.ThrowsAsync<ExternalServiceUnavailableException>(
+            () => client.GenerateReplyAsync([], "Xin chào"));
+    }
+
+    [Fact]
     public async Task GenerateReplyAsync_IncludesVerifiedThuDucLandmarkKnowledge()
     {
         var handler = new SequenceHttpMessageHandler(
@@ -117,6 +164,8 @@ public sealed class GeminiChatbotClientTests
         Assert.Contains("Chợ đồ: mua đồ ăn", prompt, StringComparison.Ordinal);
         Assert.Contains("Không tự viết URL", prompt, StringComparison.Ordinal);
         Assert.Contains("nút điều hướng phù hợp", prompt, StringComparison.Ordinal);
+        Assert.Contains("không được tự đặt đơn", prompt, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("xác nhận tổng tiền", prompt, StringComparison.OrdinalIgnoreCase);
     }
 
     private static HttpResponseMessage CreateRateLimitedResponse()

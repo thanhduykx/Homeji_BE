@@ -16,7 +16,22 @@ public sealed class ChatbotNavigationCatalogTests
         var action = Assert.Single(actions);
         Assert.Equal("marketplace-food", action.Id);
         Assert.Equal(ChatbotNavigationActionKind.OpenSection, action.Kind);
-        Assert.Equal("marketplace", action.Target);
+        Assert.Equal("marketplace:food", action.Target);
+        Assert.Contains("không tự tạo đơn", action.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FindActions_WhenUserAsksForCart_ReturnsCartReviewButton()
+    {
+        var actions = ChatbotNavigationCatalog.FindActions(
+            "Mở giỏ hàng để mình kiểm tra và xác nhận đặt món",
+            UserRole.Renter);
+
+        var action = Assert.Single(actions);
+        Assert.Equal("marketplace-cart", action.Id);
+        Assert.Equal(ChatbotNavigationActionKind.OpenSection, action.Kind);
+        Assert.Equal("marketplace:cart", action.Target);
+        Assert.Contains("xác nhận", action.Label, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

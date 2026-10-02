@@ -79,7 +79,15 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
             if (response.IsSuccessStatusCode)
             {
-                return NormalizeReply(ExtractModelText(responseText));
+                try
+                {
+                    return NormalizeReply(ExtractModelText(responseText));
+                }
+                catch (Exception exception) when (
+                    exception is JsonException or KeyNotFoundException or InvalidOperationException)
+                {
+                    throw Unavailable();
+                }
             }
 
             LogGeminiChatFailed(_logger, (int)response.StatusCode, attempt, maxAttempts, null);
@@ -104,7 +112,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
                     retryAfter);
             }
 
-            throw Validation("chatbot", "Chatbot tạm thời không khả dụng.");
+            throw Unavailable();
         }
 
         throw new InvalidOperationException("Gemini retry loop completed unexpectedly.");
@@ -177,7 +185,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         string latestUserMessage)
     {
         var builder = new StringBuilder();
-        builder.AppendLine("Bạn là Homeji Assistant trong popup chat của web/app Homeji.");
+        builder.AppendLine("Bạn là trợ lý Homeji trong popup chat của web/app Homeji.");
         builder.AppendLine("Nhiệm vụ: giải đáp cách dùng tất cả tính năng thật của Homeji và hướng người dùng tới đúng chức năng trong ứng dụng.");
         builder.AppendLine("Quy tắc trả lời:");
         builder.AppendLine("- Trả lời bằng tiếng Việt, ngắn gọn, thực tế, thân thiện.");
@@ -216,7 +224,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         var candidates = document.RootElement.GetProperty("candidates");
         if (candidates.ValueKind != JsonValueKind.Array || candidates.GetArrayLength() == 0)
         {
-            throw Validation("chatbot", "Chatbot không trả về kết quả.");
+            throw Unavailable();
         }
 
         var parts = candidates[0]
@@ -225,13 +233,13 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
 
         if (parts.ValueKind != JsonValueKind.Array || parts.GetArrayLength() == 0)
         {
-            throw Validation("chatbot", "Chatbot không trả về nội dung.");
+            throw Unavailable();
         }
 
         var text = parts[0].GetProperty("text").GetString();
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw Validation("chatbot", "Chatbot trả về nội dung trống.");
+            throw Unavailable();
         }
 
         return text;
@@ -251,15 +259,14 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             || string.IsNullOrWhiteSpace(_options.ApiKey)
             || _options.ApiKey.Equals("REPLACE_WITH_GEMINI_API_KEY", StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Chưa cấu hình Gemini AI.");
+            throw Unavailable();
         }
     }
 
-    private static RequestValidationException Validation(string field, string message)
+    private static ExternalServiceUnavailableException Unavailable()
     {
-        return new RequestValidationException(new Dictionary<string, string[]>
-        {
-            [field] = [message],
-        });
+        return new ExternalServiceUnavailableException(
+            "Gemini",
+            "Chatbot tạm thời không khả dụng. Vui lòng thử lại sau.");
     }
 }
