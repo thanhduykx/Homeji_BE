@@ -49,64 +49,86 @@ public sealed class MarketplacePostRepository : IMarketplacePostRepository
             .ToListAsync(cancellationToken);
 
     public async Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
-        string? keyword,
-        string? category,
-        MarketplaceListingType? listingType,
-        decimal? minPrice,
-        decimal? maxPrice,
-        decimal? minLatitude,
-        decimal? maxLatitude,
-        decimal? minLongitude,
-        decimal? maxLongitude,
-        int skip,
-        int take,
+        MarketplaceSearchQuery search,
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.MarketplacePosts
             .AsNoTracking()
-            .Include(post => post.Media)
             .Where(post => post.Status == MarketplacePostStatus.Active && post.AvailableQuantity > 0);
-        if (!string.IsNullOrWhiteSpace(keyword))
+        if (!string.IsNullOrWhiteSpace(search.Keyword))
         {
-            var pattern = $"%{keyword.Trim()}%";
+            var pattern = $"%{search.Keyword.Trim()}%";
             query = query.Where(post =>
                 EF.Functions.ILike(post.Title, pattern)
                 || EF.Functions.ILike(post.Description, pattern));
         }
 
-        if (!string.IsNullOrWhiteSpace(category))
+        if (!string.IsNullOrWhiteSpace(search.Category))
         {
-            query = query.Where(post => post.Category == category.Trim());
+            query = query.Where(post => post.Category == search.Category.Trim());
         }
 
-        if (listingType.HasValue)
+        if (search.SellerId.HasValue)
         {
-            query = query.Where(post => post.ListingType == listingType.Value);
+            query = query.Where(post => post.SellerId == search.SellerId.Value);
         }
 
-        if (minPrice.HasValue)
+        if (search.ListingType.HasValue)
         {
-            query = query.Where(post => post.Price >= minPrice.Value);
+            query = query.Where(post => post.ListingType == search.ListingType.Value);
         }
 
-        if (maxPrice.HasValue)
+        if (search.MinPrice.HasValue)
         {
-            query = query.Where(post => post.Price <= maxPrice.Value);
+            query = query.Where(post => post.Price >= search.MinPrice.Value);
         }
 
-        if (minLatitude.HasValue && maxLatitude.HasValue && minLongitude.HasValue && maxLongitude.HasValue)
+        if (search.MaxPrice.HasValue)
+        {
+            query = query.Where(post => post.Price <= search.MaxPrice.Value);
+        }
+
+        if (search.MinLatitude.HasValue && search.MaxLatitude.HasValue && search.MinLongitude.HasValue && search.MaxLongitude.HasValue)
         {
             query = query.Where(post =>
-                post.Latitude >= minLatitude.Value
-                && post.Latitude <= maxLatitude.Value
-                && post.Longitude >= minLongitude.Value
-                && post.Longitude <= maxLongitude.Value);
+                post.Latitude >= search.MinLatitude.Value
+                && post.Latitude <= search.MaxLatitude.Value
+                && post.Longitude >= search.MinLongitude.Value
+                && post.Longitude <= search.MaxLongitude.Value);
+        }
+
+        if (search.CenterLatitude.HasValue && search.CenterLongitude.HasValue && search.RadiusKm.HasValue)
+        {
+            const double radiansPerDegree = Math.PI / 180;
+            const double earthRadiusKm = 6371;
+            var latitude = (double)search.CenterLatitude.Value;
+            var longitude = (double)search.CenterLongitude.Value;
+            var limit = Math.Pow(Math.Sin((double)search.RadiusKm.Value / (2 * earthRadiusKm)), 2);
+            // Haversine's component is monotonic with distance; filter and sort in SQL before paging.
+            return await query.Select(post => new
+                {
+                    Post = post,
+                    DistanceComponent = Math.Pow(Math.Sin(((double)post.Latitude - latitude) * radiansPerDegree / 2), 2)
+                        + Math.Cos(latitude * radiansPerDegree) * Math.Cos((double)post.Latitude * radiansPerDegree)
+                        * Math.Pow(Math.Sin(((double)post.Longitude - longitude) * radiansPerDegree / 2), 2),
+                })
+                .Where(item => item.DistanceComponent <= limit)
+                .OrderBy(item => item.DistanceComponent)
+                .ThenByDescending(item => item.Post.UpdatedAt)
+                .ThenBy(item => item.Post.Id)
+                .Skip(search.Skip)
+                .Take(search.Take)
+                .Select(item => item.Post)
+                .Include(post => post.Media)
+                .ToListAsync(cancellationToken);
         }
 
         return await query
             .OrderByDescending(post => post.UpdatedAt)
-            .Skip(skip)
-            .Take(take)
+            .ThenBy(post => post.Id)
+            .Skip(search.Skip)
+            .Take(search.Take)
+            .Include(post => post.Media)
             .ToListAsync(cancellationToken);
     }
 

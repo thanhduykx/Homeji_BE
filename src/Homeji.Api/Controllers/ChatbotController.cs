@@ -3,6 +3,8 @@ using Homeji.Api.Views.Chatbot;
 using Homeji.Application.DTOs.Chatbot;
 using Homeji.Application.IServices.Chatbot;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Homeji.Api.RateLimiting;
 
 namespace Homeji.Api.Controllers;
 
@@ -47,6 +49,7 @@ public sealed class ChatbotController : ControllerBase
     }
 
     [HttpPost("messages")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
     [ProducesResponseType<ChatbotReplyDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]

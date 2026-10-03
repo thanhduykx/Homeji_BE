@@ -17,6 +17,10 @@
 coverage/
 *.coverage
 *.coveragexml
+output/
+.sonarqube/
+.scannerwork/
+__pycache__/
 
 ## Local configuration and secrets
 .env

@@ -15,7 +15,7 @@ public sealed class SupabaseAccountService : IAccountService
 {
     private static readonly Regex FullNameRegex = new(
         "^[\\p{L}\\p{M}' -]+$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly Action<ILogger, Guid, Exception?> FailedToRemoveUnconfirmedUser =
         LoggerMessage.Define<Guid>(
@@ -413,7 +413,8 @@ public sealed class SupabaseAccountService : IAccountService
     {
         ValidateEmailAndPassword(request.Email, request.Password);
 
-        var normalizedName = Regex.Replace(request.DisplayName?.Trim() ?? string.Empty, "\\s+", " ");
+        var normalizedName = Regex.Replace(request.DisplayName?.Trim() ?? string.Empty, "\\s+", " ",
+            RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
         if (normalizedName.Length is < 2 or > 60)
         {
             throw Validation("displayName", "Full name must contain between 2 and 60 characters.");
@@ -437,7 +438,8 @@ public sealed class SupabaseAccountService : IAccountService
 
         var normalized = NormalizeEmail(email);
         if (normalized.Length > 254
-            || !Regex.IsMatch(normalized, @"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.CultureInvariant))
+            || !Regex.IsMatch(normalized, @"^[^\s@]+@[^\s@]+\.[^\s@]+$",
+                RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100)))
         {
             throw Validation("email", "Email không hợp lệ.");
         }

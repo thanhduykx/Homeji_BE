@@ -1,0 +1,195 @@
+using Homeji.Application.IRepositories.Marketplace;
+using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
+using Homeji.Infrastructure.Context;
+using Homeji.Infrastructure.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using Homeji.Infrastructure.Migrations;
+using Npgsql;
+
+namespace Homeji.Api.IntegrationTests;
+
+// These tests write only to an explicitly supplied, disposable loopback database.
+public sealed class MarketplaceDatabaseTests
+{
+    [LocalMarketplaceDatabaseFact]
+    public async Task Nearby_search_filters_circle_and_orders_before_paging()
+    {
+        await using var db = await OpenAsync();
+        var seller = await AddSellerAsync(db);
+        var now = DateTimeOffset.UtcNow;
+        var near = Post(seller, 10.8501m, 106.77m, now.AddDays(-2));
+        var far = Post(seller, 10.857m, 106.77m, now);
+        var corner = Post(seller, 10.858m, 106.778m, now.AddMinutes(1));
+        db.MarketplacePosts.AddRange(near, far, corner);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var repository = new MarketplacePostRepository(db);
+        var search = new MarketplaceSearchQuery(null, null, MarketplaceListingType.Food, null, null,
+            10.85m, 106.77m, 1, 10.84m, 10.86m, 106.76m, 106.78m, 0, 1, seller);
+
+        var first = await repository.SearchActiveAsync(search);
+        var second = await repository.SearchActiveAsync(search with { Skip = 1 });
+        var all = await repository.SearchActiveAsync(search with { Take = 50 });
+
+        Assert.Equal(near.Id, Assert.Single(first).Id);
+        Assert.Equal(far.Id, Assert.Single(second).Id);
+        Assert.DoesNotContain(all, post => post.Id == corner.Id);
+        Assert.NotEmpty(first[0].Media);
+        Assert.Empty(db.ChangeTracker.Entries());
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Concurrent_stock_reservations_do_not_oversell()
+    {
+        await using var first = await OpenAsync();
+        var seller = await AddSellerAsync(first);
+        var buyer = await AddSellerAsync(first);
+        var wallet = WalletAccount.Create(buyer, DateTimeOffset.UtcNow);
+        wallet.CreditTopUp(200_000, DateTimeOffset.UtcNow);
+        first.WalletAccounts.Add(wallet);
+        var post = Post(seller, 10.85m, 106.77m, DateTimeOffset.UtcNow, quantity: 1);
+        first.MarketplacePosts.Add(post);
+        await first.SaveChangesAsync();
+        await using var second = await OpenAsync();
+        var competing = await second.MarketplacePosts.SingleAsync(item => item.Id == post.Id);
+        var competingWallet = await second.WalletAccounts.SingleAsync(item => item.UserId == buyer);
+        post.Reserve(1, DateTimeOffset.UtcNow);
+        competing.Reserve(1, DateTimeOffset.UtcNow);
+        wallet.DebitPurchase(30_000, DateTimeOffset.UtcNow);
+        competingWallet.DebitPurchase(30_000, DateTimeOffset.UtcNow);
+
+        await first.SaveChangesAsync();
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
+        await using var verification = await OpenAsync();
+        var saved = await verification.MarketplacePosts.SingleAsync(item => item.Id == post.Id);
+        Assert.Equal(0, saved.AvailableQuantity);
+        Assert.Equal(1, saved.ReservedQuantity);
+        Assert.Equal(170_000, (await verification.WalletAccounts.SingleAsync(item => item.UserId == buyer)).Balance);
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Migration_backfill_preserves_legacy_cart_groups_without_zero_checkout_ids()
+    {
+        await using var db = await OpenAsync();
+        await db.Database.OpenConnectionAsync();
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TEMP TABLE legacy_checkout (
+                "Id" uuid, "BuyerId" uuid, "SellerId" uuid, "CreatedAt" timestamptz, "CheckoutId" uuid);
+            """);
+        var buyer = Guid.NewGuid();
+        var seller = Guid.NewGuid();
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        var third = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO legacy_checkout VALUES
+            ({first}, {buyer}, {seller}, {now}, {Guid.Empty}),
+            ({second}, {buyer}, {seller}, {now}, {Guid.Empty}),
+            ({third}, {buyer}, {seller}, {now.AddSeconds(1)}, {Guid.Empty});
+            """);
+        var sql = new AddMarketplaceFulfillmentAndCheckout().UpOperations.OfType<SqlOperation>()
+            .Single(operation => operation.Sql.Contains("WITH grouped", StringComparison.Ordinal)).Sql;
+        await db.Database.ExecuteSqlRawAsync(sql.Replace("homeji.marketplace_orders", "pg_temp.legacy_checkout", StringComparison.Ordinal));
+        var checkouts = await db.Database.SqlQueryRaw<Guid>("SELECT \"CheckoutId\" AS \"Value\" FROM legacy_checkout").ToListAsync();
+        Assert.DoesNotContain(Guid.Empty, checkouts);
+        Assert.Equal(2, checkouts.Distinct().Count());
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Distinct_checkouts_at_same_timestamp_remain_separate_and_delivery_roundtrips()
+    {
+        await using var db = await OpenAsync();
+        var seller = await AddSellerAsync(db);
+        var buyer = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var post = Post(seller, 10.85m, 106.77m, now);
+        db.MarketplacePosts.Add(post);
+        var first = new MarketplaceOrder(post.Id, buyer, seller, 30_000, now.AddHours(1), "Tiệm", null, now);
+        var second = new MarketplaceOrder(post.Id, buyer, seller, 30_000, now.AddHours(1), "Tiệm", null, now,
+            fulfillmentType: MarketplaceFulfillmentType.SellerDelivery,
+            delivery: new MarketplaceDelivery("Người nhận thử nghiệm", "0901234567", "KTX Thủ Đức", 10.85m, 106.77m));
+        db.MarketplaceOrders.AddRange(first, second);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var repository = new MarketplaceOrderRepository(db);
+        var group = await repository.GetGroupByIdAsync(first.Id);
+        var delivered = await repository.GetByIdAsync(second.Id);
+        Assert.Equal(first.Id, Assert.Single(group).Id);
+        Assert.Equal(MarketplaceFulfillmentType.SellerDelivery, delivered!.FulfillmentType);
+        Assert.Equal("KTX Thủ Đức", delivered.DeliveryAddress);
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Seed_reproducible_food_catalog_for_api_load_test()
+    {
+        await using var db = await OpenAsync();
+        var seller = await AddSellerAsync(db);
+        var now = DateTimeOffset.UtcNow;
+        db.MarketplacePosts.AddRange(Enumerable.Range(0, 2000).Select(index =>
+            Post(seller, 10.81m + (index % 100) * 0.0008m, 106.74m + (index / 100) * 0.003m, now.AddSeconds(-index))));
+        await db.SaveChangesAsync();
+        Assert.True(await db.MarketplacePosts.CountAsync() >= 2000);
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Old_application_inserts_keep_cart_groups_during_rolling_deployment()
+    {
+        await using var db = await OpenAsync();
+        var seller = await AddSellerAsync(db);
+        var buyer = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var post = Post(seller, 10.85m, 106.77m, now);
+        db.MarketplacePosts.Add(post);
+        var first = new MarketplaceOrder(post.Id, buyer, seller, 30_000, now.AddHours(1), "Tiệm", null, now);
+        var second = new MarketplaceOrder(post.Id, buyer, seller, 30_000, now.AddHours(1), "Tiệm", null, now);
+        var other = new MarketplaceOrder(post.Id, buyer, seller, 30_000, now.AddHours(1), "Tiệm", null, now.AddSeconds(1));
+        db.MarketplaceOrders.AddRange(first, second, other);
+        foreach (var order in new[] { first, second, other })
+            db.Entry(order).Property(item => item.CheckoutId).CurrentValue = Guid.Empty;
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        var saved = await db.MarketplaceOrders.Where(order => order.Id == first.Id || order.Id == second.Id || order.Id == other.Id).ToArrayAsync();
+        Assert.DoesNotContain(saved, order => order.CheckoutId == Guid.Empty);
+        Assert.Equal(saved.Single(order => order.Id == first.Id).CheckoutId, saved.Single(order => order.Id == second.Id).CheckoutId);
+        Assert.NotEqual(saved.Single(order => order.Id == first.Id).CheckoutId, saved.Single(order => order.Id == other.Id).CheckoutId);
+    }
+
+    private static async Task<ApplicationDbContext> OpenAsync()
+    {
+        var connection = Environment.GetEnvironmentVariable("HOMEJI_TEST_DATABASE")
+            ?? throw new InvalidOperationException("HOMEJI_TEST_DATABASE is required.");
+        var settings = new NpgsqlConnectionStringBuilder(connection);
+        if (settings.Host != "127.0.0.1" || settings.Database != "homeji_quality")
+            throw new InvalidOperationException("Tests require the disposable loopback homeji_quality database.");
+        var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>().UseNpgsql(connection).Options);
+        return await Task.FromResult(db);
+    }
+
+    private static async Task<Guid> AddSellerAsync(ApplicationDbContext db)
+    {
+        var seller = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO auth.users(id) VALUES ({seller})");
+        db.UserProfiles.Add(UserProfile.Create(seller, "Tiệm thử nghiệm", DateTimeOffset.UtcNow));
+        await db.SaveChangesAsync();
+        return seller;
+    }
+
+    private static MarketplacePost Post(Guid seller, decimal latitude, decimal longitude, DateTimeOffset now, int quantity = 10) =>
+        new(seller, "Cơm sinh viên thử nghiệm", "Món ăn cho kiểm thử cục bộ", 30_000, "Mới", "Cơm",
+            "Thủ Đức", latitude, longitude, null, ["https://example.com/test-food.jpg"], now,
+            MarketplaceListingType.Food, quantity, "phần", 15);
+}
+
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class LocalMarketplaceDatabaseFactAttribute : FactAttribute
+{
+    public LocalMarketplaceDatabaseFactAttribute()
+    {
+        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("HOMEJI_TEST_DATABASE")))
+            Skip = "Run scripts/quality/Test-LocalBackend.ps1 to use an isolated PostgreSQL instance.";
+    }
+}

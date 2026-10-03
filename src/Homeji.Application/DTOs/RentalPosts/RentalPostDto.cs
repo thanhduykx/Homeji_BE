@@ -41,4 +41,5 @@ public sealed record RentalPostDto(
     string? OwnerAvatarPath = null,
     bool IsOwnerVerified = false,
     bool IsOwnerPremium = false,
-    string? OwnerBadge = null);
+    string? OwnerBadge = null,
+    bool IsSynthetic = false);

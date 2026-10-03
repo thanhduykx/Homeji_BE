@@ -2,7 +2,16 @@ using Homeji.Domain.Enums;
 
 namespace Homeji.Application.DTOs.MarketplaceOrders;
 
-public sealed record CreateMarketplaceOrderDto(DateTimeOffset PickupAt, string? PickupAddress, string? Note, int Quantity = 1);
+public sealed record CreateMarketplaceOrderDto(
+    DateTimeOffset PickupAt, string? PickupAddress, string? Note, int Quantity = 1,
+    MarketplaceFulfillmentDto? Fulfillment = null);
+
+public sealed record MarketplaceFulfillmentDto(
+    MarketplaceFulfillmentType Mode,
+    MarketplaceDeliveryDto? Delivery = null);
+
+public sealed record MarketplaceDeliveryDto(
+    string? RecipientName, string? RecipientPhone, string? Address, decimal Latitude, decimal Longitude);
 
 public sealed record MarketplaceCartItemDto(Guid PostId, int Quantity);
 
@@ -10,7 +19,8 @@ public sealed record CreateMarketplaceCartOrderDto(
     IReadOnlyList<MarketplaceCartItemDto> Items,
     DateTimeOffset PickupAt,
     string? PickupAddress,
-    string? Note);
+    string? Note,
+    MarketplaceFulfillmentDto? Fulfillment = null);
 
 public sealed record MarketplaceOrderDto(
     Guid Id,
@@ -37,4 +47,7 @@ public sealed record MarketplaceOrderDto(
     string? PostImageUrl = null,
     string? BuyerDisplayName = null,
     string? SellerDisplayName = null,
-    string? SellerAddress = null);
+    string? SellerAddress = null,
+    Guid CheckoutId = default,
+    MarketplaceFulfillmentType FulfillmentType = MarketplaceFulfillmentType.Pickup,
+    MarketplaceDeliveryDto? Delivery = null);

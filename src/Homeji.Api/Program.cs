@@ -5,6 +5,7 @@ using Homeji.Api.RateLimiting;
 using Homeji.Api.Realtime;
 using Homeji.Api.Middlewares;
 using Homeji.Api.BackgroundJobs;
+using Homeji.Api.Security;
 using Homeji.Application;
 using Homeji.Application.Abstractions.Authentication;
 using Homeji.Application.Abstractions.Notifications;
@@ -20,12 +21,18 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Local clones use only tracked appsettings files. Production retains environment
-// variables so managed hosts can inject secrets without committing them to Git.
 if (builder.Environment.IsDevelopment())
 {
-    RemoveEnvironmentBackedConfigurationSources(builder.Configuration);
+    builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
+        .AddEnvironmentVariables()
+        .AddCommandLine(args);
 }
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.AddServerHeader = false;
+    options.Limits.MaxRequestBodySize = 128 * 1024;
+});
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -45,8 +52,17 @@ builder.Services.AddOptions<PaymentRedirectOptions>()
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
-builder.Services.AddHostedService<MarketplaceSellerLocationNormalizer>();
+if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
+{
+    builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
+    builder.Services.AddHostedService<PaymentExpirationWorker>();
+    // Legacy seed repairs must be explicitly enabled; startup must preserve edits
+    // made by users and imports rather than rewriting their titles or locations.
+    if (builder.Configuration.GetValue("LegacyData:NormalizeLocationsOnStartup", false))
+    {
+        builder.Services.AddHostedService<MarketplaceSellerLocationNormalizer>();
+    }
+}
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
@@ -59,13 +75,7 @@ builder.Services.AddSingleton<IUserSessionRealtimePublisher, SignalRUserSessionP
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
 
-// Render / reverse proxies forward the real client IP via X-Forwarded-For.
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+builder.Services.AddTrustedProxyHeaders(builder.Configuration);
 
 builder.Services.AddAuthorizationBuilder()
     .SetFallbackPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
@@ -151,18 +161,6 @@ app.MapGet(
 app.MapControllers();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
-app.Run();
-
-static void RemoveEnvironmentBackedConfigurationSources(ConfigurationManager configuration)
-{
-    for (var index = configuration.Sources.Count - 1; index >= 0; index--)
-    {
-        var sourceName = configuration.Sources[index].GetType().Name;
-        if (sourceName is "EnvironmentVariablesConfigurationSource" or "UserSecretsConfigurationSource")
-        {
-            configuration.Sources.RemoveAt(index);
-        }
-    }
-}
+await app.RunAsync();
 
 public partial class Program;

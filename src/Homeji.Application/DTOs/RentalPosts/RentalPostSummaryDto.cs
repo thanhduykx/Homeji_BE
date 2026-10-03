@@ -22,4 +22,5 @@ public sealed record RentalPostSummaryDto(
     DateOnly? OriginalLeaseEndsOn = null,
     decimal PassFee = 0,
     bool OwnerConsentVerified = false,
-    string? OwnerConsentContact = null);
+    string? OwnerConsentContact = null,
+    bool IsSynthetic = false);

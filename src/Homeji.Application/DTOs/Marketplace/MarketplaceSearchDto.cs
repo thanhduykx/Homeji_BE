@@ -11,4 +11,5 @@ public sealed record MarketplaceSearchDto(
     decimal? RadiusKm,
     Guid? NearRentalPostId,
     int Page,
-    int PageSize);
+    int PageSize,
+    Guid? SellerId = null);

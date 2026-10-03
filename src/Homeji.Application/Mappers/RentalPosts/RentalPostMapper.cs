@@ -41,7 +41,8 @@ public static class RentalPostMapper
             post.OwnerConsentVerifiedAt,
             post.ModerationReason,
             post.CreatedAt,
-            post.UpdatedAt);
+            post.UpdatedAt,
+            IsSynthetic: post.IsSynthetic);
     }
 
     public static RentalPostSummaryDto ToSummaryDto(
@@ -74,7 +75,8 @@ public static class RentalPostMapper
             post.OriginalLeaseEndsOn,
             post.PassFee,
             post.OwnerConsentVerifiedAt.HasValue,
-            includePrivateTransferReview ? post.OwnerConsentContact : null);
+            includePrivateTransferReview ? post.OwnerConsentContact : null,
+            post.IsSynthetic);
     }
 
     private static RentalPostMediaDto ToDto(RentalPostMedia media)

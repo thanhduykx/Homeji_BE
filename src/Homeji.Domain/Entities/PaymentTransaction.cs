@@ -5,6 +5,8 @@ namespace Homeji.Domain.Entities;
 
 public sealed class PaymentTransaction
 {
+    public static readonly TimeSpan PaymentLifetime = TimeSpan.FromMinutes(15);
+    public const string ExpirationMessage = "Đơn đã hủy do quá 15 phút chưa thanh toán.";
     public const int MaxOrderCodeLength = 80;
     public const int MaxRequestIdLength = 80;
     public const int MaxDescriptionLength = 500;
@@ -155,7 +157,7 @@ public sealed class PaymentTransaction
         string? rawProviderPayload,
         DateTimeOffset failedAt)
     {
-        if (Status == PaymentStatus.Paid)
+        if (Status != PaymentStatus.Pending)
         {
             return;
         }
@@ -164,6 +166,19 @@ public sealed class PaymentTransaction
         ProviderMessage = NormalizeOptional(providerMessage, MaxProviderMessageLength, nameof(providerMessage));
         RawProviderPayload = rawProviderPayload;
         UpdatedAt = failedAt;
+    }
+
+    public bool CancelIfOverdue(DateTimeOffset now)
+    {
+        if (Status != PaymentStatus.Pending || now < CreatedAt.Add(PaymentLifetime))
+        {
+            return false;
+        }
+
+        Status = PaymentStatus.Cancelled;
+        ProviderMessage = ExpirationMessage;
+        UpdatedAt = now;
+        return true;
     }
 
     private static string NormalizeRequired(string value, int maxLength, string fieldName)

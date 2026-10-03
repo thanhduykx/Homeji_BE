@@ -26,9 +26,7 @@ public sealed class MarketplaceOrderRepository : IMarketplaceOrderRepository
         }
 
         return await _dbContext.MarketplaceOrders
-            .Where(order => order.BuyerId == anchor.BuyerId
-                && order.SellerId == anchor.SellerId
-                && order.CreatedAt == anchor.CreatedAt)
+            .Where(order => order.CheckoutId == anchor.CheckoutId)
             .OrderBy(order => order.Id)
             .ToListAsync(cancellationToken);
     }

@@ -5,6 +5,8 @@ namespace Homeji.Application.IRepositories.Payments;
 
 public interface IPaymentTransactionRepository
 {
+    Task<int> CancelOverdueAsync(DateTimeOffset now, Guid? userId = null, CancellationToken cancellationToken = default);
+
     Task<PaymentTransaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<PaymentTransaction?> GetByOrderCodeAsync(string orderCode, CancellationToken cancellationToken = default);

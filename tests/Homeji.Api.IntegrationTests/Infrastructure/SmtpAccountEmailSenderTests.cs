@@ -7,6 +7,16 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class SmtpAccountEmailSenderTests
 {
     [Fact]
+    public async Task Plaintext_smtp_is_rejected_before_sending_confirmation_link()
+    {
+        var sender = new SmtpAccountEmailSender(
+            Options.Create(new SmtpOptions { Enabled = true, EnableSsl = false, Host = "smtp.example.com", FromEmail = "sender@example.com" }),
+            NullLogger<SmtpAccountEmailSender>.Instance);
+        var result = await sender.SendRegistrationConfirmationAsync("user@example.com", "Homeji User", "https://example.com/verify");
+        Assert.False(result.Sent);
+    }
+
+    [Fact]
     public async Task SendRegistrationConfirmationAsync_WhenSmtpDisabled_DoesNotRequireSmtpSettings()
     {
         var sender = new SmtpAccountEmailSender(

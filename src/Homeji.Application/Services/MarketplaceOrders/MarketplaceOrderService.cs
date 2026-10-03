@@ -123,11 +123,13 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             post.SellerId,
             post.Price,
             request.PickupAt,
-            request.PickupAddress!,
+            request.Fulfillment?.Mode == MarketplaceFulfillmentType.SellerDelivery ? post.Address : request.PickupAddress!,
             request.Note,
             now,
             request.Quantity,
-            commissionRate);
+            commissionRate,
+            fulfillmentType: request.Fulfillment?.Mode ?? MarketplaceFulfillmentType.Pickup,
+            delivery: ToDelivery(request.Fulfillment));
         post.Reserve(request.Quantity, now);
         buyerWallet.DebitPurchase(order.AgreedPrice, now);
         await _wallets.AddTransactionAsync(new WalletTransaction(
@@ -229,6 +231,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
 
         var now = _timeProvider.GetUtcNow();
         var commissionRate = _financeOptions.CommissionRate;
+        var checkoutId = Guid.NewGuid();
         var createdOrders = new List<(MarketplaceOrder Order, MarketplacePost Post)>(posts.Count);
         var notifications = new List<Notification>(posts.Count);
         foreach (var post in posts)
@@ -240,11 +243,14 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 sellerId,
                 post.Price,
                 request.PickupAt,
-                request.PickupAddress!,
+                request.Fulfillment?.Mode == MarketplaceFulfillmentType.SellerDelivery ? post.Address : request.PickupAddress!,
                 request.Note,
                 now,
                 item.Quantity,
-                commissionRate);
+                commissionRate,
+                checkoutId: checkoutId,
+                fulfillmentType: request.Fulfillment?.Mode ?? MarketplaceFulfillmentType.Pickup,
+                delivery: ToDelivery(request.Fulfillment));
             post.Reserve(item.Quantity, now);
             buyerWallet.DebitPurchase(order.AgreedPrice, now);
             await _wallets.AddTransactionAsync(new WalletTransaction(
@@ -294,6 +300,20 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             profilesById.GetValueOrDefault(order.SellerId)?.DisplayName)).ToArray();
     }
 
+    public async Task<MarketplaceOrderDto> GetDetailAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        var order = await _orders.GetByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(MarketplaceOrder), id);
+        if (userId != order.BuyerId && userId != order.SellerId)
+        {
+            throw new ForbiddenAccessException("Bạn không có quyền xem đơn hàng này.");
+        }
+
+        var post = await _posts.GetByIdWithMediaAsync(order.MarketplacePostId, cancellationToken);
+        return ToDto(order, post);
+    }
+
     public async Task<int> ExpireOverdueAsync(CancellationToken cancellationToken = default)
     {
         var now = _timeProvider.GetUtcNow();
@@ -309,12 +329,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
 
         var notifications = new List<Notification>(overdueOrders.Count * 2);
         var expiredOrderCount = 0;
-        foreach (var overdueGroup in overdueOrders.GroupBy(order => new
-                 {
-                     order.BuyerId,
-                     order.SellerId,
-                     order.CreatedAt,
-                 }))
+        foreach (var overdueGroup in overdueOrders.GroupBy(order => order.CheckoutId))
         {
             var orderGroup = await _orders.GetGroupByIdAsync(overdueGroup.First().Id, cancellationToken);
             if (orderGroup.Count == 0
@@ -362,12 +377,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
 
         var notifications = new List<Notification>(dueOrders.Count * 2);
         var releasedCount = 0;
-        foreach (var dueGroup in dueOrders.GroupBy(order => new
-                 {
-                     order.BuyerId,
-                     order.SellerId,
-                     order.CreatedAt,
-                 }))
+        foreach (var dueGroup in dueOrders.GroupBy(order => order.CheckoutId))
         {
             var orderGroup = await _orders.GetGroupByIdAsync(dueGroup.First().Id, cancellationToken);
             if (orderGroup.Count == 0
@@ -430,6 +440,11 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         }
 
         var order = orderGroup.Single(groupOrder => groupOrder.Id == id);
+        if (userId != order.BuyerId && userId != order.SellerId)
+        {
+            throw new ForbiddenAccessException("Bạn không có quyền xử lý đơn hàng này.");
+        }
+
         var currentTime = _timeProvider.GetUtcNow();
         if (orderGroup.All(groupOrder => groupOrder.Status == MarketplaceOrderStatus.Requested)
             && order.CreatedAt.AddMinutes(_financeOptions.OrderRequestTimeoutMinutes) <= currentTime)
@@ -631,7 +646,17 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             post?.Media.OrderBy(media => media.SortOrder).Select(media => media.Url).FirstOrDefault(),
             buyerDisplayName,
             sellerDisplayName,
-            post?.Address);
+            post?.Address,
+            order.CheckoutId,
+            order.FulfillmentType,
+            order.DeliveryAddress is null ? null : new MarketplaceDeliveryDto(
+                order.RecipientName, order.RecipientPhone, order.DeliveryAddress,
+                order.DeliveryLatitude!.Value, order.DeliveryLongitude!.Value));
+
+    private static MarketplaceDelivery? ToDelivery(MarketplaceFulfillmentDto? fulfillment) =>
+        fulfillment?.Delivery is { } delivery
+            ? new MarketplaceDelivery(delivery.RecipientName!, delivery.RecipientPhone!, delivery.Address!, delivery.Latitude, delivery.Longitude)
+            : null;
 
     private async Task RefundOrderGroupAndReleaseStockAsync(
         IReadOnlyList<MarketplaceOrder> orders,

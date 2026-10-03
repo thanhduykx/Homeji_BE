@@ -55,17 +55,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
     {
         var search = await NormalizeSearchAsync(request, cancellationToken);
         var posts = await _marketplacePosts.SearchActiveAsync(
-            search.Keyword,
-            search.Category,
-            search.ListingType,
-            search.MinPrice,
-            search.MaxPrice,
-            search.MinLatitude,
-            search.MaxLatitude,
-            search.MinLongitude,
-            search.MaxLongitude,
-            (search.Page - 1) * search.PageSize,
-            search.PageSize,
+            search,
             cancellationToken);
         var profiles = await _profiles.GetByIdsAsync(
             posts.Select(post => post.SellerId).Distinct().ToArray(),
@@ -78,8 +68,6 @@ public sealed class MarketplacePostService : IMarketplacePostService
                 profilesById.GetValueOrDefault(post.SellerId),
                 search.CenterLatitude,
                 search.CenterLongitude))
-            .OrderBy(post => post.DistanceKm ?? decimal.MaxValue)
-            .ThenByDescending(post => post.UpdatedAt)
             .ToArray();
     }
 
@@ -276,12 +264,21 @@ public sealed class MarketplacePostService : IMarketplacePostService
             : new SellerLocation(anchor.Address, anchor.Latitude, anchor.Longitude);
     }
 
-    private async Task<NormalizedSearch> NormalizeSearchAsync(
+    private async Task<MarketplaceSearchQuery> NormalizeSearchAsync(
         MarketplaceSearchDto request,
         CancellationToken cancellationToken)
     {
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, MaxPageSize);
+        if (page > 1000 || request.Keyword?.Length > MarketplacePost.MaxTitleLength
+            || request.Category?.Length > MarketplacePost.MaxCategoryLength
+            || request.RadiusKm is <= 0 or > MaxRadiusKm || request.SellerId == Guid.Empty)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["search"] = ["Trang tối đa 1000, bán kính từ 0 đến 50 km, từ khóa tối đa 200 ký tự và danh mục tối đa 80 ký tự."],
+            });
+        }
         if (request.MinPrice is < 0 || request.MaxPrice is < 0 || request.MinPrice > request.MaxPrice)
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
@@ -325,6 +322,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
         decimal? maxLatitude = null;
         decimal? minLongitude = null;
         decimal? maxLongitude = null;
+        decimal? radiusKm = null;
         if (latitude.HasValue && longitude.HasValue)
         {
             if (latitude is < -90 or > 90 || longitude is < -180 or > 180)
@@ -335,17 +333,17 @@ public sealed class MarketplacePostService : IMarketplacePostService
                 });
             }
 
-            var radiusKm = Math.Clamp(request.RadiusKm ?? DefaultRadiusKm, 0.1m, MaxRadiusKm);
-            var latitudeDelta = radiusKm / 111m;
+            radiusKm = request.RadiusKm ?? DefaultRadiusKm;
+            var latitudeDelta = radiusKm.Value / 111m;
             var cosine = Math.Max(0.01, Math.Cos((double)latitude.Value * Math.PI / 180));
-            var longitudeDelta = radiusKm / (111m * (decimal)cosine);
+            var longitudeDelta = radiusKm.Value / (111m * (decimal)cosine);
             minLatitude = latitude.Value - latitudeDelta;
             maxLatitude = latitude.Value + latitudeDelta;
             minLongitude = longitude.Value - longitudeDelta;
             maxLongitude = longitude.Value + longitudeDelta;
         }
 
-        return new NormalizedSearch(
+        return new MarketplaceSearchQuery(
             request.Keyword?.Trim(),
             request.Category?.Trim(),
             request.ListingType,
@@ -353,12 +351,14 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.MaxPrice,
             latitude,
             longitude,
+            radiusKm,
             minLatitude,
             maxLatitude,
             minLongitude,
             maxLongitude,
-            page,
-            pageSize);
+            (page - 1) * pageSize,
+            pageSize,
+            request.SellerId);
     }
 
     private static MarketplacePostDto ToDto(
@@ -393,7 +393,8 @@ public sealed class MarketplacePostService : IMarketplacePostService
             post.AvailableQuantity,
             post.ReservedQuantity,
             post.Unit,
-            post.PreparationMinutes);
+            post.PreparationMinutes,
+            post.IsSynthetic);
     }
 
     private static decimal CalculateDistanceKm(decimal lat1, decimal lon1, decimal lat2, decimal lon2)
@@ -440,21 +441,6 @@ public sealed class MarketplacePostService : IMarketplacePostService
             });
         }
     }
-
-    private sealed record NormalizedSearch(
-        string? Keyword,
-        string? Category,
-        MarketplaceListingType? ListingType,
-        decimal? MinPrice,
-        decimal? MaxPrice,
-        decimal? CenterLatitude,
-        decimal? CenterLongitude,
-        decimal? MinLatitude,
-        decimal? MaxLatitude,
-        decimal? MinLongitude,
-        decimal? MaxLongitude,
-        int Page,
-        int PageSize);
 
     private sealed record SellerLocation(string Address, decimal Latitude, decimal Longitude);
 }

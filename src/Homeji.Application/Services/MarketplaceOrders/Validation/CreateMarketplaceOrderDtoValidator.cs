@@ -13,10 +13,13 @@ public sealed class CreateMarketplaceOrderDtoValidator : AbstractValidator<Creat
             .WithMessage("Thời gian nhận hàng phải ở tương lai.");
         RuleFor(request => request.PickupAddress)
             .NotEmpty()
-            .MaximumLength(MarketplaceOrder.MaxPickupAddressLength);
+            .When(request => request.Fulfillment?.Mode != Homeji.Domain.Enums.MarketplaceFulfillmentType.SellerDelivery);
+        RuleFor(request => request.PickupAddress).MaximumLength(MarketplaceOrder.MaxPickupAddressLength);
         RuleFor(request => request.Note)
             .MaximumLength(MarketplaceOrder.MaxNoteLength);
         RuleFor(request => request.Quantity)
             .InclusiveBetween(1, MarketplacePost.MaxFoodStock);
+        When(request => request.Fulfillment is not null,
+            () => RuleFor(request => request.Fulfillment!).SetValidator(new MarketplaceFulfillmentDtoValidator()));
     }
 }

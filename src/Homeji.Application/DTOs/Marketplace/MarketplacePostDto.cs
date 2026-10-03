@@ -25,4 +25,5 @@ public sealed record MarketplacePostDto(
     int AvailableQuantity,
     int ReservedQuantity,
     string Unit,
-    int? PreparationMinutes);
+    int? PreparationMinutes,
+    bool IsSynthetic = false);

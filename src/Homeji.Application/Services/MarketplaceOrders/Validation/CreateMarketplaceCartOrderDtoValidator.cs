@@ -15,7 +15,8 @@ public sealed class CreateMarketplaceCartOrderDtoValidator : AbstractValidator<C
             .WithMessage("Pickup time must be in the future.");
         RuleFor(request => request.PickupAddress)
             .NotEmpty()
-            .MaximumLength(MarketplaceOrder.MaxPickupAddressLength);
+            .When(request => request.Fulfillment?.Mode != Homeji.Domain.Enums.MarketplaceFulfillmentType.SellerDelivery);
+        RuleFor(request => request.PickupAddress).MaximumLength(MarketplaceOrder.MaxPickupAddressLength);
         RuleFor(request => request.Note)
             .MaximumLength(MarketplaceOrder.MaxNoteLength);
         RuleFor(request => request.Items)
@@ -23,6 +24,8 @@ public sealed class CreateMarketplaceCartOrderDtoValidator : AbstractValidator<C
             .NotEmpty()
             .Must(items => items.Count <= MaxCartItems)
             .WithMessage($"A cart can contain at most {MaxCartItems} items.")
+            .Must(items => items.All(item => item is not null))
+            .WithMessage("Giỏ hàng không được chứa món trống.")
             .Must(items => items.Select(item => item.PostId).Distinct().Count() == items.Count)
             .WithMessage("Cart items must be unique.");
         RuleForEach(request => request.Items).ChildRules(item =>
@@ -30,5 +33,7 @@ public sealed class CreateMarketplaceCartOrderDtoValidator : AbstractValidator<C
             item.RuleFor(value => value.PostId).NotEmpty();
             item.RuleFor(value => value.Quantity).InclusiveBetween(1, MarketplacePost.MaxFoodStock);
         });
+        When(request => request.Fulfillment is not null,
+            () => RuleFor(request => request.Fulfillment!).SetValidator(new MarketplaceFulfillmentDtoValidator()));
     }
 }

@@ -16,6 +16,7 @@ public static class RateLimitingPolicyNames
     /// <summary>Login / register / email checks — stricter.</summary>
     public const string PublicAuth = "public-auth";
     public const string WebsiteTraffic = "website-traffic";
+    public const string CostlyOperations = "costly-operations";
 }
 
 public sealed class RateLimitingOptions
@@ -25,6 +26,7 @@ public sealed class RateLimitingOptions
     public RateLimitWindowOptions PublicSearch { get; set; } = new() { PermitLimit = 60, WindowSeconds = 60 };
     public RateLimitWindowOptions PublicRead { get; set; } = new() { PermitLimit = 120, WindowSeconds = 60 };
     public RateLimitWindowOptions PublicAuth { get; set; } = new() { PermitLimit = 20, WindowSeconds = 60 };
+    public RateLimitWindowOptions CostlyOperations { get; set; } = new() { PermitLimit = 10, WindowSeconds = 60 };
 }
 
 public sealed class RateLimitWindowOptions
@@ -63,7 +65,9 @@ public static class RateLimitingExtensions
                         Detail = "Bạn thao tác quá nhanh. Vui lòng thử lại sau ít phút.",
                         Instance = context.HttpContext.Request.Path,
                     },
-                    cancellationToken);
+                    options: (System.Text.Json.JsonSerializerOptions?)null,
+                    contentType: "application/problem+json",
+                    cancellationToken: cancellationToken);
             };
 
             options.AddPolicy(
@@ -79,6 +83,8 @@ public static class RateLimitingExtensions
                 httpContext => CreateIpPartition(httpContext, settings.PublicAuth));
             options.AddPolicy(RateLimitingPolicyNames.WebsiteTraffic,
                 httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 30, WindowSeconds = 60 }));
+            options.AddPolicy(RateLimitingPolicyNames.CostlyOperations,
+                httpContext => CreateIpPartition(httpContext, settings.CostlyOperations));
         });
 
         return services;

@@ -1,5 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <ItemGroup>
+    <!-- Local credentials must never enter publish/Docker output. -->
+    <Content Update="appsettings.Local.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Homeji.Application\Homeji.Application.csproj" />
     <ProjectReference Include="..\Homeji.Infrastructure\Homeji.Infrastructure.csproj" />
   </ItemGroup>

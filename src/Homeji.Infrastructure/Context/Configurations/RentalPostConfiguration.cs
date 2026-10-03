@@ -17,6 +17,7 @@ public sealed class RentalPostConfiguration : IEntityTypeConfiguration<RentalPos
         builder.Property(post => post.Status).HasColumnName("status").HasConversion<int>().IsRequired();
         builder.Property(post => post.Title).HasColumnName("title").HasMaxLength(RentalPost.MaxTitleLength).IsRequired();
         builder.Property(post => post.Description).HasColumnName("description").HasMaxLength(RentalPost.MaxDescriptionLength).IsRequired();
+        builder.Property(post => post.IsSynthetic).HasColumnName("is_synthetic").HasDefaultValue(false).IsRequired();
         builder.Property(post => post.Price).HasColumnName("price").HasPrecision(18, 2).IsRequired();
         builder.Property(post => post.Deposit).HasColumnName("deposit").HasPrecision(18, 2).IsRequired();
         builder.Property(post => post.Area).HasColumnName("area").HasPrecision(10, 2).IsRequired();

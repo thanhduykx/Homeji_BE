@@ -9,6 +9,7 @@ public interface IMarketplaceOrderService
         CreateMarketplaceCartOrderDto request,
         CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MarketplaceOrderDto>> GetMineAsync(CancellationToken cancellationToken = default);
+    Task<MarketplaceOrderDto> GetDetailAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MarketplaceOrderDto> AcceptAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MarketplaceOrderDto> RejectAsync(Guid id, CancellationToken cancellationToken = default);
     Task<MarketplaceOrderDto> CancelAsync(Guid id, CancellationToken cancellationToken = default);

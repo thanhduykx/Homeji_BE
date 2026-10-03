@@ -12,5 +12,7 @@ services:
         value: Production
       - key: Database__ApplyMigrationsOnStartup
         value: "true"
+      - key: ConnectionStrings__DefaultConnection
+        sync: false
       - key: Ai__Gemini__ApiKey
         sync: false

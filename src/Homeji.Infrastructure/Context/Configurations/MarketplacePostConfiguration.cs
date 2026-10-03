@@ -12,10 +12,11 @@ public sealed class MarketplacePostConfiguration : IEntityTypeConfiguration<Mark
         builder.HasKey(post => post.Id).HasName("pk_marketplace_posts");
         builder.Property(post => post.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(post => post.SellerId).HasColumnName("seller_id").IsRequired();
-        builder.Property(post => post.Status).HasColumnName("status").HasConversion<int>().IsRequired();
+        builder.Property(post => post.Status).HasColumnName("status").HasConversion<int>().IsConcurrencyToken().IsRequired();
         builder.Property(post => post.Title).HasColumnName("title").HasMaxLength(MarketplacePost.MaxTitleLength).IsRequired();
         builder.Property(post => post.Description).HasColumnName("description").HasMaxLength(MarketplacePost.MaxDescriptionLength).IsRequired();
-        builder.Property(post => post.Price).HasColumnName("price").HasPrecision(18, 2).IsRequired();
+        builder.Property(post => post.IsSynthetic).HasColumnName("is_synthetic").HasDefaultValue(false).IsRequired();
+        builder.Property(post => post.Price).HasColumnName("price").HasPrecision(18, 2).IsConcurrencyToken().IsRequired();
         builder.Property(post => post.Condition).HasColumnName("condition").HasMaxLength(MarketplacePost.MaxConditionLength).IsRequired();
         builder.Property(post => post.Category).HasColumnName("category").HasMaxLength(MarketplacePost.MaxCategoryLength).IsRequired();
         builder.Property(post => post.Address).HasColumnName("address").HasMaxLength(MarketplacePost.MaxAddressLength).IsRequired();
@@ -23,8 +24,8 @@ public sealed class MarketplacePostConfiguration : IEntityTypeConfiguration<Mark
         builder.Property(post => post.Longitude).HasColumnName("longitude").HasPrecision(9, 6).IsRequired();
         builder.Property(post => post.LinkedRentalPostId).HasColumnName("linked_rental_post_id");
         builder.Property(post => post.ListingType).HasColumnName("listing_type").HasConversion<int>().IsRequired();
-        builder.Property(post => post.AvailableQuantity).HasColumnName("available_quantity").IsRequired();
-        builder.Property(post => post.ReservedQuantity).HasColumnName("reserved_quantity").IsRequired();
+        builder.Property(post => post.AvailableQuantity).HasColumnName("available_quantity").IsConcurrencyToken().IsRequired();
+        builder.Property(post => post.ReservedQuantity).HasColumnName("reserved_quantity").IsConcurrencyToken().IsRequired();
         builder.Property(post => post.Unit).HasColumnName("unit").HasMaxLength(MarketplacePost.MaxUnitLength).IsRequired();
         builder.Property(post => post.PreparationMinutes).HasColumnName("preparation_minutes");
         builder.Property(post => post.CreatedAt).HasColumnName("created_at").IsRequired();

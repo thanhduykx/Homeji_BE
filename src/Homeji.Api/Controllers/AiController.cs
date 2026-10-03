@@ -3,11 +3,14 @@ using Homeji.Api.Views.AI;
 using Homeji.Application.DTOs.AI;
 using Homeji.Application.IServices.AI;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Homeji.Api.RateLimiting;
 
 namespace Homeji.Api.Controllers;
 
 [ApiController]
 [Route("api/ai")]
+[EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
 public sealed class AiController : ControllerBase
 {
     private readonly IAiSearchService _aiSearch;

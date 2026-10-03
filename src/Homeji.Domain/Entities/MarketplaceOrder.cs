@@ -23,7 +23,10 @@ public sealed class MarketplaceOrder
         string? note,
         DateTimeOffset createdAt,
         int quantity = 1,
-        decimal platformFeeRate = 0.10m)
+        decimal platformFeeRate = 0.10m,
+        Guid? checkoutId = null,
+        MarketplaceFulfillmentType fulfillmentType = MarketplaceFulfillmentType.Pickup,
+        MarketplaceDelivery? delivery = null)
     {
         if (buyerId == sellerId)
         {
@@ -36,6 +39,13 @@ public sealed class MarketplaceOrder
         }
 
         Id = Guid.NewGuid();
+        CheckoutId = checkoutId ?? Id;
+        if (CheckoutId == Guid.Empty)
+        {
+            throw new DomainException("Mã thanh toán không được để trống.");
+        }
+
+        SetFulfillment(fulfillmentType, delivery);
         MarketplacePostId = marketplacePostId;
         BuyerId = buyerId;
         SellerId = sellerId;
@@ -59,6 +69,13 @@ public sealed class MarketplaceOrder
     }
 
     public Guid Id { get; private set; }
+    public Guid CheckoutId { get; private set; }
+    public MarketplaceFulfillmentType FulfillmentType { get; private set; }
+    public string? RecipientName { get; private set; }
+    public string? RecipientPhone { get; private set; }
+    public string? DeliveryAddress { get; private set; }
+    public decimal? DeliveryLatitude { get; private set; }
+    public decimal? DeliveryLongitude { get; private set; }
     public Guid MarketplacePostId { get; private set; }
     public Guid BuyerId { get; private set; }
     public Guid SellerId { get; private set; }
@@ -158,6 +175,31 @@ public sealed class MarketplaceOrder
 
         Status = target;
         UpdatedAt = updatedAt;
+    }
+
+    private void SetFulfillment(MarketplaceFulfillmentType fulfillmentType, MarketplaceDelivery? delivery)
+    {
+        if (!Enum.IsDefined(fulfillmentType)
+            || (fulfillmentType == MarketplaceFulfillmentType.SellerDelivery && delivery is null)
+            || (fulfillmentType == MarketplaceFulfillmentType.Pickup && delivery is not null))
+        {
+            throw new DomainException("Thông tin nhận hàng không hợp lệ.");
+        }
+
+        FulfillmentType = fulfillmentType;
+        if (delivery is null) return;
+        RecipientName = Normalize(delivery.RecipientName, 100, nameof(RecipientName));
+        RecipientPhone = Normalize(delivery.RecipientPhone, 16, nameof(RecipientPhone));
+        var digits = RecipientPhone.StartsWith('+') ? RecipientPhone[1..] : RecipientPhone;
+        if (digits.Length is < 9 or > 15 || digits.Any(character => character is < '0' or > '9')
+            || delivery.Latitude is < -90 or > 90 || delivery.Longitude is < -180 or > 180)
+        {
+            throw new DomainException("Số điện thoại hoặc tọa độ giao hàng không hợp lệ.");
+        }
+
+        DeliveryAddress = Normalize(delivery.Address, MaxPickupAddressLength, nameof(DeliveryAddress));
+        DeliveryLatitude = delivery.Latitude;
+        DeliveryLongitude = delivery.Longitude;
     }
 
     private static string Normalize(string value, int maxLength, string fieldName)

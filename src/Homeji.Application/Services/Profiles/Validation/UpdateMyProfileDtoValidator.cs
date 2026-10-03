@@ -9,7 +9,7 @@ public sealed class UpdateMyProfileDtoValidator : AbstractValidator<UpdateMyProf
 {
     private static readonly Regex FullNameRegex = new(
         "^[\\p{L}\\p{M}' -]+$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
 
     /// <summary>
     /// Vietnamese mobile prefixes (10 digits starting with 0):
@@ -17,7 +17,7 @@ public sealed class UpdateMyProfileDtoValidator : AbstractValidator<UpdateMyProf
     /// </summary>
     private static readonly Regex VietnamMobilePhoneRegex = new(
         "^0(3[2-9]|5[2689]|7[06-9]|8[1-9]|9[0-4]|9[6-9])[0-9]{7}$",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
 
     public UpdateMyProfileDtoValidator()
     {
@@ -49,7 +49,8 @@ public sealed class UpdateMyProfileDtoValidator : AbstractValidator<UpdateMyProf
 
     private static bool BeValidFullName(string? value)
     {
-        var normalized = Regex.Replace(value?.Trim() ?? string.Empty, "\\s+", " ");
+        var normalized = Regex.Replace(value?.Trim() ?? string.Empty, "\\s+", " ",
+            RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
         return normalized.Length is >= 2 and <= 60
             && FullNameRegex.IsMatch(normalized)
             && normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length >= 2;

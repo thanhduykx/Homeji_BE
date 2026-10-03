@@ -50,6 +50,7 @@ public sealed class RentalPost
     public string Title { get; private set; }
 
     public string Description { get; private set; }
+    public bool IsSynthetic { get; private set; }
 
     public decimal Price { get; private set; }
 

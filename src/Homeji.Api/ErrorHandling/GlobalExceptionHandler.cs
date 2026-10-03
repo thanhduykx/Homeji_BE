@@ -145,7 +145,7 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         problemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.TraceIdentifier;
 
         var exposeDetails = _environment.IsDevelopment()
-            || _configuration.GetValue("Api:ExposeErrorDetails", false);
+            || (!_environment.IsProduction() && _configuration.GetValue("Api:ExposeErrorDetails", false));
 
         if (exposeDetails && problemDetails.Status >= StatusCodes.Status500InternalServerError)
         {

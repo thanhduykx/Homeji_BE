@@ -15,6 +15,10 @@ public sealed class MarketplaceOrdersController : ControllerBase
     public async Task<ActionResult<IReadOnlyList<MarketplaceOrderDto>>> GetMine(CancellationToken cancellationToken) =>
         Ok(await _orders.GetMineAsync(cancellationToken));
 
+    [HttpGet("{id:guid}")]
+    public async Task<ActionResult<MarketplaceOrderDto>> GetDetail(Guid id, CancellationToken cancellationToken) =>
+        Ok(await _orders.GetDetailAsync(id, cancellationToken));
+
     [HttpPost("/api/marketplace-posts/{postId:guid}/orders")]
     public async Task<ActionResult<MarketplaceOrderDto>> Create(
         Guid postId,

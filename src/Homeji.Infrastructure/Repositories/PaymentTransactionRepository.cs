@@ -15,6 +15,23 @@ public sealed class PaymentTransactionRepository : IPaymentTransactionRepository
         _dbContext = dbContext;
     }
 
+    public Task<int> CancelOverdueAsync(DateTimeOffset now, Guid? userId = null, CancellationToken cancellationToken = default)
+    {
+        var cutoff = now.Subtract(PaymentTransaction.PaymentLifetime);
+        var query = _dbContext.PaymentTransactions.Where(payment =>
+            payment.Status == PaymentStatus.Pending && payment.CreatedAt <= cutoff);
+        if (userId.HasValue)
+        {
+            query = query.Where(payment => payment.UserId == userId.Value);
+        }
+
+        // One conditional UPDATE prevents the sweep from downgrading a paid order.
+        return query.ExecuteUpdateAsync(setters => setters
+            .SetProperty(payment => payment.Status, PaymentStatus.Cancelled)
+            .SetProperty(payment => payment.ProviderMessage, PaymentTransaction.ExpirationMessage)
+            .SetProperty(payment => payment.UpdatedAt, now), cancellationToken);
+    }
+
     public Task<PaymentTransaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return _dbContext.PaymentTransactions.SingleOrDefaultAsync(payment => payment.Id == id, cancellationToken);

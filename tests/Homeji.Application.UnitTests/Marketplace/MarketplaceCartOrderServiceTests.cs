@@ -20,7 +20,34 @@ public sealed class MarketplaceCartOrderServiceTests
     private static readonly DateTimeOffset UtcNow = new(2026, 7, 16, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task CreateCartAsync_TwoItemsFromSameSeller_ReservesAndChargesInOneSave()
+    public async Task Unauthorized_user_cannot_trigger_expiration_or_read_delivery_details()
+    {
+        var buyerId = Guid.NewGuid();
+        var sellerId = Guid.NewGuid();
+        var post = CreateFoodPost(sellerId, "Cơm", 30_000);
+        var order = new MarketplaceOrder(post.Id, buyerId, sellerId, post.Price,
+            UtcNow.AddHours(1), "Tiệm", null, UtcNow.AddHours(-1));
+        var orders = new StubOrderRepository();
+        orders.Added.Add(order);
+        var wallet = ActivatedWallet(buyerId, 200_000);
+        var service = new MarketplaceOrderService(
+            new UserContext(new StubCurrentUser(Guid.NewGuid()), profiles: null!), orders,
+            new StubPostRepository([post]), new StubNotificationRepository(), new StubNotificationPublisher(),
+            new StubTimeProvider(), new StubWalletRepository(wallet), validator: null!, cartValidator: null!,
+            Options.Create(new MarketplaceFinanceOptions()), profiles: null!);
+
+        await Assert.ThrowsAsync<Homeji.Application.Common.Exceptions.ForbiddenAccessException>(() => service.CancelAsync(order.Id));
+        await Assert.ThrowsAsync<Homeji.Application.Common.Exceptions.ForbiddenAccessException>(() => service.GetDetailAsync(order.Id));
+        Assert.Equal(MarketplaceOrderStatus.Requested, order.Status);
+        Assert.Null(order.RefundedAt);
+        Assert.Equal(0, orders.SaveCount);
+        Assert.Equal(200_000, wallet.Balance);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CreateCartAsync_TwoItemsFromSameSeller_ReservesAndChargesInOneSave(bool sellerDelivery)
     {
         var buyerId = Guid.NewGuid();
         var sellerId = Guid.NewGuid();
@@ -58,9 +85,19 @@ public sealed class MarketplaceCartOrderServiceTests
             posts.Select(post => new MarketplaceCartItemDto(post.Id, 1)).ToArray(),
             UtcNow.AddHours(1),
             "Nhận tại bếp",
-            null));
+            null,
+            sellerDelivery ? new MarketplaceFulfillmentDto(MarketplaceFulfillmentType.SellerDelivery,
+                new MarketplaceDeliveryDto("Sinh viên", "0901234567", "KTX Thủ Đức", 10.85m, 106.77m)) : null));
 
         Assert.Equal(2, result.Count);
+        Assert.Single(result.Select(order => order.CheckoutId).Distinct());
+        Assert.All(result, order => Assert.Equal(sellerDelivery
+            ? MarketplaceFulfillmentType.SellerDelivery : MarketplaceFulfillmentType.Pickup, order.FulfillmentType));
+        if (sellerDelivery)
+        {
+            Assert.All(result, order => Assert.Equal("KTX Thủ Đức", order.Delivery!.Address));
+            Assert.All(result, order => Assert.Equal("Bếp Homeji", order.PickupAddress));
+        }
         Assert.All(result, order => Assert.Equal(0.10m, order.PlatformFeeRate));
         Assert.Equal(165_000, buyerWallet.Balance);
         Assert.All(posts, post => Assert.Equal(1, post.ReservedQuantity));
@@ -253,10 +290,7 @@ public sealed class MarketplaceCartOrderServiceTests
             Task.FromResult<IReadOnlyList<MarketplacePost>>(posts.Where(post => ids.Contains(post.Id)).ToArray());
 
         public Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
-            string? keyword, string? category, MarketplaceListingType? listingType,
-            decimal? minPrice, decimal? maxPrice,
-            decimal? minLatitude, decimal? maxLatitude, decimal? minLongitude, decimal? maxLongitude,
-            int skip, int take, CancellationToken cancellationToken = default) =>
+            MarketplaceSearchQuery search, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task AddAsync(MarketplacePost post, CancellationToken cancellationToken = default) =>

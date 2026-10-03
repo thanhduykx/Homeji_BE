@@ -97,7 +97,7 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         var timeoutMilliseconds = Math.Clamp(_options.TimeoutSeconds, 5, 120) * 1_000;
         return new SmtpClient(_options.Host, _options.Port)
         {
-            EnableSsl = _options.EnableSsl,
+            EnableSsl = true,
             DeliveryMethod = SmtpDeliveryMethod.Network,
             Timeout = timeoutMilliseconds,
             UseDefaultCredentials = false,
@@ -145,6 +145,11 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
 
     private void ValidateOptions(string confirmationUrl)
     {
+        if (!_options.EnableSsl)
+        {
+            throw new InvalidOperationException("SMTP TLS must be enabled before sending confirmation links.");
+        }
+
         if (string.IsNullOrWhiteSpace(_options.Host))
         {
             throw new InvalidOperationException("SMTP host must be configured.");

@@ -204,17 +204,7 @@ public sealed class MarketplaceOrderExpirationServiceTests
             Task.FromResult<MarketplacePost?>(id == post.Id ? post : null);
 
         public Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
-            string? keyword,
-            string? category,
-            MarketplaceListingType? listingType,
-            decimal? minPrice,
-            decimal? maxPrice,
-            decimal? minLatitude,
-            decimal? maxLatitude,
-            decimal? minLongitude,
-            decimal? maxLongitude,
-            int skip,
-            int take,
+            MarketplaceSearchQuery search,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 

@@ -2,6 +2,8 @@ using Homeji.Application.DTOs.Conversations;
 using Homeji.Application.IServices.Conversations;
 using Homeji.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Homeji.Api.RateLimiting;
 
 namespace Homeji.Api.Controllers;
 
@@ -59,7 +61,8 @@ public sealed class ConversationsController : ControllerBase
     }
 
     [HttpPost("{conversationId:guid}/messages/images")]
-    [RequestSizeLimit(42 * 1024 * 1024)]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    [RequestSizeLimit(42 * 1024 * 1024)] // At most five images; each is decoded and size checked.
     [ProducesResponseType<PostMessageDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PostMessageDto>> SendImages(

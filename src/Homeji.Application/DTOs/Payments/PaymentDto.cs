@@ -22,4 +22,5 @@ public sealed record PaymentDto(
     string? ProviderMessage,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? PaidAt);
+    DateTimeOffset? PaidAt,
+    DateTimeOffset? ExpiresAt = null);

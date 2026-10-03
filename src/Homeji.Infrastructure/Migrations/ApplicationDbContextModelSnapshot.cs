@@ -170,11 +170,29 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<Guid>("BuyerId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("CheckoutId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset?>("DeliveredAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("DeliveryLatitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<decimal?>("DeliveryLongitude")
+                        .HasPrecision(9, 6)
+                        .HasColumnType("numeric(9,6)");
+
+                    b.Property<int>("FulfillmentType")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("FundsReleasedAt")
                         .HasColumnType("timestamp with time zone");
@@ -205,6 +223,14 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
+                    b.Property<string>("RecipientName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RecipientPhone")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<DateTimeOffset?>("RefundedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -227,6 +253,8 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CheckoutId");
 
                     b.HasIndex("BuyerId", "CreatedAt");
 
@@ -252,6 +280,7 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnName("address");
 
                     b.Property<int>("AvailableQuantity")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("available_quantity");
 
@@ -277,6 +306,12 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(3000)")
                         .HasColumnName("description");
 
+                    b.Property<bool>("IsSynthetic")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_synthetic");
+
                     b.Property<decimal>("Latitude")
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)")
@@ -300,11 +335,13 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnName("preparation_minutes");
 
                     b.Property<decimal>("Price")
+                        .IsConcurrencyToken()
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("price");
 
                     b.Property<int>("ReservedQuantity")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("reserved_quantity");
 
@@ -313,6 +350,7 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnName("seller_id");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
@@ -526,6 +564,7 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnName("request_id");
 
                     b.Property<int>("Status")
+                        .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("status");
 
@@ -733,6 +772,12 @@ namespace Homeji.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("internet_price");
+
+                    b.Property<bool>("IsSynthetic")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_synthetic");
 
                     b.Property<decimal>("Latitude")
                         .HasPrecision(10, 7)
@@ -997,6 +1042,88 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("rental_reviews", "homeji", t =>
                         {
                             t.HasCheckConstraint("ck_rental_reviews_rating", "rating >= 1 AND rating <= 5");
+                        });
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.RentalSourceListing", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("address");
+
+                    b.Property<decimal>("Area")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)")
+                        .HasColumnName("area");
+
+                    b.Property<DateTimeOffset>("CollectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("collected_at");
+
+                    b.Property<string>("District")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("district");
+
+                    b.PrimitiveCollection<string[]>("ImageUrls")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("image_urls");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("price");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("SourceId")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("source_id");
+
+                    b.Property<DateTimeOffset?>("SourceUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("source_updated_at");
+
+                    b.Property<string>("SourceUrl")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("source_url");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Source", "SourceId")
+                        .IsUnique();
+
+                    b.HasIndex("District", "CollectedAt", "Id");
+
+                    b.ToTable("rental_source_listings", "homeji", t =>
+                        {
+                            t.HasCheckConstraint("ck_rental_source_listings_district", "district IN ('quan-9', 'thu-duc')");
+
+                            t.HasCheckConstraint("ck_rental_source_listings_images", "jsonb_typeof(image_urls) = 'array' AND jsonb_array_length(image_urls) BETWEEN 1 AND 10");
+
+                            t.HasCheckConstraint("ck_rental_source_listings_price_area", "price > 0 AND price <= 100000000 AND area > 0 AND area <= 1000");
                         });
                 });
 

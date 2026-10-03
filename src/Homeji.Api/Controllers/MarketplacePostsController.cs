@@ -33,6 +33,7 @@ public sealed class MarketplacePostsController : ControllerBase
         [FromQuery] decimal? longitude,
         [FromQuery] decimal? radiusKm,
         [FromQuery] Guid? nearRentalPostId,
+        [FromQuery] Guid? sellerId,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -48,7 +49,8 @@ public sealed class MarketplacePostsController : ControllerBase
             radiusKm,
             nearRentalPostId,
             page,
-            pageSize), cancellationToken));
+            pageSize,
+            sellerId), cancellationToken));
     }
 
     [AllowAnonymous]

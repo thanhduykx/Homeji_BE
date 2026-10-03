@@ -1,6 +1,8 @@
 using Homeji.Application.DTOs.Upload;
 using Homeji.Application.IServices.Upload;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Homeji.Api.RateLimiting;
 
 namespace Homeji.Api.Controllers;
 
@@ -20,10 +22,11 @@ public sealed class UploadController : ControllerBase
     /// Used by landlords (rental post images) and users (avatar, reports, etc.).
     /// </summary>
     [HttpPost("image")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
     [ProducesResponseType<IReadOnlyList<UploadImageResultDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
-    [RequestSizeLimit(50 * 1024 * 1024)] // 50 MB total
+    [RequestSizeLimit(50 * 1024 * 1024)] // At most ten images; upload service enforces per-image limits.
     public async Task<ActionResult<IReadOnlyList<UploadImageResultDto>>> UploadImages(
         IReadOnlyList<IFormFile> files,
         [FromQuery] string? folder,

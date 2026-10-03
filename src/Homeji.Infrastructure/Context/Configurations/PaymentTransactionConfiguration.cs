@@ -13,7 +13,8 @@ public sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration<P
         builder.Property(payment => payment.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(payment => payment.UserId).HasColumnName("user_id").IsRequired();
         builder.Property(payment => payment.Method).HasColumnName("method").HasConversion<int>().IsRequired();
-        builder.Property(payment => payment.Status).HasColumnName("status").HasConversion<int>().IsRequired();
+        // A webhook loaded before an expiration sweep must retry against the new status.
+        builder.Property(payment => payment.Status).HasColumnName("status").HasConversion<int>().IsRequired().IsConcurrencyToken();
         builder.Property(payment => payment.Amount).HasColumnName("amount").HasPrecision(18, 2).IsRequired();
         builder.Property(payment => payment.Purpose).HasColumnName("purpose").HasConversion<int>().IsRequired();
         builder.Property(payment => payment.PackageCode).HasColumnName("package_code").HasMaxLength(PaymentTransaction.MaxPackageCodeLength);

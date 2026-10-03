@@ -14,6 +14,30 @@ namespace Homeji.Api.IntegrationTests;
 public sealed class GlobalExceptionHandlerTests
 {
     [Fact]
+    public async Task Production_error_does_not_disclose_exception_even_when_config_enabled()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddProblemDetails();
+        await using var provider = services.BuildServiceProvider();
+        var handler = new GlobalExceptionHandler(
+            provider.GetRequiredService<ILogger<GlobalExceptionHandler>>(),
+            provider.GetRequiredService<IProblemDetailsService>(), new TestHostEnvironment(),
+            new ConfigurationBuilder().AddInMemoryCollection(
+                new Dictionary<string, string?> { ["Api:ExposeErrorDetails"] = "true" }).Build());
+        var context = new DefaultHttpContext { RequestServices = provider };
+        context.Response.Body = new MemoryStream();
+
+        await handler.TryHandleAsync(context, new InvalidOperationException("private database credentials"), CancellationToken.None);
+
+        context.Response.Body.Position = 0;
+        using var body = await JsonDocument.ParseAsync(context.Response.Body);
+        Assert.Equal(500, context.Response.StatusCode);
+        Assert.False(body.RootElement.TryGetProperty("detail", out _));
+        Assert.False(body.RootElement.TryGetProperty("exceptionType", out _));
+    }
+
+    [Fact]
     public async Task ForbiddenAccessException_ReturnsForbiddenProblemDetails()
     {
         var services = new ServiceCollection();

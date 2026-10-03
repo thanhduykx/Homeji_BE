@@ -12,6 +12,7 @@ public sealed class ApplicationDbContext : DbContext
 
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<RentalPost> RentalPosts => Set<RentalPost>();
+    public DbSet<RentalSourceListing> RentalSourceListings => Set<RentalSourceListing>();
     public DbSet<RentalPostMedia> RentalPostMedia => Set<RentalPostMedia>();
     public DbSet<RentalPostAmenity> RentalPostAmenities => Set<RentalPostAmenity>();
     public DbSet<RentalReview> RentalReviews => Set<RentalReview>();

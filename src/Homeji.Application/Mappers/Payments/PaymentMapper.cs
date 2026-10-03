@@ -27,6 +27,7 @@ public static class PaymentMapper
             payment.ProviderMessage,
             payment.CreatedAt,
             payment.UpdatedAt,
-            payment.PaidAt);
+            payment.PaidAt,
+            payment.CreatedAt.Add(PaymentTransaction.PaymentLifetime));
     }
 }

@@ -62,6 +62,10 @@ public sealed class MarketplaceSellerLocationNormalizer : BackgroundService
                         latitude,
                         longitude
                     FROM homeji.marketplace_posts
+                    WHERE seller_id IN (
+                        'd3000000-0000-0000-0000-000000000021'::uuid,
+                        'd3000000-0000-0000-0000-000000000022'::uuid,
+                        'd3000000-0000-0000-0000-000000000024'::uuid)
                     ORDER BY seller_id, created_at, id
                 )
                 UPDATE homeji.marketplace_posts AS post

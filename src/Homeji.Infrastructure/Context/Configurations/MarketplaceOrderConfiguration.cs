@@ -10,6 +10,13 @@ public sealed class MarketplaceOrderConfiguration : IEntityTypeConfiguration<Mar
     {
         builder.ToTable("marketplace_orders", "homeji");
         builder.HasKey(order => order.Id);
+        builder.Property(order => order.FulfillmentType).HasConversion<int>();
+        builder.Property(order => order.RecipientName).HasMaxLength(100);
+        builder.Property(order => order.RecipientPhone).HasMaxLength(16);
+        builder.Property(order => order.DeliveryAddress).HasMaxLength(MarketplaceOrder.MaxPickupAddressLength);
+        builder.Property(order => order.DeliveryLatitude).HasPrecision(9, 6);
+        builder.Property(order => order.DeliveryLongitude).HasPrecision(9, 6);
+        builder.HasIndex(order => order.CheckoutId);
         builder.Property(order => order.Status).HasConversion<int>().IsConcurrencyToken();
         builder.Property(order => order.AgreedPrice).HasPrecision(18, 2).IsRequired();
         builder.Property(order => order.UnitPrice).HasPrecision(18, 2).IsRequired();

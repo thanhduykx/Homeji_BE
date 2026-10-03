@@ -38,11 +38,15 @@ Controller không gọi DAL trực tiếp. Service không phụ thuộc HTTP. Re
 
 ## Cấu hình
 
-Project không dùng file cấu hình local riêng, `.env`, .NET User Secrets hoặc environment variables cho application config.
+Cấu hình không chứa secret trong Git:
 
-- File cấu hình duy nhất: `src/Homeji.Api/appsettings.json`
-- Runtime, EF tooling và Docker image đều đọc file này.
-- Trade-off: clone repo chạy đơn giản hơn, nhưng nếu repo public hoặc chia sẻ rộng thì cần rotate/giới hạn quyền các key trong `appsettings.json`.
+- `src/Homeji.Api/appsettings.json`: cấu hình chung và giá trị mặc định không bí mật.
+- Development đọc thêm `appsettings.Local.json` (đã được Git/Docker/publish bỏ qua); bản local trên máy hiện tại đã giữ lại các giá trị cấu hình cũ.
+- Environment variables ghi đè cấu hình ở mọi môi trường; ví dụ `ConnectionStrings__DefaultConnection`, `Email__Smtp__Password`, `Payments__MoMo__AccessKey`, `Payments__MoMo__SecretKey`, `Payments__PayOS__ApiKey`, `Payments__PayOS__ChecksumKey`, `Supabase__ServiceRoleKey`.
+- EF tooling đọc cấu hình chung, local và environment variables. Không chạy `database update` nếu chưa kiểm tra database đích.
+- Production không nạp file local. Các khóa từng được commit cần được rotate qua nhà cung cấp; thay đổi working tree không xóa lịch sử Git.
+- Reverse proxy phải cấu hình IP/CIDR tin cậy bằng `ReverseProxy:KnownProxies` hoặc `ReverseProxy:KnownNetworks`. Mặc định chỉ tin loopback; không dùng mạng `/0`. Cần cấu hình đúng proxy của Render trước khi deploy, để giữ HTTPS và rate limiting theo IP chính xác.
+- Production bật HSTS, không trả exception nội bộ; JSON body mặc định tối đa 128 KiB, upload ảnh có giới hạn riêng.
 
 Docker chỉ bind port bằng command argument:
 
@@ -226,5 +230,25 @@ Production, ASP.NET Core tự động ánh xạ `Ai__Gemini__ApiKey` thành
 - Business invariants nằm trong Domain.
 - Orchestration nằm trong Application Services.
 - DAL chỉ đi qua repository.
-- Không tự động chạy migration khi API start.
+- Migration startup do `Database:ApplyMigrationsOnStartup` điều khiển; Render hiện bật qua environment variable. Production nên chạy migration như bước deploy riêng bằng tài khoản DDL, API dùng quyền tối thiểu.
 - Build bật nullable reference types, analyzers và warnings-as-errors.
+
+## Food quanh trọ và kiểm chứng chất lượng (03/10/2026)
+
+Phạm vi sản phẩm: Quận 9 cũ / Thủ Đức; tiệm tự giao hoặc khách đến lấy. Chi tiết hợp đồng mới và kết quả kiểm chứng nằm trong [backend-verification-2026-10-03.md](docs/backend-verification-2026-10-03.md).
+
+Danh mục tin nguồn và ảnh dùng `GET /api/rental-source-listings`, có link nguồn và thời điểm thu thập; các tin giả lập cũ được phân biệt qua `isSynthetic`. Hướng dẫn thu thập và kiểm tra dữ liệu nằm trong tài liệu trên.
+
+```powershell
+# Sonar analyzer cục bộ, build nghiêm ngặt, tests, coverage và dependency audit
+./scripts/quality/Test-Quality.ps1
+
+# PostgreSQL riêng, toàn bộ migration/tests và k6; tự dừng API/DB sau chạy
+./scripts/quality/Test-LocalBackend.ps1
+
+# Scanner server/Cloud: cần SONAR_TOKEN, SONAR_PROJECT_KEY, SONAR_HOST_URL,
+# và SONAR_ORGANIZATION với Cloud đã tạo project
+./scripts/quality/Test-Quality.ps1 -ServerAnalysis
+```
+
+`Test-LocalBackend.ps1` chỉ dùng database `homeji_quality` trên loopback, không chạy tải vào production. Cần PostgreSQL 18 tại đường dẫn mặc định hoặc truyền `-PostgresBin`, cùng k6 trong PATH.

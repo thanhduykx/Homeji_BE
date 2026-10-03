@@ -1,0 +1,6 @@
+<Project>
+  <!-- Opt-in local Sonar rules; the server scanner manages its own analyzers. -->
+  <ItemGroup Condition="'$(EnableSonarAnalyzers)' == 'true'">
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

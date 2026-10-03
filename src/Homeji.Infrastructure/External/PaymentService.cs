@@ -61,6 +61,7 @@ public sealed class PaymentService : IPaymentService
         CancellationToken cancellationToken = default)
     {
         var userId = _userContext.GetRequiredUserId();
+        await _payments.CancelOverdueAsync(_timeProvider.GetUtcNow(), userId, cancellationToken);
         var payment = await _payments.GetByIdAsync(paymentId, cancellationToken)
             ?? throw new NotFoundException(nameof(PaymentTransaction), paymentId);
 
@@ -78,6 +79,7 @@ public sealed class PaymentService : IPaymentService
         }
 
         var userId = _userContext.GetRequiredUserId();
+        await _payments.CancelOverdueAsync(_timeProvider.GetUtcNow(), userId, cancellationToken);
         var payment = await _payments.GetByOrderCodeAsync(orderCode, cancellationToken)
             ?? throw new NotFoundException(nameof(PaymentTransaction), orderCode);
 
@@ -91,6 +93,7 @@ public sealed class PaymentService : IPaymentService
         CancellationToken cancellationToken = default)
     {
         var userId = _userContext.GetRequiredUserId();
+        await _payments.CancelOverdueAsync(_timeProvider.GetUtcNow(), userId, cancellationToken);
         var payments = await _payments.GetForUserAsync(userId, status, Math.Clamp(take, 1, 100), cancellationToken);
         return payments.Select(PaymentMapper.ToDto).ToArray();
     }
@@ -341,6 +344,7 @@ public sealed class PaymentService : IPaymentService
             description = providerDescription,
             cancelUrl = _payOsOptions.CancelUrl,
             returnUrl = _payOsOptions.ReturnUrl,
+            expiredAt = now.Add(PaymentTransaction.PaymentLifetime).ToUnixTimeSeconds(),
             signature = Sign(rawSignature, _payOsOptions.ChecksumKey),
         };
 

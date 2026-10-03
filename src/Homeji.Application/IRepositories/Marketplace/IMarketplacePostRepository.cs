@@ -23,17 +23,7 @@ public interface IMarketplacePostRepository
         Task.FromResult<IReadOnlyList<MarketplacePost>>([]);
 
     Task<IReadOnlyList<MarketplacePost>> SearchActiveAsync(
-        string? keyword,
-        string? category,
-        Homeji.Domain.Enums.MarketplaceListingType? listingType,
-        decimal? minPrice,
-        decimal? maxPrice,
-        decimal? minLatitude,
-        decimal? maxLatitude,
-        decimal? minLongitude,
-        decimal? maxLongitude,
-        int skip,
-        int take,
+        MarketplaceSearchQuery search,
         CancellationToken cancellationToken = default);
 
     Task AddAsync(MarketplacePost post, CancellationToken cancellationToken = default);

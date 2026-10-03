@@ -16,3 +16,6 @@ coverage
 src/Homeji.Api/appsettings.Local.json
 **/bin
 **/obj
+**/appsettings.Local.json
+output/
+.sonarqube/

@@ -5,7 +5,8 @@ namespace Homeji.Application.Services.Moderation;
 
 public sealed class ContentModerationService
 {
-    private static readonly Regex HiddenPhoneRegex = new(@"\d(?:[\s.\-_\(\)]*\d){9}", RegexOptions.Compiled);
+    private static readonly Regex HiddenPhoneRegex = new(@"\d(?:[\s.\-_\(\)]*\d){9}",
+        RegexOptions.Compiled | RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
     private readonly IBadWordRepository _badWords;
 
     public ContentModerationService(IBadWordRepository badWords)

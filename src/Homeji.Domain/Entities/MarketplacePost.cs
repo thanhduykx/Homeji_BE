@@ -67,6 +67,7 @@ public sealed class MarketplacePost
     public string Title { get; private set; } = null!;
 
     public string Description { get; private set; } = null!;
+    public bool IsSynthetic { get; private set; }
 
     public decimal Price { get; private set; }
 

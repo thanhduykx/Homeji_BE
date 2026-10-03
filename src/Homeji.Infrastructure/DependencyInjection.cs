@@ -77,6 +77,7 @@ public static class DependencyInjection
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<IAccountEmailRepository, AccountEmailRepository>();
         services.AddScoped<IRentalPostRepository, RentalPostRepository>();
+        services.AddScoped<IRentalSourceListingRepository, RentalSourceListingRepository>();
         services.AddScoped<ISavedPostRepository, SavedPostRepository>();
         services.AddScoped<IRoommateInvitationRepository, RoommateInvitationRepository>();
         services.AddScoped<IRoommateConversationRepository, RoommateConversationRepository>();
