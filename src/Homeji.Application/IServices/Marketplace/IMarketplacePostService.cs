@@ -4,6 +4,7 @@ namespace Homeji.Application.IServices.Marketplace;
 
 public interface IMarketplacePostService
 {
+    Task<IReadOnlyList<MarketplacePostDto>> GetMineAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<MarketplacePostDto>> SearchAsync(
         MarketplaceSearchDto request,
         CancellationToken cancellationToken = default);

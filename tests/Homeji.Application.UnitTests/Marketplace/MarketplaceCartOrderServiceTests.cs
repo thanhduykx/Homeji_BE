@@ -281,6 +281,8 @@ public sealed class MarketplaceCartOrderServiceTests
 
     private sealed class StubPostRepository(IReadOnlyList<MarketplacePost> posts) : IMarketplacePostRepository
     {
+        public Task<IReadOnlyList<MarketplacePost>> GetBySellerAsync(Guid sellerId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MarketplacePost>>(posts.Where(post => post.SellerId == sellerId).ToArray());
         public Task<MarketplacePost?> GetByIdWithMediaAsync(Guid id, CancellationToken cancellationToken = default) =>
             Task.FromResult(posts.SingleOrDefault(post => post.Id == id));
 

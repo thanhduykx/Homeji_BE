@@ -71,6 +71,14 @@ public sealed class MarketplacePostService : IMarketplacePostService
             .ToArray();
     }
 
+    public async Task<IReadOnlyList<MarketplacePostDto>> GetMineAsync(CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        var posts = await _marketplacePosts.GetBySellerAsync(userId, cancellationToken);
+        var seller = await _profiles.GetByIdAsync(userId, cancellationToken);
+        return posts.Select(post => ToDto(post, seller, null, null)).ToArray();
+    }
+
     public async Task<MarketplacePostDto> GetDetailAsync(
         Guid id,
         CancellationToken cancellationToken = default)

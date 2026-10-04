@@ -62,6 +62,11 @@ public sealed class MarketplacePostsController : ControllerBase
         return Ok(await _marketplaceService.GetDetailAsync(id, cancellationToken));
     }
 
+    [Authorize]
+    [HttpGet("mine")]
+    public async Task<ActionResult<IReadOnlyList<MarketplacePostDto>>> GetMine(CancellationToken cancellationToken) =>
+        Ok(await _marketplaceService.GetMineAsync(cancellationToken));
+
     [HttpPost]
     [ProducesResponseType<MarketplacePostDto>(StatusCodes.Status201Created)]
     public async Task<ActionResult<MarketplacePostDto>> Create(

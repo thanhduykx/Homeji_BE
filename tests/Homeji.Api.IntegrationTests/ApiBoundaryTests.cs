@@ -61,6 +61,8 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
 
     [Theory]
     [InlineData("/api/conversations")]
+    [InlineData("/api/marketplace-posts/mine")]
+    [InlineData("/api/rental-posts/mine/stats")]
     [InlineData("/api/marketplace-orders")]
     [InlineData("/api/payments")]
     [InlineData("/api/activities")]

@@ -4,6 +4,7 @@ namespace Homeji.Application.IRepositories.Marketplace;
 
 public interface IMarketplacePostRepository
 {
+    Task<IReadOnlyList<MarketplacePost>> GetBySellerAsync(Guid sellerId, CancellationToken cancellationToken = default);
     Task<MarketplacePost?> GetByIdWithMediaAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task<MarketplacePost?> GetSellerLocationAnchorAsync(
