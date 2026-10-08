@@ -49,6 +49,8 @@ public sealed class RentalPostRepository : IRentalPostRepository
         if (search.ExcludeSynthetic || search.Ids is { Count: > 0 }) query = query.Where(post => !post.IsSynthetic);
         if (search.ExcludeRoommateShare)
             query = query.Where(post => post.Type != RentalPostType.RoommateShare);
+        if (search.Type.HasValue)
+            query = query.Where(post => post.Type == search.Type.Value);
         foreach (var code in (search.ExcludedAmenities ?? []).Select(value => value.Trim().ToUpperInvariant()).Distinct(StringComparer.Ordinal))
             query = query.Where(post => !post.Amenities.Any(amenity => amenity.Code == code));
 

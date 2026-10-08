@@ -1,3 +1,5 @@
+using Homeji.Domain.Enums;
+
 namespace Homeji.Application.DTOs.RentalPosts;
 
 public sealed record RentalPostSearchDto(
@@ -19,4 +21,5 @@ public sealed record RentalPostSearchDto(
     IReadOnlyCollection<string>? ExcludedAmenities = null,
     bool ExcludeRoommateShare = false,
     IReadOnlyCollection<Guid>? Ids = null,
-    bool ExcludeSynthetic = false);
+    bool ExcludeSynthetic = false,
+    RentalPostType? Type = null);

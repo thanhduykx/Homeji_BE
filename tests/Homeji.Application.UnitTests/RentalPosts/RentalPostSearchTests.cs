@@ -17,6 +17,17 @@ namespace Homeji.Application.UnitTests.RentalPosts;
 public sealed class RentalPostSearchTests
 {
     [Theory]
+    [InlineData(0)]
+    [InlineData(999)]
+    public async Task SearchAsync_UndefinedListingType_IsRejected(int type)
+    {
+        var service = CreateComparisonService(null, []);
+        var request = new RentalPostSearchDto(null, null, null, null, null, null, null, null, null,
+            [], Type: (RentalPostType)type);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.SearchAsync(request));
+    }
+
+    [Theory]
     [InlineData("owner")]
     [InlineData("other")]
     [InlineData("guest")]

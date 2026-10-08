@@ -4,6 +4,7 @@ using Homeji.Api.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Api.Controllers;
 
@@ -42,6 +43,7 @@ public sealed class RentalPostsController : ControllerBase
         [FromQuery] string[]? excludedAmenities = null,
         [FromQuery] bool excludeRoommateShare = false,
         [FromQuery] Guid[]? ids = null,
+        [FromQuery] RentalPostType? type = null,
         CancellationToken cancellationToken = default)
     {
         var result = await _rentalPostService.SearchAsync(
@@ -63,7 +65,8 @@ public sealed class RentalPostsController : ControllerBase
                 availableFromBefore,
                 excludedAmenities,
                 excludeRoommateShare,
-                ids),
+                ids,
+                Type: type),
             cancellationToken);
 
         return Ok(result);

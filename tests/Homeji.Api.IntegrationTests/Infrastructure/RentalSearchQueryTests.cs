@@ -8,6 +8,20 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class RentalSearchQueryTests
 {
     [Fact]
+    public void Roommate_type_is_filtered_in_postgres_before_pagination()
+    {
+        using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Database=translation_only;Username=translation_only;Password=unused").Options);
+        var request = new RentalPostSearchDto(null, null, null, null, null, null, null, null, null,
+            [], Page: 2, PageSize: 20, MinAvailableSlots: 1, Type: Homeji.Domain.Enums.RentalPostType.RoommateShare);
+        var sql = new RentalPostRepository(db).BuildActiveSearchQuery(request).ToQueryString();
+        Assert.Matches(@"\w+\.type = @", sql);
+        Assert.Contains("available_slots >=", sql, StringComparison.Ordinal);
+        Assert.True(sql.IndexOf(".type =", StringComparison.Ordinal) < sql.IndexOf("LIMIT", StringComparison.Ordinal));
+        Assert.Contains("OFFSET", sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Shortlist_filters_translate_to_parameterized_postgres_before_paging_without_a_connection()
     {
         // Translation only: this test never opens a connection or writes to a database.

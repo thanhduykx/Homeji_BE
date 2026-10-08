@@ -236,6 +236,8 @@ public sealed class RentalPostService : IRentalPostService
         RentalPostSearchDto request,
         CancellationToken cancellationToken = default)
     {
+        if (request.Type.HasValue && !Enum.IsDefined(request.Type.Value))
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["type"] = ["Loại tin phòng không hợp lệ."] });
         if (request.Ids?.Count > 10 || request.ExcludedAmenities?.Count > 20 || request.ExcludedAmenities?.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > RentalPost.MaxAmenityCodeLength) == true || request.MinAvailableSlots is < 1 or > 20)
             throw new RequestValidationException(new Dictionary<string, string[]> { ["filters"] = ["Bộ lọc tin phòng không hợp lệ."] });
         var search = request;
@@ -392,7 +394,7 @@ public sealed class RentalPostService : IRentalPostService
 
     private static bool HasSearchCriteria(RentalPostSearchDto search)
     {
-        return !string.IsNullOrWhiteSpace(search.Keyword)
+        return search.Type.HasValue || !string.IsNullOrWhiteSpace(search.Keyword)
             || search.MinPrice.HasValue
             || search.MaxPrice.HasValue
             || search.MinArea.HasValue
