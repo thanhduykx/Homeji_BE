@@ -148,7 +148,7 @@ public static class ChatbotNavigationCatalog
             terms.Select(Normalize).ToArray());
     }
 
-    private static string Normalize(string value)
+    internal static string Normalize(string value)
     {
         var decomposed = value.Normalize(NormalizationForm.FormD);
         var builder = new StringBuilder(decomposed.Length);

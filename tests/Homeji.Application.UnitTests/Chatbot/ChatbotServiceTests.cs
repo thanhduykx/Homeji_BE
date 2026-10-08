@@ -18,6 +18,31 @@ public sealed class ChatbotServiceTests
     private static readonly Guid UserId = Guid.Parse("8e996f4c-ec40-4b5e-b66b-9f33c4f29b63");
     private static readonly DateTimeOffset UtcNow = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData("hi", "Xin chào")]
+    [InlineData("Cách thanh toán bằng PayOS như thế nào?", "PayOS")]
+    public async Task KnownSupportQuestion_AnswersWithoutCallingUnavailableProvider(string message, string expected)
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new CountingUnavailableClient();
+        var reply = await CreateService(repository, ai, historyStorageEnabled: false)
+            .SendMessageAsync(new(null, message));
+        Assert.Contains(expected, reply.AssistantMessage.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("không khả dụng", reply.AssistantMessage.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, ai.Calls);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    private sealed class CountingUnavailableClient : IChatbotAiClient
+    {
+        public int Calls { get; private set; }
+        public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string latestUserMessage, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            throw new ExternalServiceUnavailableException("Gemini", "Unavailable");
+        }
+    }
+
     [Fact]
     public async Task GetPopupConfigAsync_UsesExactHomejiBrandName()
     {

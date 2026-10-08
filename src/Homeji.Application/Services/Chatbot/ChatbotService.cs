@@ -147,6 +147,9 @@ public sealed class ChatbotService : IChatbotService
         IReadOnlyCollection<ChatbotNavigationActionDto> actions,
         CancellationToken cancellationToken)
     {
+        var knownReply = ChatbotSupportKnowledge.FindReply(message);
+        if (knownReply is not null) return knownReply;
+
         try
         {
             return await _aiClient.GenerateReplyAsync(history, message, cancellationToken);
