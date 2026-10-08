@@ -2,6 +2,15 @@
 
 Ngày kiểm tra: 2026-10-08. Phạm vi: tài liệu chính thức, đối chiếu mã nguồn Homeji; không gọi thanh toán thật, không thử gửi tin nhắn đến đội hỗ trợ của dịch vụ khác.
 
+## Đã triển khai và giới hạn còn lại
+
+- Backend `0c03a25` đã Live trên Render. `ChatbotSupportKnowledge` xử lý lời chào, giới thiệu, cảm ơn, hướng dẫn PayOS/Premium/đặt đồ ăn và câu hỏi cần kiểm tra trạng thái trước khi gọi Gemini. Tìm phòng vẫn dùng retrieval hiện có. History và Routes vẫn tắt.
+- Test service cho `hi` và câu PayOS đi từ 2 failed sang 2 passed, đồng thời kiểm tra không gọi provider và không lưu repository. Tổng 303 unit tests, 84 API tests passed / 8 skipped; Release publish đạt.
+- Browser production tại `/privacy` gửi đúng `hi` và “Cách thanh toán bằng PayOS như thế nào?”: trả lời chào và hướng dẫn 4 bước, CTA mở gói, không còn thông báo unavailable cho hai câu này. Không tạo thanh toán hoặc đăng tin. Ảnh frontend `output/verification/chatbot-payos-fixed-20261008.jpg`.
+- Provider vẫn chưa khôi phục: log Render gọi model cấu hình `gemini-3.5-flash` và trả HTTP 401. Credential sẵn có trong môi trường máy được thử riêng với một prompt không chứa dữ liệu người dùng, Google trả `API_KEY_INVALID`. Không in/lưu key hoặc payload bí mật. Render có `Ai__Gemini__ApiKey` và `Ai__Gemini__Endpoint`, chưa tìm thấy key hợp lệ để thay thế. Không kết luận các credential ở máy và Render giống nhau. Cần credential Google Gemini hợp lệ để kiểm chứng lại phần sinh câu trả lời mở rộng. Google mô tả 401 là vấn đề xác thực trong [API errors](https://ai.google.dev/gemini-api/docs/api-errors).
+
+Luồng FAQ đã sửa không đồng nghĩa Gemini đã hoạt động; câu hỏi ngoài kiến thức được duyệt vẫn dùng provider và báo sự cố trung thực khi provider lỗi.
+
 ## Những gì tài liệu chính thức xác nhận
 
 **Intercom Fin** trả lời từ nội dung hỗ trợ và dữ liệu được cung cấp. Khi chưa tìm được câu trả lời rõ ràng, Fin có thể nêu phần thông tin tìm được, thể hiện sự chưa chắc chắn và hỏi làm rõ. Tài liệu cũng phân biệt không biết câu trả lời với sự cố LLM; khi lỗi lặp lại, Fin chuyển hội thoại sang đội hỗ trợ đã được tích hợp. Không nên hiểu việc chuyển giao là một khả năng mặc định của mọi chatbot. [Fin AI Agent FAQs](https://www.intercom.com/help/en/articles/7837535-fin-ai-agent-faqs).
