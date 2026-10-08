@@ -39,6 +39,9 @@ public sealed class RentalPostsController : ControllerBase
         [FromQuery] DateOnly? availableFromBefore = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] string[]? excludedAmenities = null,
+        [FromQuery] bool excludeRoommateShare = false,
+        [FromQuery] Guid[]? ids = null,
         CancellationToken cancellationToken = default)
     {
         var result = await _rentalPostService.SearchAsync(
@@ -57,7 +60,10 @@ public sealed class RentalPostsController : ControllerBase
                 pageSize,
                 maxDeposit,
                 minAvailableSlots,
-                availableFromBefore),
+                availableFromBefore,
+                excludedAmenities,
+                excludeRoommateShare,
+                ids),
             cancellationToken);
 
         return Ok(result);

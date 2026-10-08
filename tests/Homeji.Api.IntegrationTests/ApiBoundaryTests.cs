@@ -72,6 +72,8 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [InlineData("/api/admin/wallet-withdrawals?status=1")]
     [InlineData("/api/admin/analytics/product?days=30")]
     [InlineData("/api/admin/analytics/traffic?days=30")]
+    [InlineData("/api/chatbot/conversations")]
+    [InlineData("/api/chatbot/conversations/11111111-1111-4111-8111-111111111111/messages")]
     [InlineData("/api/marketplace-seller-plans")]
     [InlineData("/api/marketplace-seller-plans/mine")]
     public async Task NewPrivateEndpoints_WithoutAccessToken_ReturnUnauthorized(string path)
@@ -102,6 +104,17 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
             });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GroundedSearchAndChatbotDelete_WithoutToken_RejectBeforeExecutingServices()
+    {
+        var search = await _client.PostAsJsonAsync(new Uri("/api/ai/highlight-rental-posts", UriKind.Relative), new { text = "Phòng dưới 4tr" });
+        Assert.Equal(HttpStatusCode.Unauthorized, search.StatusCode);
+        var chat = await _client.PostAsJsonAsync(new Uri("/api/chatbot/messages", UriKind.Relative), new { message = "Phòng dưới 4tr" });
+        Assert.Equal(HttpStatusCode.Unauthorized, chat.StatusCode);
+        var deleted = await _client.DeleteAsync(new Uri("/api/chatbot/conversations/11111111-1111-4111-8111-111111111111", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.Unauthorized, deleted.StatusCode);
     }
 
     [Fact]

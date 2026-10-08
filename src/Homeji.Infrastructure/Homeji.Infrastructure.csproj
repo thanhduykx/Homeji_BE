@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <InternalsVisibleTo Include="Homeji.Api.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\Homeji.Application\Homeji.Application.csproj" />
     <ProjectReference Include="..\Homeji.Domain\Homeji.Domain.csproj" />
   </ItemGroup>

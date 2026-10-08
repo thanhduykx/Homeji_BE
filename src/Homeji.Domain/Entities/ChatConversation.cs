@@ -27,6 +27,14 @@ public sealed class ChatConversation
     public Guid UserId { get; private set; }
 
     public string Title { get; private set; }
+    public string? SearchCriteriaJson { get; private set; }
+
+    public void UpdateSearchCriteria(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > 8_000)
+            throw new DomainException("Tiêu chí tìm phòng không hợp lệ.");
+        SearchCriteriaJson = json;
+    }
 
     public DateTimeOffset CreatedAt { get; private set; }
 

@@ -26,6 +26,10 @@ public sealed class ChatConversationConfiguration : IEntityTypeConfiguration<Cha
             .HasMaxLength(ChatConversation.MaxTitleLength)
             .IsRequired();
 
+        builder.Property(conversation => conversation.SearchCriteriaJson)
+            .HasColumnName("search_criteria_json")
+            .HasMaxLength(8_000);
+
         builder.Property(conversation => conversation.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

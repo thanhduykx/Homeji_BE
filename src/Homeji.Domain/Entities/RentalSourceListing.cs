@@ -19,6 +19,16 @@ public sealed class RentalSourceListing
     public string[] ImageUrls { get; private set; } = [];
     public DateTimeOffset? SourceUpdatedAt { get; private set; }
     public DateTimeOffset CollectedAt { get; private set; }
+    public DateTimeOffset? SourceExpiresAt { get; private set; }
+    public DateTimeOffset? SourceCheckedAt { get; private set; }
+
+    public void RecordSourceExpiry(DateTimeOffset? expiresAt, DateTimeOffset checkedAt)
+    {
+        if (SourceCheckedAt is { } previous && checkedAt < previous)
+            throw new DomainException("Không ghi đè kiểm tra nguồn mới hơn bằng kết quả cũ.");
+        SourceExpiresAt = expiresAt?.ToUniversalTime();
+        SourceCheckedAt = checkedAt.ToUniversalTime();
+    }
 
     public static RentalSourceListing Create(
         string sourceId, string sourceUrl, string title, string address, string district,

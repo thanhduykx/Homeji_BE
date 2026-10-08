@@ -15,4 +15,8 @@ public sealed record RentalPostSearchDto(
     int PageSize = 20,
     decimal? MaxDeposit = null,
     int? MinAvailableSlots = null,
-    DateOnly? AvailableFromBefore = null);
+    DateOnly? AvailableFromBefore = null,
+    IReadOnlyCollection<string>? ExcludedAmenities = null,
+    bool ExcludeRoommateShare = false,
+    IReadOnlyCollection<Guid>? Ids = null,
+    bool ExcludeSynthetic = false);

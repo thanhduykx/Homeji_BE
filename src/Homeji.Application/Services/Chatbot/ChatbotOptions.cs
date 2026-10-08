@@ -13,6 +13,8 @@ public sealed class ChatbotOptions
     public int MaxHistoryMessages { get; set; } = 12;
 
     public int SearchResultLimit { get; set; } = 5;
+    // Storage stays off until the product's retention policy is configured and enforced.
+    public bool HistoryStorageEnabled { get; set; }
 
     public string[] SuggestedPrompts { get; set; } =
     [

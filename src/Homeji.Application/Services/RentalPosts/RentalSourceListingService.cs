@@ -36,5 +36,9 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
     private static RentalSourceListingDto ToDto(RentalSourceListing listing) => new(
         listing.Id, listing.Source, listing.SourceId, listing.SourceUrl, listing.Title,
         listing.Address, listing.District, listing.Price, listing.Area, listing.ImageUrls.ToArray(),
-        listing.SourceUpdatedAt, listing.CollectedAt);
+        listing.SourceUpdatedAt, listing.CollectedAt)
+    {
+        SourceExpiresAt = listing.SourceExpiresAt,
+        SourceCheckedAt = listing.SourceCheckedAt,
+    };
 }

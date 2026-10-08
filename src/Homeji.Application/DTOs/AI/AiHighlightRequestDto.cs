@@ -2,4 +2,6 @@ namespace Homeji.Application.DTOs.AI;
 
 public sealed record AiHighlightRequestDto(
     string? Text,
-    int MaxResults = 5);
+    int MaxResults = 5,
+    AiParsedSearchCriteriaDto? Criteria = null,
+    AiParsedSearchCriteriaDto? PreviousCriteria = null);

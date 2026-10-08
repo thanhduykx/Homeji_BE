@@ -9,7 +9,7 @@ import json
 import re
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
@@ -59,6 +59,22 @@ def linked_data(soup):
             yield value
 
 
+def extract_source_expiry(html):
+    soup = BeautifulSoup(html, "html.parser")
+    label = soup.find(string=re.compile(r"^\s*Ngày hết hạn:?\s*$"))
+    if label is None:
+        return None
+    row = label.find_parent("tr") or label.parent.parent
+    match = re.search(r"(\d{1,2}:\d{2})\s+(\d{1,2}/\d{1,2}/\d{4})", row.get_text(" ", strip=True))
+    if match is None:
+        return None
+    try:
+        local = datetime.strptime(f"{match[1]} {match[2]}", "%H:%M %d/%m/%Y")
+        return local.replace(tzinfo=timezone(timedelta(hours=7))).astimezone(timezone.utc).isoformat()
+    except ValueError:
+        return None
+
+
 def extract_listing(html, url, district, collected_at):
     soup = BeautifulSoup(html, "html.parser")
     metadata = list(linked_data(soup))
@@ -93,6 +109,7 @@ def extract_listing(html, url, district, collected_at):
         "source_id": source_id, "source_url": url, "title": title, "address": address,
         "district": district, "price": price, "area": area, "image_urls": images,
         "source_updated_at": page.get("dateModified"), "collected_at": collected_at,
+        "source_expires_at": extract_source_expiry(html), "source_checked_at": collected_at,
     }
 
 
@@ -107,15 +124,16 @@ def render_sql(records):
             "id", "source", "source_id", "source_url", "title", "address", "district")]
         values += [str(record["price"]), str(record["area"]),
                    sql_string(json.dumps(record["image_urls"], ensure_ascii=False)) + "::jsonb",
-                   sql_string(record["source_updated_at"]), sql_string(record["collected_at"])]
+                   sql_string(record["source_updated_at"]), sql_string(record["collected_at"]),
+                   sql_string(record.get("source_expires_at")), sql_string(record.get("source_checked_at"))]
         statements.append(
             "INSERT INTO homeji.rental_source_listings "
-            "(id,source,source_id,source_url,title,address,district,price,area,image_urls,source_updated_at,collected_at) "
+            "(id,source,source_id,source_url,title,address,district,price,area,image_urls,source_updated_at,collected_at,source_expires_at,source_checked_at) "
             "VALUES (" + ",".join(values) + ") ON CONFLICT (source,source_id) DO UPDATE SET "
             "source_url=EXCLUDED.source_url,title=EXCLUDED.title,address=EXCLUDED.address,"
             "district=EXCLUDED.district,price=EXCLUDED.price,area=EXCLUDED.area,"
             "image_urls=EXCLUDED.image_urls,source_updated_at=EXCLUDED.source_updated_at,"
-            "collected_at=EXCLUDED.collected_at "
+            "collected_at=EXCLUDED.collected_at,source_expires_at=EXCLUDED.source_expires_at,source_checked_at=EXCLUDED.source_checked_at "
             "WHERE EXCLUDED.collected_at > rental_source_listings.collected_at "
             "AND (rental_source_listings.source_updated_at IS NULL "
             "OR EXCLUDED.source_updated_at >= rental_source_listings.source_updated_at);")

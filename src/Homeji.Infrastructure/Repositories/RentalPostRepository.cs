@@ -34,11 +34,23 @@ public sealed class RentalPostRepository : IRentalPostRepository
         RentalPostSearchDto search,
         CancellationToken cancellationToken = default)
     {
+        return await BuildActiveSearchQuery(search).ToListAsync(cancellationToken);
+    }
+
+    internal IQueryable<RentalPost> BuildActiveSearchQuery(RentalPostSearchDto search)
+    {
         var query = _dbContext.RentalPosts
             .AsNoTracking()
             .Include(post => post.Media)
             .Include(post => post.Amenities)
             .Where(post => post.Status == RentalPostStatus.Active);
+        if (search.Ids is { Count: > 0 })
+            query = query.Where(post => search.Ids.Contains(post.Id));
+        if (search.ExcludeSynthetic || search.Ids is { Count: > 0 }) query = query.Where(post => !post.IsSynthetic);
+        if (search.ExcludeRoommateShare)
+            query = query.Where(post => post.Type != RentalPostType.RoommateShare);
+        foreach (var code in (search.ExcludedAmenities ?? []).Select(value => value.Trim().ToUpperInvariant()).Distinct(StringComparer.Ordinal))
+            query = query.Where(post => !post.Amenities.Any(amenity => amenity.Code == code));
 
         if (!string.IsNullOrWhiteSpace(search.Keyword))
         {
@@ -112,13 +124,12 @@ public sealed class RentalPostRepository : IRentalPostRepository
         var page = Math.Max(1, search.Page);
         var pageSize = Math.Clamp(search.PageSize, 1, MaxPageSize);
 
-        return await query
+        return query
             .AsSplitQuery()
             .OrderByDescending(post => post.UpdatedAt)
             .ThenBy(post => post.Id)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+            .Take(pageSize);
     }
 
     public async Task<IReadOnlyList<RentalPost>> GetPendingAsync(CancellationToken cancellationToken = default)
