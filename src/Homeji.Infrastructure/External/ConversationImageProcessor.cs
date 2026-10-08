@@ -1,9 +1,7 @@
 using System.Security.Cryptography;
 using Homeji.Application.DTOs.Conversations;
 using Homeji.Application.IServices.Upload;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Processing;
+using SkiaSharp;
 
 namespace Homeji.Infrastructure.External;
 
@@ -18,14 +16,7 @@ public sealed class ConversationImageProcessor : IConversationImageProcessor
         "image/png",
         "image/webp",
     };
-    private static readonly HashSet<string> AllowedFormatNames = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "JPEG",
-        "PNG",
-        "WEBP",
-    };
-
-    public async Task<ProcessedConversationImage> ProcessAsync(
+    public Task<ProcessedConversationImage> ProcessAsync(
         ConversationImageUpload upload,
         CancellationToken cancellationToken = default)
     {
@@ -39,40 +30,41 @@ public sealed class ConversationImageProcessor : IConversationImageProcessor
             throw new InvalidOperationException("Each image must be between 1 byte and 8 MB.");
         }
 
-        await using var input = new MemoryStream(upload.Content, writable: false);
-        var detectedFormat = await Image.DetectFormatAsync(input, cancellationToken);
-        if (detectedFormat is null || !AllowedFormatNames.Contains(detectedFormat.Name))
+        cancellationToken.ThrowIfCancellationRequested();
+        using var data = SKData.CreateCopy(upload.Content);
+        using var codec = SKCodec.Create(data);
+        if (codec is null || codec.EncodedFormat is not (SKEncodedImageFormat.Jpeg or SKEncodedImageFormat.Png or SKEncodedImageFormat.Webp))
         {
             throw new InvalidOperationException("The file signature is not JPEG, PNG, or WebP.");
         }
 
-        input.Position = 0;
-        var info = await Image.IdentifyAsync(input, cancellationToken)
-            ?? throw new InvalidOperationException("The uploaded file is not a valid image.");
-        if ((long)info.Width * info.Height > MaxPixels)
+        var info = codec.Info;
+        if (info.Width <= 0 || info.Height <= 0 || (long)info.Width * info.Height > MaxPixels)
         {
             throw new InvalidOperationException("The image dimensions are too large.");
         }
 
-        input.Position = 0;
-        using var image = await Image.LoadAsync(input, cancellationToken);
-        image.Metadata.ExifProfile = null;
-        image.Metadata.XmpProfile = null;
-        image.Metadata.IptcProfile = null;
-
-        if (image.Width > MaxDimension || image.Height > MaxDimension)
+        using var decoded = new SKBitmap(new SKImageInfo(info.Width, info.Height, SKColorType.Bgra8888, SKAlphaType.Premul));
+        if (codec.GetPixels(decoded.Info, decoded.GetPixels()) != SKCodecResult.Success)
         {
-            image.Mutate(context => context.Resize(new ResizeOptions
-            {
-                Mode = ResizeMode.Max,
-                Size = new Size(MaxDimension, MaxDimension),
-            }));
+            throw new InvalidOperationException("The uploaded file is not a valid image.");
         }
-
-        await using var output = new MemoryStream();
-        await image.SaveAsJpegAsync(output, new JpegEncoder { Quality = 86 }, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var scale = Math.Min(1d, (double)MaxDimension / Math.Max(info.Width, info.Height));
+        var width = Math.Max(1, (int)Math.Round(info.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(info.Height * scale));
+        // Encode a fresh pixel surface: no input EXIF/XMP/IPTC is copied.
+        using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque))
+            ?? throw new InvalidOperationException("The image could not be processed.");
+        surface.Canvas.Clear(SKColors.White);
+        using var image = SKImage.FromBitmap(decoded);
+        surface.Canvas.DrawImage(image, new SKRect(0, 0, width, height), new SKSamplingOptions(SKFilterMode.Linear));
+        using var snapshot = surface.Snapshot();
+        using var output = snapshot.Encode(SKEncodedImageFormat.Jpeg, 86)
+            ?? throw new InvalidOperationException("The image could not be encoded.");
+        cancellationToken.ThrowIfCancellationRequested();
         var sanitized = output.ToArray();
         var hash = Convert.ToHexStringLower(SHA256.HashData(sanitized));
-        return new ProcessedConversationImage("image/jpeg", sanitized, image.Width, image.Height, hash);
+        return Task.FromResult(new ProcessedConversationImage("image/jpeg", sanitized, width, height, hash));
     }
 }
