@@ -7,12 +7,117 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Homeji.Infrastructure.Migrations;
 using Npgsql;
+using Homeji.Application.Abstractions.Authentication;
+using Homeji.Application.Abstractions.Notifications;
+using Homeji.Application.DTOs.MarketplaceOrders;
+using Homeji.Application.Services.Common;
+using Homeji.Application.Services.Marketplace;
+using Homeji.Application.Services.MarketplaceOrders;
+using Homeji.Application.Services.MarketplaceOrders.Validation;
+using Homeji.Domain.Exceptions;
+using Microsoft.Extensions.Options;
 
 namespace Homeji.Api.IntegrationTests;
 
 // These tests write only to an explicitly supplied, disposable loopback database.
 public sealed class MarketplaceDatabaseTests
 {
+    [LocalMarketplaceDatabaseFact]
+    public async Task Goods_purchase_delivery_and_escrow_release_persist_without_duplicate_payout()
+    {
+        await using var db = await OpenAsync();
+        var (post, buyer, seller, clock) = await SeedGoodsCheckoutAsync(db);
+        var buyerService = OrderService(db, buyer, clock);
+        var sellerService = OrderService(db, seller, clock);
+        var order = await buyerService.CreateAsync(post.Id, new CreateMarketplaceOrderDto(clock.Now.AddHours(1), "Linh Trung", null));
+        db.ChangeTracker.Clear();
+        Assert.Equal(170_000, (await db.WalletAccounts.SingleAsync(wallet => wallet.UserId == buyer)).Balance);
+        Assert.Equal(1, (await db.MarketplacePosts.SingleAsync(item => item.Id == post.Id)).ReservedQuantity);
+        await sellerService.AcceptAsync(order.Id);
+        db.ChangeTracker.Clear();
+        await sellerService.MarkDeliveredAsync(order.Id);
+        db.ChangeTracker.Clear();
+        await buyerService.CompleteAsync(order.Id);
+        db.ChangeTracker.Clear();
+        Assert.Equal(100_000, (await db.WalletAccounts.SingleAsync(wallet => wallet.UserId == seller)).Balance);
+        Assert.Null((await db.MarketplaceOrders.SingleAsync(item => item.Id == order.Id)).FundsReleasedAt);
+        clock.Now = clock.Now.AddHours(25);
+        Assert.Equal(1, await sellerService.ReleaseOverdueFundsAsync());
+        db.ChangeTracker.Clear();
+        Assert.Equal(0, await sellerService.ReleaseOverdueFundsAsync());
+        db.ChangeTracker.Clear();
+        var saved = await db.MarketplaceOrders.SingleAsync(item => item.Id == order.Id);
+        Assert.Equal(MarketplaceOrderStatus.Completed, saved.Status);
+        Assert.NotNull(saved.FundsReleasedAt);
+        Assert.Equal(127_000, (await db.WalletAccounts.SingleAsync(wallet => wallet.UserId == seller)).Balance);
+        var inventory = await db.MarketplacePosts.SingleAsync(item => item.Id == post.Id);
+        Assert.Equal(MarketplacePostStatus.Sold, inventory.Status);
+        Assert.Equal(0, inventory.ReservedQuantity);
+        Assert.Equal(1, await db.WalletTransactions.CountAsync(item => item.ReferenceId == order.Id && item.Kind == WalletTransactionKind.SaleProceeds));
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Rejected_goods_order_refunds_once_and_restores_persisted_stock()
+    {
+        await using var db = await OpenAsync();
+        var (post, buyer, seller, clock) = await SeedGoodsCheckoutAsync(db);
+        var order = await OrderService(db, buyer, clock).CreateAsync(post.Id, new CreateMarketplaceOrderDto(clock.Now.AddHours(1), "Linh Trung", null));
+        db.ChangeTracker.Clear();
+        var sellerService = OrderService(db, seller, clock);
+        await sellerService.RejectAsync(order.Id);
+        db.ChangeTracker.Clear();
+        await Assert.ThrowsAsync<DomainException>(() => sellerService.RejectAsync(order.Id));
+        db.ChangeTracker.Clear();
+        var saved = await db.MarketplaceOrders.SingleAsync(item => item.Id == order.Id);
+        Assert.Equal(MarketplaceOrderStatus.Rejected, saved.Status);
+        Assert.NotNull(saved.RefundedAt);
+        Assert.Equal(200_000, (await db.WalletAccounts.SingleAsync(wallet => wallet.UserId == buyer)).Balance);
+        var inventory = await db.MarketplacePosts.SingleAsync(item => item.Id == post.Id);
+        Assert.Equal(1, inventory.AvailableQuantity);
+        Assert.Equal(0, inventory.ReservedQuantity);
+        Assert.Equal(MarketplacePostStatus.Active, inventory.Status);
+        Assert.Equal(1, await db.WalletTransactions.CountAsync(item => item.ReferenceId == order.Id && item.Kind == WalletTransactionKind.Refund));
+    }
+
+    private static async Task<(MarketplacePost Post, Guid Buyer, Guid Seller, CheckoutClock Clock)> SeedGoodsCheckoutAsync(ApplicationDbContext db)
+    {
+        var seller = await AddSellerAsync(db);
+        var buyer = await AddSellerAsync(db);
+        var clock = new CheckoutClock();
+        var buyerWallet = WalletAccount.Create(buyer, clock.Now);
+        buyerWallet.CreditTopUp(200_000, clock.Now);
+        var sellerWallet = WalletAccount.Create(seller, clock.Now);
+        sellerWallet.CreditTopUp(100_000, clock.Now);
+        var post = new MarketplacePost(seller, "Bàn học kiểm thử", "Kiểm chứng giao dịch với database local", 30_000,
+            "Còn tốt", "Bàn ghế", "Linh Trung", 10.85m, 106.77m, null, ["https://example.com/local-qa.jpg"], clock.Now);
+        db.WalletAccounts.AddRange(buyerWallet, sellerWallet);
+        db.MarketplacePosts.Add(post);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        return (post, buyer, seller, clock);
+    }
+
+    private static MarketplaceOrderService OrderService(ApplicationDbContext db, Guid user, CheckoutClock clock)
+    {
+        var profiles = new UserProfileRepository(db);
+        return new MarketplaceOrderService(new UserContext(new CheckoutUser(user), profiles),
+            new MarketplaceOrderRepository(db), new MarketplacePostRepository(db), new NotificationRepository(db),
+            new LocalNotificationPublisher(), clock, new WalletRepository(db),
+            new CreateMarketplaceOrderDtoValidator(clock), new CreateMarketplaceCartOrderDtoValidator(clock),
+            Options.Create(new MarketplaceFinanceOptions()), profiles);
+    }
+
+    private sealed class CheckoutUser(Guid user) : ICurrentUser { public Guid? UserId => user; }
+    private sealed class CheckoutClock : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = DateTimeOffset.UtcNow;
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+    private sealed class LocalNotificationPublisher : INotificationRealtimePublisher
+    {
+        public Task PublishAsync(Notification notification, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
     [LocalMarketplaceDatabaseFact]
     public async Task Nearby_search_filters_circle_and_orders_before_paging()
     {
