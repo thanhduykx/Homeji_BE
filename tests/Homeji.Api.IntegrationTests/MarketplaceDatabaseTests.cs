@@ -16,6 +16,7 @@ using Homeji.Application.Services.MarketplaceOrders;
 using Homeji.Application.Services.MarketplaceOrders.Validation;
 using Homeji.Domain.Exceptions;
 using Microsoft.Extensions.Options;
+using Homeji.Application.Services.Conversations;
 
 namespace Homeji.Api.IntegrationTests;
 
@@ -54,6 +55,19 @@ public sealed class MarketplaceDatabaseTests
         Assert.Equal(MarketplacePostStatus.Sold, inventory.Status);
         Assert.Equal(0, inventory.ReservedQuantity);
         Assert.Equal(1, await db.WalletTransactions.CountAsync(item => item.ReferenceId == order.Id && item.Kind == WalletTransactionKind.SaleProceeds));
+        // Completed/sold listings must still let the order's two participants contact each other.
+        var sellerChat = await ConversationService(db, seller).StartMarketplaceOrderConversationAsync(order.Id);
+        db.ChangeTracker.Clear();
+        var buyerChat = await ConversationService(db, buyer).StartMarketplaceOrderConversationAsync(order.Id);
+        Assert.Equal(sellerChat.Id, buyerChat.Id);
+        Assert.Equal(buyer, sellerChat.OtherParticipantId);
+        Assert.Equal(seller, buyerChat.OtherParticipantId);
+        Assert.Equal(post.Id, sellerChat.SubjectId);
+        await Assert.ThrowsAsync<Homeji.Application.Common.Exceptions.ForbiddenAccessException>(() =>
+            ConversationService(db, Guid.NewGuid()).StartMarketplaceOrderConversationAsync(order.Id));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            ConversationService(db, Guid.Empty).StartMarketplaceOrderConversationAsync(order.Id));
+        Assert.Equal(1, await db.PostConversations.CountAsync(item => item.SubjectId == post.Id));
     }
 
     [LocalMarketplaceDatabaseFact]
@@ -105,6 +119,15 @@ public sealed class MarketplaceDatabaseTests
             new LocalNotificationPublisher(), clock, new WalletRepository(db),
             new CreateMarketplaceOrderDtoValidator(clock), new CreateMarketplaceCartOrderDtoValidator(clock),
             Options.Create(new MarketplaceFinanceOptions()), profiles);
+    }
+
+    private static PostConversationService ConversationService(ApplicationDbContext db, Guid user)
+    {
+        var profiles = new UserProfileRepository(db);
+        return new PostConversationService(new UserContext(new CheckoutUser(user), profiles),
+            new PostConversationRepository(db), new RentalPostRepository(db), new MarketplacePostRepository(db),
+            wantedPosts: null!, profiles, new NotificationRepository(db), new LocalNotificationPublisher(),
+            TimeProvider.System, imageProcessor: null!, new MarketplaceOrderRepository(db));
     }
 
     private sealed class CheckoutUser(Guid user) : ICurrentUser { public Guid? UserId => user; }
