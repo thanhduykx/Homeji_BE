@@ -71,6 +71,14 @@ public sealed class UserProfileRepository : IUserProfileRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<UserProfile>> GetDiscoverableByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default)
+    {
+        return await (from user in _dbContext.UserProfiles.AsNoTracking()
+                      join profile in _dbContext.RoommateProfiles.AsNoTracking() on user.Id equals profile.UserId
+                      where userIds.Contains(user.Id) && profile.IsDiscoverable && user.Role == UserRole.Renter
+                      select user).ToListAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default)
     {
         return await _dbContext.UserProfiles

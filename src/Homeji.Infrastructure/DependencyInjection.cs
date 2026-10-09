@@ -75,6 +75,7 @@ public static class DependencyInjection
                 }));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<Homeji.Application.IRepositories.Roommates.IRoommateDirectoryRepository, RoommateDirectoryRepository>();
         services.AddScoped<IAccountEmailRepository, AccountEmailRepository>();
         services.AddScoped<IRentalPostRepository, RentalPostRepository>();
         services.AddScoped<IRentalSourceListingRepository, RentalSourceListingRepository>();

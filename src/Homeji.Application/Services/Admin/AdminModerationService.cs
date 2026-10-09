@@ -369,7 +369,7 @@ public sealed class AdminModerationService : IAdminModerationService
             .ToDictionary(post => post.Id);
 
         var rentalPostIds = GetTargetIds(reports, ReportTargetType.RentalPost)
-            .Concat(invitations.Values.Select(invitation => invitation.RentalPostId))
+            .Concat(invitations.Values.Where(x => x.RentalPostId.HasValue).Select(x => x.RentalPostId!.Value))
             .Concat(reviews.Values.Select(review => review.RentalPostId))
             .Distinct()
             .ToArray();
@@ -473,7 +473,7 @@ public sealed class AdminModerationService : IAdminModerationService
             case ReportTargetType.MarketplacePost when marketplacePosts.TryGetValue(report.TargetId, out var marketplacePost):
                 return new ReportTargetDisplay(marketplacePost.Title, marketplacePost.Media.OrderBy(media => media.SortOrder).FirstOrDefault()?.Url, marketplacePost.LinkedRentalPostId);
             case ReportTargetType.RoommateInvitation when invitations.TryGetValue(report.TargetId, out var invitation):
-                return rentalPosts.TryGetValue(invitation.RentalPostId, out var invitationPost)
+                return invitation.RentalPostId is { } invitationPostId && rentalPosts.TryGetValue(invitationPostId, out var invitationPost)
                     ? new ReportTargetDisplay($"Lời mời ở ghép cho “{invitationPost.Title}”", invitationPost.Id)
                     : new ReportTargetDisplay("Lời mời ở ghép", invitation.RentalPostId);
             case ReportTargetType.RentalReview when reviews.TryGetValue(report.TargetId, out var review):

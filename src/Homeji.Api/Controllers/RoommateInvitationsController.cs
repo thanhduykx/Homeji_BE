@@ -15,6 +15,13 @@ public sealed class RoommateInvitationsController : ControllerBase
         _invitationService = invitationService;
     }
 
+    [HttpPost]
+    public async Task<ActionResult<RoommateInvitationDto>> CreateIndependent([FromBody] CreateRoommateInvitationDto request, CancellationToken cancellationToken)
+    {
+        var invitation = await _invitationService.CreateIndependentAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(GetMine), invitation);
+    }
+
     [HttpGet("mine")]
     [ProducesResponseType<IReadOnlyList<RoommateInvitationDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RoommateInvitationDto>>> GetMine(CancellationToken cancellationToken)

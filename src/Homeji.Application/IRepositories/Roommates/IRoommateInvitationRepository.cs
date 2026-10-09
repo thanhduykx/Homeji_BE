@@ -5,8 +5,10 @@ namespace Homeji.Application.IRepositories.Roommates;
 
 public interface IRoommateInvitationRepository
 {
+    Task<RoommateInvitation?> GetActiveIndependentAsync(Guid firstUserId, Guid secondUserId, CancellationToken cancellationToken = default);
+
     Task<bool> HasPendingAsync(
-        Guid rentalPostId,
+        Guid? rentalPostId,
         Guid senderId,
         Guid receiverId,
         CancellationToken cancellationToken = default);

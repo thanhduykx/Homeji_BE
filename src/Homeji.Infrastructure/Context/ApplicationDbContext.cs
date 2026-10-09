@@ -10,6 +10,7 @@ public sealed class ApplicationDbContext : DbContext
     {
     }
 
+    public DbSet<RoommateProfile> RoommateProfiles => Set<RoommateProfile>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<RentalPost> RentalPosts => Set<RentalPost>();
     public DbSet<RentalSourceListing> RentalSourceListings => Set<RentalSourceListing>();
