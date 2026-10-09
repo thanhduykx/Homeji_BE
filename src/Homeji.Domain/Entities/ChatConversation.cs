@@ -27,6 +27,7 @@ public sealed class ChatConversation
     public Guid UserId { get; private set; }
 
     public string Title { get; private set; }
+    public string? SearchIntentJson { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
 
@@ -64,6 +65,13 @@ public sealed class ChatConversation
     {
         Title = NormalizeTitle(title);
         UpdatedAt = updatedAt;
+    }
+
+    public void RememberSearchIntent(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > 8000)
+            throw new DomainException("Tiêu chí hội thoại không hợp lệ.");
+        SearchIntentJson = json;
     }
 
     private static string NormalizeTitle(string value)

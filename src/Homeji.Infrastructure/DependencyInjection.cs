@@ -89,6 +89,9 @@ public static class DependencyInjection
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
         services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
         services.AddScoped<IChatConversationRepository, ChatConversationRepository>();
+        services.AddScoped<IChatHistoryStore, ChatHistoryStore>();
+        services.Configure<GoogleCommuteOptions>(configuration.GetSection("Ai:Commute"));
+        services.AddHttpClient<ICommuteClient, GoogleCommuteClient>();
         services.AddScoped<IViewingAppointmentRepository, ViewingAppointmentRepository>();
         services.AddScoped<ILandlordVerificationRepository, LandlordVerificationRepository>();
         services.AddScoped<IUserActivityRepository, UserActivityRepository>();

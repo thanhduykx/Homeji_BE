@@ -6,4 +6,11 @@ public sealed record AiHighlightedRentalPostDto(
     RentalPostSummaryDto Post,
     decimal Score,
     IReadOnlyCollection<string> Reasons,
-    string Tag);
+    string Tag)
+{
+    public IReadOnlyCollection<AiEvidenceDto> Evidence { get; init; } = [];
+    public decimal UserFit => Score;
+    public decimal CommercialBoost => Post.BoostScore;
+}
+
+public sealed record AiEvidenceDto(Guid PostId, string SourceType, string Field, string Text, DateTimeOffset UpdatedAt);

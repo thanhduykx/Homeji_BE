@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.AddScoped<IWebsiteTrafficService, WebsiteTrafficService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IAiSearchService, AiSearchService>();
+        services.AddScoped<IRentalDecisionService, RentalDecisionService>();
         services.AddScoped<IChatbotService, ChatbotService>();
         services.AddScoped<IMarketplacePostService, MarketplacePostService>();
         services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();

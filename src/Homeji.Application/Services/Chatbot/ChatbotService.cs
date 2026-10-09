@@ -6,8 +6,10 @@ using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.Mappers.Chatbot;
 using Homeji.Application.Services.Common;
+using Homeji.Application.Services.AI;
 using Homeji.Domain.Entities;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace Homeji.Application.Services.Chatbot;
 
@@ -108,10 +110,11 @@ public sealed class ChatbotService : IChatbotService
             .ToArray();
 
         var actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
-        var assistantReply = await GenerateReplyAsync(history, message, actions, cancellationToken);
-        var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
-
         var searchUpdate = await BuildSearchUpdateAsync(conversation, cancellationToken);
+        var assistantReply = searchUpdate is null
+            ? await GenerateReplyAsync(history, message, actions, cancellationToken)
+            : BuildGroundedReply(searchUpdate);
+        var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
 
         await _conversations.SaveChangesAsync(cancellationToken);
 
@@ -156,32 +159,46 @@ public sealed class ChatbotService : IChatbotService
         CancellationToken cancellationToken)
     {
         var userMessages = conversation.Messages
-            .Where(message => message.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
-            .OrderBy(message => message.CreatedAt)
-            .TakeLast(Math.Clamp(_options.MaxHistoryMessages, 2, 30))
-            .Select(message => message.Content)
-            .ToArray();
-        var contextualQuery = string.Join(Environment.NewLine, userMessages);
-        if (!LooksLikeRentalSearch(contextualQuery))
+            .Where(item => item.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
+            .OrderBy(item => item.CreatedAt).ToArray();
+        if (!userMessages.Any(item => LooksLikeRentalSearch(item.Content))) return null;
+        var latest = userMessages.Last().Content;
+        if (ChatbotNavigationCatalog.FindActions(latest, Homeji.Domain.Enums.UserRole.Renter).Count > 0
+            && !LooksLikeRentalSearch(latest)) return null;
+        // Store a bounded schema owned by this conversation, never concatenate prior prompts.
+        var intent = RentalSearchIntent.Empty();
+        if (conversation.SearchIntentJson is not null)
         {
-            return null;
+            try { intent = JsonSerializer.Deserialize<AiParsedSearchCriteriaDto>(conversation.SearchIntentJson) ?? intent; }
+            catch (JsonException) { intent = RentalSearchIntent.Empty(); }
         }
-
+        else
+            foreach (var item in userMessages.Take(userMessages.Length - 1)) intent = RentalSearchIntent.Apply(item.Content, intent);
         try
         {
-            return await _aiSearch.HighlightRentalPostsAsync(
-                new AiHighlightRequestDto(contextualQuery, _options.SearchResultLimit),
-                cancellationToken);
+            var parsed = await _aiSearch.ParseSearchAsync(new AiParseSearchRequestDto(latest), cancellationToken);
+            intent = RentalSearchIntent.Apply(latest, RentalSearchIntent.Merge(intent, parsed));
+            var result = await _aiSearch.HighlightRentalPostsAsync(
+                new AiHighlightRequestDto(null, Math.Clamp(_options.SearchResultLimit, 1, 5), intent), cancellationToken);
+            result = result with { CompareRequested = RentalSearchIntent.Normalize(latest).Contains("so sanh", StringComparison.Ordinal) };
+            conversation.RememberSearchIntent(JsonSerializer.Serialize(result.Criteria));
+            return result;
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // The conversational answer remains usable when the optional map update fails.
-            return null;
-        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (ExternalDependencyException) { return new AiHighlightResponseDto(intent, [], "Phù hợp theo tiêu chí", null, null, null) { Clarifications = ["Chưa thể truy vấn tin. Vui lòng thử lại hoặc dùng bộ lọc thông thường."] }; }
+    }
+
+    private static string BuildGroundedReply(AiHighlightResponseDto result)
+    {
+        var lines = new List<string> { "Homeji hiểu tiêu chí của bạn; bạn có thể sửa hoặc bỏ từng tiêu chí bên dưới." };
+        lines.AddRange(result.Clarifications);
+        if (result.Posts.Count > 0)
+            lines.Add($"Tìm thấy {result.Posts.Count} tin phù hợp. Giá và tiện ích bên dưới lấy từ tin chủ phòng, không phải xác minh của Homeji.");
+        else if (result.NeedsConfirmation.Count > 0)
+            lines.Add("Các tin bên dưới cần xác nhận phí hoặc đường đi; chưa thể khẳng định đáp ứng toàn bộ yêu cầu.");
+        else
+            lines.Add("Chưa có tin đáp ứng các điều kiện. Bạn có muốn bỏ một tiện ích bắt buộc hoặc chọn khu vực khác trong phạm vi Homeji? Ngân sách vẫn được giữ nguyên.");
+        return string.Join(Environment.NewLine, lines);
     }
 
     private static bool LooksLikeRentalSearch(string text)
@@ -192,7 +209,13 @@ public sealed class ChatbotService : IChatbotService
             "gần", "diện tích", "wifi", "bãi xe", "giờ giấc", "toilet", "wc",
         ];
 
-        return searchTerms.Any(term => text.Contains(term, StringComparison.OrdinalIgnoreCase));
+        var normalized = RentalSearchIntent.Normalize(text);
+        var intent = RentalSearchIntent.Apply(text);
+        return searchTerms.Any(term => normalized.Contains(RentalSearchIntent.Normalize(term), StringComparison.Ordinal))
+            || intent.PriceMin.HasValue || intent.PriceMax.HasValue || intent.Occupants.HasValue
+            || intent.AreaMin.HasValue || intent.AreaMax.HasValue || intent.Destination is not null
+            || intent.Location is not null || intent.RequiredAmenities.Count > 0
+            || intent.Criteria.Count > 0 || intent.ExcludedAmenities.Count > 0;
     }
 
     private async Task<ChatConversation> GetOwnedConversationAsync(

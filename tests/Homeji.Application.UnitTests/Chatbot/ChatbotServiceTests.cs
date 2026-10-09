@@ -7,6 +7,7 @@ using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.Services.Chatbot;
+using Homeji.Application.Services.AI;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Microsoft.Extensions.Options;
@@ -58,6 +59,23 @@ public sealed class ChatbotServiceTests
             new StubTimeProvider());
     }
 
+    [Theory]
+    [InlineData("2 người, dưới 4 triệu cả phí, có bếp")]
+    [InlineData("3tr")]
+    [InlineData("Cần máy lạnh")]
+    [InlineData("FPT")]
+    public async Task SendMessageAsync_RecognizesConstraintsWithoutRentalKeywords(string message)
+    {
+        var conversations = new InMemoryChatConversationRepository();
+        var service = CreateService(conversations, new UnavailableChatbotAiClient());
+
+        var reply = await service.SendMessageAsync(new SendChatbotMessageDto(null, message));
+
+        Assert.NotNull(reply.SearchUpdate);
+        Assert.Contains("Homeji hiểu", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.NotNull(conversations.Conversation!.SearchIntentJson);
+    }
+
     private sealed record StubCurrentUser(Guid? UserId) : ICurrentUser;
 
     private sealed class StubTimeProvider : TimeProvider
@@ -84,14 +102,14 @@ public sealed class ChatbotServiceTests
             AiParseSearchRequestDto request,
             CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(RentalSearchIntent.Apply(request.Text ?? string.Empty));
         }
 
         public Task<AiHighlightResponseDto> HighlightRentalPostsAsync(
             AiHighlightRequestDto request,
             CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(new AiHighlightResponseDto(request.Intent!, [], "Phù hợp theo tiêu chí", null, null, null));
         }
     }
 

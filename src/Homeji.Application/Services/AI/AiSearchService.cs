@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.AI;
 using Homeji.Application.DTOs.RentalPosts;
@@ -7,296 +8,131 @@ using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
 using Microsoft.Extensions.Options;
 
 namespace Homeji.Application.Services.AI;
 
 public sealed class AiSearchService : IAiSearchService
 {
-    private const string AiHighlightTag = "AI bảo thế đó";
-    private const int MaxSearchTextLength = 1_000;
-    private const int MaxCandidatePosts = 100;
-
-    private static readonly Dictionary<string, string[]> CriterionSynonyms =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["parking"] = ["PARKING", "giu xe", "giữ xe", "xe", "parking"],
-            ["freeTime"] = ["FREE_TIME", "gio giac", "giờ giấc", "tu do", "tự do", "free time"],
-            ["wifi"] = ["WIFI", "internet", "wifi"],
-            ["airConditioner"] = ["AIR_CONDITIONER", "may lanh", "máy lạnh", "dieu hoa", "điều hòa"],
-            ["privateToilet"] = ["PRIVATE_TOILET", "wc rieng", "wc riêng", "ve sinh rieng", "vệ sinh riêng"],
-            ["security"] = ["SECURITY", "an ninh", "bao ve", "bảo vệ"],
-            ["quiet"] = ["QUIET", "yen tinh", "yên tĩnh"],
-            ["petFriendly"] = ["PET_FRIENDLY", "thu cung", "thú cưng", "pet"],
-            ["kitchen"] = ["KITCHEN", "bep", "bếp", "nau an", "nấu ăn"],
-        };
-
+    private const string HighlightTag = "Phù hợp theo tiêu chí";
     private readonly IAiSearchTextParser _parser;
     private readonly IRentalPostRepository _posts;
     private readonly IUserSubscriptionRepository _subscriptions;
-    private readonly IRentalReviewRepository _reviews;
     private readonly AiSearchOptions _options;
     private readonly TimeProvider _timeProvider;
 
-    public AiSearchService(
-        IAiSearchTextParser parser,
-        IRentalPostRepository posts,
-        IUserSubscriptionRepository subscriptions,
-        IRentalReviewRepository reviews,
-        IOptions<AiSearchOptions> options,
-        TimeProvider timeProvider)
+    public AiSearchService(IAiSearchTextParser parser, IRentalPostRepository posts,
+        IUserSubscriptionRepository subscriptions, IRentalReviewRepository reviews,
+        IOptions<AiSearchOptions> options, TimeProvider timeProvider)
     {
         _parser = parser;
         _posts = posts;
         _subscriptions = subscriptions;
-        _reviews = reviews;
         _options = options.Value;
         _timeProvider = timeProvider;
     }
 
-    public async Task<AiParsedSearchCriteriaDto> ParseSearchAsync(
-        AiParseSearchRequestDto request,
+    public async Task<AiParsedSearchCriteriaDto> ParseSearchAsync(AiParseSearchRequestDto request,
         CancellationToken cancellationToken = default)
     {
         var text = ValidateText(request.Text);
-        var parsed = await _parser.ParseAsync(text, cancellationToken);
-
-        return NormalizeParsedCriteria(parsed);
+        AiParsedSearchCriteriaDto parsed;
+        try { parsed = await _parser.ParseAsync(text, cancellationToken); }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
+        catch (Exception exception) when (exception is ExternalDependencyException or ExternalServiceUnavailableException
+            or HttpRequestException or System.Text.Json.JsonException or TaskCanceledException
+            or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
+        { parsed = RentalSearchIntent.Empty(); }
+        return ValidateIntent(RentalSearchIntent.Apply(text, parsed));
     }
 
-    public async Task<AiHighlightResponseDto> HighlightRentalPostsAsync(
-        AiHighlightRequestDto request,
+    public async Task<AiHighlightResponseDto> HighlightRentalPostsAsync(AiHighlightRequestDto request,
         CancellationToken cancellationToken = default)
     {
-        var text = ValidateText(request.Text);
-        var parsed = NormalizeParsedCriteria(await _parser.ParseAsync(text, cancellationToken));
-        var maxResults = Math.Clamp(
-            request.MaxResults <= 0 ? _options.MaxHighlightedPosts : request.MaxResults,
-            1,
-            Math.Max(1, _options.MaxHighlightedPosts));
-
-        var search = new RentalPostSearchDto(
-            BuildKeyword(parsed),
-            parsed.PriceMin,
-            parsed.PriceMax,
-            parsed.AreaMin,
-            parsed.AreaMax,
-            null,
-            null,
-            null,
-            null,
-            [],
-            1,
-            MaxCandidatePosts);
-
+        var parsed = request.Intent is null
+            ? await ParseSearchAsync(new AiParseSearchRequestDto(request.Text), cancellationToken)
+            : ValidateIntent(string.IsNullOrWhiteSpace(request.Text) ? request.Intent : RentalSearchIntent.Apply(ValidateText(request.Text), request.Intent));
+        var limit = Math.Clamp(request.MaxResults, 1, Math.Clamp(_options.MaxHighlightedPosts, 1, 10));
+        var search = new RentalPostSearchDto(null, parsed.PriceMin, parsed.PriceMax,
+            parsed.AreaMin, parsed.AreaMax, HomejiServiceArea.MinLatitude, HomejiServiceArea.MaxLatitude,
+            HomejiServiceArea.MinLongitude, HomejiServiceArea.MaxLongitude, parsed.RequiredAmenities,
+            1, 100, MinAvailableSlots: parsed.Occupants);
         var posts = await _posts.SearchActiveAsync(search, cancellationToken);
+        // Recheck constraints even when repository implementations change; no model can relax them.
         var now = _timeProvider.GetUtcNow();
-        var premiumByUserId = await _subscriptions.GetActivePremiumByUserIdsAsync(
-            posts.Select(post => post.OwnerId).ToArray(),
-            now,
-            cancellationToken);
-        var reviewItems = await _reviews.GetByPostIdsAsync(
-            posts.Select(post => post.Id).ToArray(),
-            cancellationToken);
-        var reviewsByPostId = reviewItems
-            .GroupBy(review => review.RentalPostId)
-            .ToDictionary(group => group.Key, group => (IReadOnlyList<RentalReview>)group.ToArray());
+        var candidates = posts.Where(post => Fits(post, parsed, DateOnly.FromDateTime(now.UtcDateTime))).ToArray();
+        var premium = await _subscriptions.GetActivePremiumByUserIdsAsync(candidates.Select(post => post.OwnerId).ToArray(), now, cancellationToken);
+        var ranked = candidates.Select(post => EvaluateFit(post, parsed, premium.ContainsKey(post.OwnerId)))
+            .OrderByDescending(item => item.Score).ThenBy(item => item.Post.Price).ThenBy(item => item.Post.Id)
+            .Take(limit).ToArray();
+        // Legacy fee fields lack confirmed units. Never advertise them as satisfying an all-in ceiling.
+        var needsConfirmation = parsed.BudgetKind == "total" || parsed.MaxCommuteMinutes.HasValue || parsed.Destination is not null;
+        var confirmed = needsConfirmation ? [] : ranked;
+        var focus = confirmed.FirstOrDefault()?.Post;
+        return new AiHighlightResponseDto(parsed, confirmed, HighlightTag, focus?.Address, focus?.Latitude, focus?.Longitude)
+        {
+            NeedsConfirmation = needsConfirmation ? ranked : [],
+            Clarifications = parsed.Unknown,
+        };
+    }
 
-        var rankedPosts = posts
-            .Select(post =>
-            {
-                var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
-                var postReviews = reviewsByPostId.GetValueOrDefault(post.Id) ?? [];
-                var score = CalculateAiScore(post, postReviews, parsed, isPremium, now, out var reasons);
-                var summary = RentalPostMapper.ToSummaryDto(
-                    post,
-                    isPremium,
-                    CalculateBoostScore(post, isPremium, now),
-                    AiHighlightTag);
+    public static bool Fits(RentalPost post, AiParsedSearchCriteriaDto intent, DateOnly today)
+    {
+        if (post.Status != RentalPostStatus.Active || post.IsSynthetic || !HomejiServiceArea.Contains(post.Latitude, post.Longitude)
+            || post.Type == RentalPostType.RoomTransfer && post.OriginalLeaseEndsOn <= today
+            || intent.PriceMin.HasValue && post.Price < intent.PriceMin || intent.PriceMax.HasValue && post.Price > intent.PriceMax
+            || intent.AreaMin.HasValue && post.Area < intent.AreaMin || intent.AreaMax.HasValue && post.Area > intent.AreaMax
+            || intent.Occupants.HasValue && post.AvailableSlots < intent.Occupants
+            || intent.ExcludeShared && post.Type == RentalPostType.RoommateShare) return false;
+        var codes = post.Amenities.Select(amenity => amenity.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!intent.RequiredAmenities.All(codes.Contains) || intent.ExcludedAmenities.Any(codes.Contains)) return false;
+        if (intent.Location is not null && !RentalSearchIntent.Normalize(post.Address).Contains(RentalSearchIntent.Normalize(intent.Location), StringComparison.Ordinal)) return false;
+        if (intent.Keyword is not null && !RentalSearchIntent.Normalize(post.Title + " " + post.Description + " " + post.Address).Contains(RentalSearchIntent.Normalize(intent.Keyword), StringComparison.Ordinal)) return false;
+        return true;
+    }
 
-                return new AiHighlightedRentalPostDto(summary, score, reasons, AiHighlightTag);
-            })
-            .Where(item => item.Score > 0)
-            .OrderByDescending(item => item.Score)
-            .ThenByDescending(item => item.Post.IsOwnerPremium)
-            .ThenByDescending(item => item.Post.BoostScore)
-            .Take(maxResults)
-            .ToArray();
-
-        var mapFocus = rankedPosts.FirstOrDefault()?.Post;
-
-        return new AiHighlightResponseDto(
-            parsed,
-            rankedPosts,
-            AiHighlightTag,
-            parsed.Location ?? mapFocus?.Address,
-            mapFocus?.Latitude,
-            mapFocus?.Longitude);
+    public static AiHighlightedRentalPostDto EvaluateFit(RentalPost post, AiParsedSearchCriteriaDto intent, bool premium)
+    {
+        var evidence = new List<AiEvidenceDto>();
+        void Add(string field, string text) => evidence.Add(new(post.Id, "ownerListing", field, text, post.UpdatedAt));
+        Add("price", intent.BudgetKind == "total" ? "Tiền thuê nằm dưới trần; tổng phí chưa được xác nhận." : "Giá thuê theo tin đăng.");
+        if (intent.PriceMax.HasValue && intent.BudgetKind == "rent") Add("price", "Giá thuê nằm trong ngân sách tối đa.");
+        if (intent.Location is not null) Add("address", "Địa chỉ tin đăng khớp khu vực yêu cầu.");
+        if (intent.Occupants.HasValue) Add("availableSlots", "Số chỗ trống theo tin đáp ứng số người.");
+        foreach (var code in intent.RequiredAmenities.Concat(intent.Criteria).Distinct(StringComparer.Ordinal))
+            if (post.Amenities.Any(amenity => amenity.Code.Equals(code, StringComparison.OrdinalIgnoreCase)))
+                Add("amenities." + code, "Có " + code + " theo tiện ích chủ tin khai báo.");
+        var score = 5m + (intent.PriceMax.HasValue ? 25 : 0) + (intent.Location is not null ? 30 : 0)
+            + evidence.Count(item => item.Field.StartsWith("amenities.", StringComparison.Ordinal)) * 12;
+        var summary = RentalPostMapper.ToSummaryDto(post, premium, premium ? 100 : 0, HighlightTag);
+        return new AiHighlightedRentalPostDto(summary, score, evidence.Select(item => item.Text).ToArray(), HighlightTag) { Evidence = evidence };
     }
 
     private static string ValidateText(string? text)
     {
-        var normalized = text?.Trim();
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            throw new RequestValidationException(new Dictionary<string, string[]>
-            {
-                ["text"] = ["Nội dung tìm kiếm là bắt buộc."],
-            });
-        }
-
-        if (normalized.Length > MaxSearchTextLength)
-        {
-            throw new RequestValidationException(new Dictionary<string, string[]>
-            {
-                ["text"] = [$"Nội dung tìm kiếm không được vượt quá {MaxSearchTextLength} ký tự."],
-            });
-        }
-
-        return normalized;
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length > 1000)
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["text"] = ["Nhập nội dung từ 1 đến 1.000 ký tự."] });
+        return text.Trim();
     }
 
-    private static AiParsedSearchCriteriaDto NormalizeParsedCriteria(AiParsedSearchCriteriaDto criteria)
+    private static AiParsedSearchCriteriaDto ValidateIntent(AiParsedSearchCriteriaDto intent)
     {
-        var normalizedCriteria = criteria.Criteria
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Select(item => item.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(20)
-            .ToArray();
-
-        return criteria with
+        if (intent.PriceMin < 0 || intent.PriceMax <= 0 || intent.AreaMin < 0 || intent.AreaMax <= 0
+            || intent.PriceMin > intent.PriceMax || intent.AreaMin > intent.AreaMax
+            || intent.Occupants is < 1 or > 50 || intent.MaxCommuteMinutes is < 1 or > 240
+            || intent.BudgetKind is not ("rent" or "total"))
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["intent"] = ["Tiêu chí tìm kiếm không hợp lệ."] });
+        string[] Codes(IEnumerable<string> values) => values.Where(value => !string.IsNullOrWhiteSpace(value) && value.Length <= 60)
+            .Select(RentalSearchIntent.AmenityCode).Distinct(StringComparer.Ordinal).Take(20).ToArray();
+        var required = Codes(intent.RequiredAmenities);
+        var excluded = Codes(intent.ExcludedAmenities);
+        if (required.Intersect(excluded, StringComparer.Ordinal).Any())
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["intent"] = ["Một tiện ích không thể vừa bắt buộc vừa loại trừ."] });
+        return intent with
         {
-            Location = NormalizeOptional(criteria.Location),
-            Keyword = NormalizeOptional(criteria.Keyword),
-            PriceMin = NormalizePositive(criteria.PriceMin),
-            PriceMax = NormalizePositive(criteria.PriceMax),
-            AreaMin = NormalizePositive(criteria.AreaMin),
-            AreaMax = NormalizePositive(criteria.AreaMax),
-            Criteria = normalizedCriteria,
+            RequiredAmenities = required, ExcludedAmenities = excluded, Criteria = Codes(intent.Criteria),
+            Unknown = intent.Unknown.Where(value => !string.IsNullOrWhiteSpace(value)).Take(6).Select(value => value.Length <= 180 ? value : value[..180]).ToArray(),
         };
-    }
-
-    private static string? BuildKeyword(AiParsedSearchCriteriaDto criteria)
-    {
-        return NormalizeOptional(criteria.Location) ?? NormalizeOptional(criteria.Keyword);
-    }
-
-    private static decimal CalculateAiScore(
-        RentalPost post,
-        IReadOnlyCollection<RentalReview> reviews,
-        AiParsedSearchCriteriaDto criteria,
-        bool isPremium,
-        DateTimeOffset now,
-        out IReadOnlyCollection<string> reasons)
-    {
-        var score = 0m;
-        var resultReasons = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(criteria.Location)
-            && (ContainsNormalized(post.Address, criteria.Location)
-                || ContainsNormalized(post.Title, criteria.Location)))
-        {
-            score += 30;
-            resultReasons.Add("Phù hợp khu vực người dùng yêu cầu.");
-        }
-
-        if (criteria.PriceMax.HasValue && post.Price <= criteria.PriceMax.Value)
-        {
-            score += 25;
-            resultReasons.Add("Giá nằm trong ngân sách tối đa.");
-        }
-        else if (!criteria.PriceMax.HasValue)
-        {
-            score += 5;
-        }
-
-        if (criteria.PriceMin.HasValue && post.Price >= criteria.PriceMin.Value)
-        {
-            score += 5;
-        }
-
-        foreach (var criterion in criteria.Criteria)
-        {
-            if (MatchesCriterion(post, reviews, criterion, out var matchedFromReview))
-            {
-                score += 12;
-                resultReasons.Add(matchedFromReview
-                    ? $"Đánh giá cộng đồng xác nhận tiêu chí: {criterion}."
-                    : $"Khớp tiêu chí: {criterion}.");
-            }
-        }
-
-        var recencyDays = Math.Max(0, (now - post.UpdatedAt).TotalDays);
-        score += Math.Max(0, 10 - (decimal)recencyDays);
-        score += Math.Min(15, post.SaveCount * 3);
-        score += Math.Min(10, post.ViewCount / 20m);
-
-        if (isPremium)
-        {
-            score += 8;
-            resultReasons.Add("Chủ bài có Premium nên được ưu tiên hiển thị.");
-        }
-
-        if (resultReasons.Count == 0)
-        {
-            resultReasons.Add("Được chọn dựa trên mức độ liên quan tổng hợp.");
-        }
-
-        reasons = resultReasons;
-        return Math.Round(score, 2);
-    }
-
-    private static decimal CalculateBoostScore(RentalPost post, bool isPremium, DateTimeOffset now)
-    {
-        var recencyDays = Math.Max(0, (now - post.UpdatedAt).TotalDays);
-        var recencyScore = Math.Max(0, 30 - (decimal)recencyDays);
-        var engagementScore = (post.SaveCount * 5) + Math.Min(post.ViewCount, 500) / 10m;
-        var premiumScore = isPremium ? 100 : 0;
-
-        return Math.Round(premiumScore + engagementScore + recencyScore, 2);
-    }
-
-    private static bool MatchesCriterion(
-        RentalPost post,
-        IReadOnlyCollection<RentalReview> reviews,
-        string criterion,
-        out bool matchedFromReview)
-    {
-        var terms = CriterionSynonyms.TryGetValue(criterion, out var synonyms)
-            ? synonyms
-            : [criterion];
-
-        var matchedFromPost = terms.Any(term =>
-            post.Amenities.Any(amenity => amenity.Code.Equals(term, StringComparison.OrdinalIgnoreCase))
-            || ContainsNormalized(post.Title, term)
-            || ContainsNormalized(post.Description, term)
-            || ContainsNormalized(post.Address, term));
-        if (matchedFromPost)
-        {
-            matchedFromReview = false;
-            return true;
-        }
-
-        matchedFromReview = reviews.Any(review =>
-            review.Comment is not null
-            && terms.Any(term => ContainsNormalized(review.Comment, term)));
-        return matchedFromReview;
-    }
-
-    private static bool ContainsNormalized(string source, string value)
-    {
-        return source.Contains(value, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string? NormalizeOptional(string? value)
-    {
-        var normalized = value?.Trim();
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-    }
-
-    private static decimal? NormalizePositive(decimal? value)
-    {
-        return value is > 0 ? value : null;
     }
 }
