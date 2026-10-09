@@ -69,6 +69,7 @@ public static class DependencyInjection
         services.AddScoped<IRentalSourceListingService, RentalSourceListingService>();
         services.AddScoped<ISavedPostService, SavedPostService>();
         services.AddScoped<IRoommateInvitationService, RoommateInvitationService>();
+        services.AddScoped<IRoommateDirectoryService, RoommateDirectoryService>();
         services.AddScoped<IRoommateChatService, RoommateChatService>();
         services.AddScoped<IReportService, ReportService>();
         services.AddScoped<IRentalReviewService, RentalReviewService>();

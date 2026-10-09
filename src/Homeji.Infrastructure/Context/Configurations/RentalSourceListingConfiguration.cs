@@ -37,6 +37,8 @@ public sealed class RentalSourceListingConfiguration : IEntityTypeConfiguration<
             .IsRequired();
         builder.Property(listing => listing.SourceUpdatedAt).HasColumnName("source_updated_at");
         builder.Property(listing => listing.CollectedAt).HasColumnName("collected_at");
+        builder.Property(listing => listing.SourceExpiresAt).HasColumnName("source_expires_at");
+        builder.Property(listing => listing.SourceCheckedAt).HasColumnName("source_checked_at");
         builder.HasIndex(listing => new { listing.Source, listing.SourceId }).IsUnique();
         builder.HasIndex(listing => new { listing.District, listing.CollectedAt, listing.Id });
     }

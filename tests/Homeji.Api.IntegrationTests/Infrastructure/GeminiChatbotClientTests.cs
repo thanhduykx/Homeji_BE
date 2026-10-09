@@ -168,6 +168,26 @@ public sealed class GeminiChatbotClientTests
         Assert.Contains("xác nhận tổng tiền", prompt, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task GenerateReplyAsync_AllowsGeneralQuestionsWithoutInventingLiveFacts()
+    {
+        var handler = new SequenceHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"candidates":[{"content":{"parts":[{"text":"Có thể giải thích kiến thức chung."}]}}]}"""),
+        });
+        var client = new GeminiChatbotClient(new HttpClient(handler),
+            Options.Create(new GeminiOptions { ApiKey = "test-key", TimeoutSeconds = 5 }),
+            NullLogger<GeminiChatbotClient>.Instance);
+
+        await client.GenerateReplyAsync([], "Vì sao trời có mưa?");
+
+        var prompt = ExtractPrompt(handler.RequestBodies.Single());
+        Assert.Contains("trả lời câu hỏi kiến thức chung", prompt, StringComparison.Ordinal);
+        Assert.Contains("Không ép chuyển chủ đề về Homeji", prompt, StringComparison.Ordinal);
+        Assert.Contains("không có quyền truy cập Internet trực tiếp", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("Nếu câu hỏi ngoài phạm vi Homeji, trả lời ngắn và hướng về", prompt, StringComparison.Ordinal);
+    }
+
     private static HttpResponseMessage CreateRateLimitedResponse()
     {
         var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests)

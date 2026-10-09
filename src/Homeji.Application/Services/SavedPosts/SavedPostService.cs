@@ -96,7 +96,7 @@ public sealed class SavedPostService : ISavedPostService
             .Distinct()
             .ToArray();
 
-        var candidates = await _profiles.GetByIdsAsync(candidateIds, cancellationToken);
+        var candidates = await _profiles.GetDiscoverableByIdsAsync(candidateIds, cancellationToken);
         return candidates
             .Select(profile => new RoommateCandidateDto(
                 profile.Id,

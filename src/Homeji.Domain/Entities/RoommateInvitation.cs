@@ -9,7 +9,7 @@ public sealed class RoommateInvitation
     {
     }
 
-    public RoommateInvitation(Guid rentalPostId, Guid senderId, Guid receiverId, DateTimeOffset createdAt)
+    public RoommateInvitation(Guid? rentalPostId, Guid senderId, Guid receiverId, DateTimeOffset createdAt)
     {
         if (senderId == receiverId)
         {
@@ -27,7 +27,7 @@ public sealed class RoommateInvitation
 
     public Guid Id { get; private set; }
 
-    public Guid RentalPostId { get; private set; }
+    public Guid? RentalPostId { get; private set; }
 
     public Guid SenderId { get; private set; }
 

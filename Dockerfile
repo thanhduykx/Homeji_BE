@@ -14,6 +14,10 @@ COPY tests/Homeji.Api.IntegrationTests/Homeji.Api.IntegrationTests.csproj tests/
 RUN dotnet restore Homeji.sln
 
 COPY . .
+RUN dotnet test tests/Homeji.Api.IntegrationTests/Homeji.Api.IntegrationTests.csproj \
+    --configuration Release \
+    --no-restore \
+    --filter FullyQualifiedName~ConversationImageProcessorTests
 RUN dotnet publish src/Homeji.Api/Homeji.Api.csproj \
     --configuration Release \
     --no-restore \

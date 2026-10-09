@@ -36,6 +36,12 @@ public sealed class ConversationsController : ControllerBase
         return Ok(await _conversations.StartMarketplaceConversationAsync(postId, cancellationToken));
     }
 
+    [HttpPost("marketplace-orders/{orderId:guid}")]
+    public async Task<ActionResult<PostConversationDto>> StartMarketplaceOrder(Guid orderId, CancellationToken cancellationToken)
+    {
+        return Ok(await _conversations.StartMarketplaceOrderConversationAsync(orderId, cancellationToken));
+    }
+
     [HttpPost("rental-wanted-posts/{postId:guid}")]
     public async Task<ActionResult<PostConversationDto>> StartWantedPost(Guid postId, CancellationToken cancellationToken)
     {

@@ -19,7 +19,8 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
 {
     private readonly UserContext _userContext;
     private readonly IRoommateInvitationRepository _invitations;
-    private readonly ISavedPostRepository _savedPosts;
+    private readonly IRoommateDirectoryRepository _directory;
+    private readonly Homeji.Application.IRepositories.Profiles.IUserProfileRepository _profiles;
     private readonly IRentalPostRepository _posts;
     private readonly INotificationRepository _notifications;
     private readonly IRoommateConversationRepository _conversations;
@@ -36,11 +37,14 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         IRoommateConversationRepository conversations,
         IPostConversationRepository directConversations,
         TimeProvider timeProvider,
-        INotificationRealtimePublisher realtimePublisher)
+        INotificationRealtimePublisher realtimePublisher,
+        IRoommateDirectoryRepository directory,
+        Homeji.Application.IRepositories.Profiles.IUserProfileRepository profiles)
     {
         _userContext = userContext;
         _invitations = invitations;
-        _savedPosts = savedPosts;
+        _directory = directory;
+        _profiles = profiles;
         _posts = posts;
         _notifications = notifications;
         _conversations = conversations;
@@ -69,11 +73,9 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
             throw new NotFoundException(nameof(RentalPost), postId);
         }
 
-        if (!await _savedPosts.ExistsAsync(senderId, postId, cancellationToken)
-            || !await _savedPosts.ExistsAsync(request.ReceiverId, postId, cancellationToken))
-        {
-            throw new ForbiddenAccessException("Cả hai người phải lưu tin đăng này trước khi gửi lời mời ở ghép.");
-        }
+        var receiver = await _directory.GetAsync(request.ReceiverId, cancellationToken);
+        if (receiver is null || !receiver.IsDiscoverable || (await _profiles.GetByIdAsync(request.ReceiverId, cancellationToken))?.Role != UserRole.Renter)
+            throw new ForbiddenAccessException("Người nhận chưa bật tìm bạn ở ghép.");
 
         if (await _invitations.HasPendingAsync(postId, senderId, request.ReceiverId, cancellationToken))
         {
@@ -98,27 +100,62 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         return RoommateInvitationMapper.ToDto(invitation, post.Title);
     }
 
+    public async Task<RoommateInvitationDto> CreateIndependentAsync(CreateRoommateInvitationDto request, CancellationToken cancellationToken = default)
+    {
+        var sender = await GetRequiredRenterAsync(cancellationToken);
+        if (request.ReceiverId == Guid.Empty || sender.Id == request.ReceiverId)
+            throw new ForbiddenAccessException("Người nhận lời mời không hợp lệ.");
+        var receiver = await _directory.GetAsync(request.ReceiverId, cancellationToken);
+        if (receiver is null || !receiver.IsDiscoverable || (await _profiles.GetByIdAsync(request.ReceiverId, cancellationToken))?.Role != UserRole.Renter)
+            throw new ForbiddenAccessException("Người nhận chưa bật tìm bạn ở ghép.");
+        var existing = await _invitations.GetActiveIndependentAsync(sender.Id, request.ReceiverId, cancellationToken);
+        if (existing is not null)
+        {
+            var chat = await _directConversations.FindAsync(ConversationSubjectType.RoommateInvitation, existing.Id,
+                existing.SenderId, existing.ReceiverId, cancellationToken);
+            return RoommateInvitationMapper.ToDto(existing, "Kết nối ở ghép", chat?.Id);
+        }
+        var invitation = new RoommateInvitation(null, sender.Id, request.ReceiverId, _timeProvider.GetUtcNow());
+        await _invitations.AddAsync(invitation, cancellationToken);
+        var notification = new Notification(request.ReceiverId, NotificationType.RoommateInvitationReceived,
+            "Lời mời ở ghép mới", "Có người muốn kết nối ở ghép với bạn.", invitation.Id, _timeProvider.GetUtcNow());
+        await _notifications.AddAsync(notification, cancellationToken);
+        try { await _invitations.SaveChangesAsync(cancellationToken); }
+        catch (RequestValidationException)
+        {
+            // A concurrent reciprocal request may have won the unique pair constraint.
+            existing = await _invitations.GetActiveIndependentAsync(sender.Id, request.ReceiverId, cancellationToken);
+            if (existing is null) throw;
+            var chat = await _directConversations.FindAsync(ConversationSubjectType.RoommateInvitation, existing.Id,
+                existing.SenderId, existing.ReceiverId, cancellationToken);
+            return RoommateInvitationMapper.ToDto(existing, "Kết nối ở ghép", chat?.Id);
+        }
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        return RoommateInvitationMapper.ToDto(invitation, "Kết nối ở ghép");
+    }
+
     public async Task<IReadOnlyList<RoommateInvitationDto>> GetMineAsync(CancellationToken cancellationToken = default)
     {
         var renter = await GetRequiredRenterAsync(cancellationToken);
         var userId = renter.Id;
         var invitations = await _invitations.GetForUserAsync(userId, cancellationToken);
-        var postIds = invitations.Select(invitation => invitation.RentalPostId).Distinct().ToArray();
+        var postIds = invitations.Where(x => x.RentalPostId.HasValue).Select(x => x.RentalPostId!.Value).Distinct().ToArray();
         var posts = await _posts.GetByIdsAsync(postIds, cancellationToken);
         var postTitles = posts.ToDictionary(post => post.Id, post => post.Title);
         var directConversations = await _directConversations.GetForUserAsync(userId, cancellationToken);
+        var names = (await _profiles.GetByIdsAsync(invitations.SelectMany(x => new[] { x.SenderId, x.ReceiverId }).Distinct().ToArray(), cancellationToken)).ToDictionary(x => x.Id, x => x.DisplayName);
 
         return invitations.Select(invitation =>
         {
             var conversationId = directConversations.FirstOrDefault(conversation =>
-                conversation.SubjectType == ConversationSubjectType.RentalPost
-                && conversation.SubjectId == invitation.RentalPostId
+                conversation.SubjectType == SubjectType(invitation)
+                && conversation.SubjectId == SubjectId(invitation)
                 && conversation.Includes(invitation.SenderId)
                 && conversation.Includes(invitation.ReceiverId))?.Id;
             return RoommateInvitationMapper.ToDto(
                 invitation,
-                postTitles.GetValueOrDefault(invitation.RentalPostId) ?? "Tin đăng không còn khả dụng",
-                conversationId);
+                invitation.RentalPostId is { } postId ? postTitles.GetValueOrDefault(postId) ?? "Tin đăng không còn khả dụng" : "Kết nối ở ghép",
+                conversationId) with { SenderDisplayName = names.GetValueOrDefault(invitation.SenderId), ReceiverDisplayName = names.GetValueOrDefault(invitation.ReceiverId) };
         }).ToArray();
     }
 
@@ -149,7 +186,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         PostConversation? directConversation = null;
         var invitation = await _invitations.GetByIdAsync(invitationId, cancellationToken)
             ?? throw new NotFoundException(nameof(RoommateInvitation), invitationId);
-        var post = await _posts.GetByIdAsync(invitation.RentalPostId, cancellationToken);
+        var post = invitation.RentalPostId is { } rentalPostId ? await _posts.GetByIdAsync(rentalPostId, cancellationToken) : null;
 
         if (cancel)
         {
@@ -162,27 +199,27 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
             if (accept)
             {
                 invitation.Accept(_timeProvider.GetUtcNow());
-                if (await _conversations.GetByInvitationIdAsync(invitation.Id, cancellationToken) is null)
+                if (invitation.RentalPostId.HasValue && await _conversations.GetByInvitationIdAsync(invitation.Id, cancellationToken) is null)
                 {
                     await _conversations.AddConversationAsync(new RoommateConversation(
                         invitation.Id,
-                        invitation.RentalPostId,
+                        invitation.RentalPostId!.Value,
                         invitation.SenderId,
                         invitation.ReceiverId,
                         _timeProvider.GetUtcNow()), cancellationToken);
                 }
 
                 directConversation = await _directConversations.FindAsync(
-                    ConversationSubjectType.RentalPost,
-                    invitation.RentalPostId,
+                    SubjectType(invitation),
+                    SubjectId(invitation),
                     invitation.SenderId,
                     invitation.ReceiverId,
                     cancellationToken);
                 if (directConversation is null)
                 {
                     directConversation = new PostConversation(
-                        ConversationSubjectType.RentalPost,
-                        invitation.RentalPostId,
+                        SubjectType(invitation),
+                        SubjectId(invitation),
                         invitation.SenderId,
                         invitation.ReceiverId,
                         _timeProvider.GetUtcNow());
@@ -211,16 +248,20 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
         }
 
         directConversation ??= await _directConversations.FindAsync(
-            ConversationSubjectType.RentalPost,
-            invitation.RentalPostId,
+            SubjectType(invitation),
+            SubjectId(invitation),
             invitation.SenderId,
             invitation.ReceiverId,
             cancellationToken);
         return RoommateInvitationMapper.ToDto(
             invitation,
-            post?.Title ?? "Tin đăng không còn khả dụng",
+            post?.Title ?? (invitation.RentalPostId is null ? "Kết nối ở ghép" : "Tin đăng không còn khả dụng"),
             directConversation?.Id);
     }
+
+    private static ConversationSubjectType SubjectType(RoommateInvitation invitation) =>
+        invitation.RentalPostId.HasValue ? ConversationSubjectType.RentalPost : ConversationSubjectType.RoommateInvitation;
+    private static Guid SubjectId(RoommateInvitation invitation) => invitation.RentalPostId ?? invitation.Id;
 
     private async Task<UserProfile> GetRequiredRenterAsync(CancellationToken cancellationToken)
     {

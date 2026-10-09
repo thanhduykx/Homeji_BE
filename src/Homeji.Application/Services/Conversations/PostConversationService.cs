@@ -3,6 +3,7 @@ using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Conversations;
 using Homeji.Application.IRepositories.Conversations;
 using Homeji.Application.IRepositories.Marketplace;
+using Homeji.Application.IRepositories.MarketplaceOrders;
 using Homeji.Application.IRepositories.Notifications;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IRepositories.RentalPosts;
@@ -27,6 +28,7 @@ public sealed class PostConversationService : IPostConversationService
     private readonly TimeProvider _timeProvider;
     private readonly IRentalWantedPostRepository _wantedPosts;
     private readonly IConversationImageProcessor _imageProcessor;
+    private readonly IMarketplaceOrderRepository _marketplaceOrders;
 
     public PostConversationService(
         UserContext userContext,
@@ -38,7 +40,8 @@ public sealed class PostConversationService : IPostConversationService
         INotificationRepository notifications,
         INotificationRealtimePublisher realtimePublisher,
         TimeProvider timeProvider,
-        IConversationImageProcessor imageProcessor)
+        IConversationImageProcessor imageProcessor,
+        IMarketplaceOrderRepository marketplaceOrders)
     {
         _userContext = userContext;
         _conversations = conversations;
@@ -50,6 +53,7 @@ public sealed class PostConversationService : IPostConversationService
         _realtimePublisher = realtimePublisher;
         _timeProvider = timeProvider;
         _imageProcessor = imageProcessor;
+        _marketplaceOrders = marketplaceOrders;
     }
 
     public async Task<PostConversationDto> StartRentalConversationAsync(
@@ -80,6 +84,18 @@ public sealed class PostConversationService : IPostConversationService
         }
 
         return await StartAsync(ConversationSubjectType.MarketplacePost, post.Id, post.SellerId, cancellationToken);
+    }
+
+    public async Task<PostConversationDto> StartMarketplaceOrderConversationAsync(
+        Guid orderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        var order = await _marketplaceOrders.GetByIdAsync(orderId, cancellationToken)
+            ?? throw new NotFoundException(nameof(MarketplaceOrder), orderId);
+        if (userId != order.BuyerId && userId != order.SellerId)
+            throw new ForbiddenAccessException("Bạn không có quyền liên hệ qua đơn hàng này.");
+        return await StartAsync(ConversationSubjectType.MarketplacePost, order.MarketplacePostId,
+            userId == order.BuyerId ? order.SellerId : order.BuyerId, cancellationToken);
     }
 
     public async Task<PostConversationDto> StartWantedPostConversationAsync(

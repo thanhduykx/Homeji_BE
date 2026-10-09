@@ -17,9 +17,10 @@ def render_insert_sql(batch):
                   ("id", "source", "source_id", "source_url", "title", "address", "district")]
         values += [str(record["price"]), str(record["area"]),
                    sql_string(json.dumps(record["image_urls"], ensure_ascii=False)) + "::jsonb",
-                   sql_string(record["source_updated_at"]), sql_string(record["collected_at"])]
+                   sql_string(record["source_updated_at"]), sql_string(record["collected_at"]),
+                   sql_string(record.get("source_expires_at")), sql_string(record.get("source_checked_at"))]
         statements.append("INSERT INTO homeji.rental_source_listings "
-                          "(id,source,source_id,source_url,title,address,district,price,area,image_urls,source_updated_at,collected_at) "
+                          "(id,source,source_id,source_url,title,address,district,price,area,image_urls,source_updated_at,collected_at,source_expires_at,source_checked_at) "
                           "VALUES (" + ",".join(values) + ") ON CONFLICT (source,source_id) DO NOTHING;")
     statements.append("COMMIT;")
     return "\n".join(statements) + "\n"

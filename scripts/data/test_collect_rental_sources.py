@@ -1,8 +1,14 @@
 import unittest
-from collect_rental_sources import extract_listing, render_sql
+from collect_rental_sources import extract_listing, extract_source_expiry, render_sql
 
 
 class SourceParserTests(unittest.TestCase):
+    def test_expiry_uses_own_label_and_vietnam_timezone(self):
+        html = '<table><tr><td>Ngày hết hạn:</td><td>Thứ 7, 10:55 12/09/2026</td></tr></table><article>20:00 01/01/2030</article>'
+        self.assertEqual("2026-09-12T03:55:00+00:00", extract_source_expiry(html))
+        self.assertIsNone(extract_source_expiry('<p>Cập nhật 10:55 12/09/2026</p>'))
+        self.assertIsNone(extract_source_expiry(html.replace('12/09/2026', '31/02/2026')))
+
     def html(self, district="quan-9"):
         return '''<script type="application/ld+json">{"@type":"WebPage","breadcrumb":{
         "itemListElement":[{"item":"/tinh-thanh/ho-chi-minh/''' + district + '''"}]}}</script>

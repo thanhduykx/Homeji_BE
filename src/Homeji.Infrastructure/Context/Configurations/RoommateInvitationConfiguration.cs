@@ -12,10 +12,10 @@ public sealed class RoommateInvitationConfiguration : IEntityTypeConfiguration<R
         builder.ToTable("roommate_invitations", "homeji");
         builder.HasKey(invitation => invitation.Id).HasName("pk_roommate_invitations");
         builder.Property(invitation => invitation.Id).HasColumnName("id").ValueGeneratedNever();
-        builder.Property(invitation => invitation.RentalPostId).HasColumnName("rental_post_id").IsRequired();
+        builder.Property(invitation => invitation.RentalPostId).HasColumnName("rental_post_id").IsRequired(false);
         builder.Property(invitation => invitation.SenderId).HasColumnName("sender_id").IsRequired();
         builder.Property(invitation => invitation.ReceiverId).HasColumnName("receiver_id").IsRequired();
-        builder.Property(invitation => invitation.Status).HasColumnName("status").HasConversion<int>().IsRequired();
+        builder.Property(invitation => invitation.Status).HasColumnName("status").HasConversion<int>().IsRequired().IsConcurrencyToken();
         builder.Property(invitation => invitation.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(invitation => invitation.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasIndex(invitation => new { invitation.RentalPostId, invitation.SenderId, invitation.ReceiverId, invitation.Status })

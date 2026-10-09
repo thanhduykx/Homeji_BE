@@ -16,4 +16,6 @@ public interface IChatConversationRepository
     Task AddAsync(ChatConversation conversation, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    void Remove(ChatConversation conversation);
 }

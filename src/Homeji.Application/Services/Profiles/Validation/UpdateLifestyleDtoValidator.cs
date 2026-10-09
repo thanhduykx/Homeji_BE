@@ -12,6 +12,10 @@ public sealed class UpdateLifestyleDtoValidator : AbstractValidator<UpdateLifest
         RuleFor(request => request.Role)
             .Must(role => role is UserRole.Renter or UserRole.Landlord);
 
+        RuleFor(request => request.SleepHabit).IsInEnum();
+        RuleFor(request => request.PetPreference).IsInEnum();
+        RuleFor(request => request.SmokingPreference).IsInEnum();
+
         RuleFor(request => request.MaxBudget)
             .GreaterThan(0)
             .When(request => request.MaxBudget.HasValue);

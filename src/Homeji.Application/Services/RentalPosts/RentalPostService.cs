@@ -229,32 +229,17 @@ public sealed class RentalPostService : IRentalPostService
             IsOwnerPremium = ownerIsPremium,
             OwnerBadge = ownerIsPremium ? "Premium" : null,
         };
-        if (!isOwner)
-        {
-            dto = dto with { OwnerConsentContact = null };
-            if (post.Type == RentalPostType.RoomTransfer)
-            {
-                dto = dto with
-                {
-                    Address = ApproximateTransferAddress(post.Address),
-                    Latitude = Math.Round(post.Latitude, 3),
-                    Longitude = Math.Round(post.Longitude, 3),
-                };
-            }
-        }
-        // Guests: hide internal moderation notes (Active posts usually null anyway).
-        if (currentUserId is null)
-        {
-            return dto with { ModerationReason = null };
-        }
-
-        return dto;
+        return RentalPostVisibility.ForViewer(dto, currentUserId);
     }
 
     public async Task<IReadOnlyList<RentalPostSummaryDto>> SearchAsync(
         RentalPostSearchDto request,
         CancellationToken cancellationToken = default)
     {
+        if (request.Type.HasValue && !Enum.IsDefined(request.Type.Value))
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["type"] = ["Loại tin phòng không hợp lệ."] });
+        if (request.Ids?.Count > 10 || request.ExcludedAmenities?.Count > 20 || request.ExcludedAmenities?.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > RentalPost.MaxAmenityCodeLength) == true || request.MinAvailableSlots is < 1 or > 20)
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["filters"] = ["Bộ lọc tin phòng không hợp lệ."] });
         var search = request;
         if (_userContext.TryGetUserId() is null)
         {
@@ -289,14 +274,7 @@ public sealed class RentalPostService : IRentalPostService
                 var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
                 var boostScore = CalculateBoostScore(post, isPremium, now);
                 var summary = RentalPostMapper.ToSummaryDto(post, isPremium, boostScore);
-                return post.Type == RentalPostType.RoomTransfer
-                    ? summary with
-                    {
-                        Address = ApproximateTransferAddress(post.Address),
-                        Latitude = Math.Round(post.Latitude, 3),
-                        Longitude = Math.Round(post.Longitude, 3),
-                    }
-                    : summary;
+                return RentalPostVisibility.ForPublicSearch(summary);
             })
             .OrderByDescending(post => post.IsOwnerPremium)
             .ThenByDescending(post => post.BoostScore)
@@ -388,6 +366,7 @@ public sealed class RentalPostService : IRentalPostService
         var reviews = await _reviews.GetByPostIdsAsync(ids, cancellationToken);
         var reviewMap = reviews.GroupBy(review => review.RentalPostId).ToDictionary(group => group.Key, group => group.ToArray());
         var postMap = posts.ToDictionary(post => post.Id);
+        var currentUserId = _userContext.TryGetUserId();
         var items = ids.Select(id =>
         {
             var postReviews = reviewMap.GetValueOrDefault(id) ?? [];
@@ -395,7 +374,7 @@ public sealed class RentalPostService : IRentalPostService
                 ? 0
                 : Math.Round(postReviews.Average(review => (decimal)review.Rating), 2);
             return new RentalPostComparisonItemDto(
-                RentalPostMapper.ToDto(postMap[id]),
+                RentalPostVisibility.ForViewer(RentalPostMapper.ToDto(postMap[id]), currentUserId),
                 average,
                 postReviews.Length);
         }).ToArray();
@@ -415,7 +394,7 @@ public sealed class RentalPostService : IRentalPostService
 
     private static bool HasSearchCriteria(RentalPostSearchDto search)
     {
-        return !string.IsNullOrWhiteSpace(search.Keyword)
+        return search.Type.HasValue || !string.IsNullOrWhiteSpace(search.Keyword)
             || search.MinPrice.HasValue
             || search.MaxPrice.HasValue
             || search.MinArea.HasValue
@@ -428,18 +407,6 @@ public sealed class RentalPostService : IRentalPostService
             || search.MaxDeposit.HasValue
             || search.MinAvailableSlots.HasValue
             || search.AvailableFromBefore.HasValue;
-    }
-
-    private static string ApproximateTransferAddress(string address)
-    {
-        var segments = address
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (segments.Length < 2)
-        {
-            return "Khu vực " + address;
-        }
-
-        return "Khu vực " + string.Join(", ", segments.TakeLast(Math.Min(2, segments.Length)));
     }
 
     private async Task<RentalPost> GetOwnedPostAsync(Guid postId, CancellationToken cancellationToken)

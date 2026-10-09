@@ -5,143 +5,179 @@ using Homeji.Application.DTOs.AI;
 
 namespace Homeji.Application.Services.AI;
 
-/// <summary>Deterministic constraints and corrections, also used when the provider is unavailable.</summary>
+/// <summary>Bounded, deterministic edits to explicit preferences. Never infers missing fees.</summary>
 public static partial class RentalSearchIntent
 {
-    public static readonly IReadOnlyDictionary<string, string[]> Amenities = new Dictionary<string, string[]>(StringComparer.Ordinal)
+    public static readonly IReadOnlyDictionary<string, string[]> AmenityAliases = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
-        ["PARKING"] = ["giu xe", "gui xe", "bai xe"],
-        ["FREE_TIME"] = ["gio giac tu do", "tu do gio giac"],
-        ["WIFI"] = ["wifi", "internet"],
-        ["AIR_CONDITIONER"] = ["may lanh", "dieu hoa"],
-        ["PRIVATE_TOILET"] = ["wc rieng", "ve sinh rieng", "toilet rieng"],
-        ["PET_FRIENDLY"] = ["thu cung", "nuoi meo", "nuoi cho"],
         ["KITCHEN"] = ["bep", "nau an"],
-        ["QUIET"] = ["yen tinh"],
-        ["SECURITY"] = ["bao ve"],
+        ["AIR_CONDITIONER"] = ["may lanh", "dieu hoa"],
+        ["WIFI"] = ["wifi", "internet"],
+        ["PARKING"] = ["giu xe", "bai xe"],
+        ["PRIVATE_BATHROOM"] = ["wc rieng", "toilet rieng", "ve sinh rieng"],
+        ["PET_FRIENDLY"] = ["thu cung", "nuoi meo", "nuoi cho"],
+        ["FREE_TIME"] = ["gio giac tu do"],
     };
 
-    public static string Normalize(string text)
+    public static string Normalize(string value)
     {
-        var decomposed = text.ToLowerInvariant().Replace('đ', 'd').Normalize(NormalizationForm.FormD);
-        var result = new StringBuilder();
-        foreach (var character in decomposed)
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value.Normalize(NormalizationForm.FormD))
+        {
             if (CharUnicodeInfo.GetUnicodeCategory(character) != UnicodeCategory.NonSpacingMark)
-                result.Append(character);
-        return result.ToString().Normalize(NormalizationForm.FormC);
+                builder.Append(character is 'đ' or 'Đ' ? 'd' : char.ToLowerInvariant(character));
+        }
+        return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    public static string AmenityCode(string value) => value switch
-    {
-        "parking" => "PARKING", "freeTime" => "FREE_TIME", "wifi" => "WIFI",
-        "airConditioner" => "AIR_CONDITIONER", "privateToilet" => "PRIVATE_TOILET",
-        "petFriendly" => "PET_FRIENDLY", "kitchen" => "KITCHEN", "quiet" => "QUIET", "security" => "SECURITY",
-        _ => value.ToUpperInvariant(),
-    };
+    public static bool IsRentalQuery(string message) => RentalTerms().IsMatch(Normalize(message));
 
-    public static AiParsedSearchCriteriaDto Apply(string text, AiParsedSearchCriteriaDto? previous = null)
+    public static AiParsedSearchCriteriaDto Apply(string message, AiParsedSearchCriteriaDto? previous = null)
     {
-        var value = Normalize(text);
-        var state = value.Contains("tim lai", StringComparison.Ordinal) || value.Contains("xoa tieu chi", StringComparison.Ordinal)
-            ? Empty() : previous ?? Empty();
-        var required = state.RequiredAmenities.Select(AmenityCode).ToHashSet(StringComparer.Ordinal);
-        var excluded = state.ExcludedAmenities.Select(AmenityCode).ToHashSet(StringComparer.Ordinal);
-        var preferred = state.Criteria.Select(AmenityCode).ToHashSet(StringComparer.Ordinal);
-        foreach (var (code, aliases) in Amenities)
+        var text = Normalize(message);
+        var state = previous ?? new AiParsedSearchCriteriaDto(null, null, null, null, null, null, []);
+        if (text.Contains("tim lai", StringComparison.Ordinal) || text.Contains("bat dau lai", StringComparison.Ordinal))
+            state = new AiParsedSearchCriteriaDto(null, null, null, null, null, null, []);
+        var required = state.RequiredAmenities.ToHashSet(StringComparer.Ordinal);
+        var excluded = state.ExcludedAmenities.ToHashSet(StringComparer.Ordinal);
+        var optional = state.Criteria.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknown = state.Unknown.ToHashSet(StringComparer.Ordinal);
+        foreach (var (code, aliases) in AmenityAliases)
         {
             foreach (var alias in aliases)
             {
-                var pattern = Regex.Escape(alias);
-                if (!Regex.IsMatch(value, $@"\b{pattern}\b", RegexOptions.CultureInvariant)) continue;
-                if (Regex.IsMatch(value, $@"(?:khong can|bo|it quan tam|khong bat buoc)\s+(?:co\s+)?{pattern}", RegexOptions.CultureInvariant))
-                { required.Remove(code); preferred.Remove(code); excluded.Remove(code); }
-                else if (Regex.IsMatch(value, $@"(?:khong co|khong muon|khong thich)\s+{pattern}", RegexOptions.CultureInvariant))
-                { required.Remove(code); preferred.Remove(code); excluded.Add(code); }
-                else if (Regex.IsMatch(value, $@"(?:uu tien|mong muon|neu co)\s+(?:co\s+)?{pattern}", RegexOptions.CultureInvariant))
-                { required.Remove(code); excluded.Remove(code); preferred.Add(code); }
-                else { excluded.Remove(code); preferred.Remove(code); required.Add(code); }
+                var match = Regex.Match(text, $@"\b(?<prefix>(?:khong can|bo|khong co|khong muon|uu tien|mong muon|co|can|bat buoc)\s+)?{Regex.Escape(alias)}\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
+                if (!match.Success) continue;
+                var prefix = match.Groups["prefix"].Value.Trim();
+                required.Remove(code); excluded.Remove(code); optional.Remove(code);
+                if (prefix is "khong can" or "bo") continue;
+                if (prefix is "khong co" or "khong muon") excluded.Add(code);
+                else if (prefix is "uu tien" or "mong muon") optional.Add(code);
+                else required.Add(code);
                 break;
             }
         }
-        var amounts = MoneyPattern().Matches(value);
-        var money = amounts.Count > 0 ? amounts[0] : Match.Empty;
-        if (money.Success)
+        var range = BudgetRange().Match(text);
+        if (range.Success)
         {
-            var amount = decimal.Parse(money.Groups[1].Value.Replace(',', '.'), CultureInfo.InvariantCulture) * 1_000_000;
-            var prefix = value[..money.Index];
-            state = prefix.EndsWith("tu ", StringComparison.Ordinal) || prefix.EndsWith("toi thieu ", StringComparison.Ordinal)
-                ? state with { PriceMin = amount } : state with { PriceMax = amount };
-            if (amounts.Count >= 2)
+            var unit = range.Groups["unit"].Value;
+            var minUnit = range.Groups["minUnit"].Success ? range.Groups["minUnit"].Value : unit;
+            if (TryMoney(range.Groups["min"].Value, minUnit, out var minimum) && TryMoney(range.Groups["max"].Value, unit, out var maximum))
             {
-                var between = value[(money.Index + money.Length)..amounts[1].Index];
-                if (between.Contains("den", StringComparison.Ordinal) || between.Contains('-', StringComparison.Ordinal))
-                    state = state with { PriceMin = amount, PriceMax = decimal.Parse(amounts[1].Groups[1].Value.Replace(',', '.'), CultureInfo.InvariantCulture) * 1_000_000 };
+                state = state with { PriceMin = minimum, PriceMax = maximum };
+                unknown.Remove("budget");
+            }
+            else unknown.Add("budget");
+        }
+        var budget = Money().Match(text);
+        if (!range.Success && budget.Success && TryMoney(budget.Groups["amount"].Value, budget.Groups["unit"].Value, out var amount))
+        {
+            if (amount is > 0 and <= 1_000_000_000)
+            {
+                state = budget.Groups["bound"].Value is "tu" or "tren" ? state with { PriceMin = amount } : state with { PriceMax = amount };
+                unknown.Remove("budget");
             }
         }
-        var vnd = VndPattern().Match(value);
-        if (!money.Success && vnd.Success)
-            state = state with { PriceMax = decimal.Parse(vnd.Groups[1].Value.Replace(".", string.Empty, StringComparison.Ordinal).Replace(",", string.Empty, StringComparison.Ordinal), CultureInfo.InvariantCulture) };
-        if (value.Contains("re hon", StringComparison.Ordinal) && !money.Success && state.PriceMax is > 0)
-            state = state with { PriceMax = Math.Floor(state.PriceMax.Value * 0.9m) };
-        if (value.Contains("bo ngan sach", StringComparison.Ordinal)) state = state with { PriceMin = null, PriceMax = null };
-        if (value.Contains("ca phi", StringComparison.Ordinal) || value.Contains("tong chi phi", StringComparison.Ordinal)) state = state with { BudgetKind = "total" };
-        if (value.Contains("chi tien thue", StringComparison.Ordinal)) state = state with { BudgetKind = "rent" };
-        var occupants = OccupantsPattern().Match(value);
-        if (occupants.Success) state = state with { Occupants = int.Parse(occupants.Groups[1].Value, CultureInfo.InvariantCulture) };
-        if (value.Contains("khong o ghep", StringComparison.Ordinal)) state = state with { ExcludeShared = true };
-        if (value.Contains("chap nhan o ghep", StringComparison.Ordinal)) state = state with { ExcludeShared = false };
-        if (value.Contains("bo so nguoi", StringComparison.Ordinal)) state = state with { Occupants = null };
-        if (value.Contains("bo dien tich", StringComparison.Ordinal)) state = state with { AreaMin = null, AreaMax = null };
-        if (value.Contains("bo khu vuc", StringComparison.Ordinal)) state = state with { Location = null, Keyword = null };
-        if (value.Contains("bo diem den", StringComparison.Ordinal)) state = state with { Destination = null };
-        if (value.Contains("bo thoi gian di", StringComparison.Ordinal)) state = state with { MaxCommuteMinutes = null };
-        var area = AreaPattern().Match(value);
-        if (area.Success)
+        else if (!range.Success && (budget.Success || text.Contains("re hon", StringComparison.Ordinal))) unknown.Add("budget");
+        if (text.Contains("bo ngan sach", StringComparison.Ordinal)) { state = state with { PriceMin = null, PriceMax = null }; unknown.Remove("budget"); }
+        var occupants = People().Match(text);
+        if (occupants.Success)
         {
-            var amount = decimal.Parse(area.Groups[2].Value.Replace(',', '.'), CultureInfo.InvariantCulture);
-            state = area.Groups[1].Value is "duoi" or "toi da" ? state with { AreaMax = amount } : state with { AreaMin = amount };
+            if (int.TryParse(occupants.Groups[1].Value, out var count) && count is >= 1 and <= 20)
+            { state = state with { Occupants = count }; unknown.Remove("occupants"); }
+            else unknown.Add("occupants");
         }
-        var commute = CommutePattern().Match(value);
-        if (commute.Success) state = state with { MaxCommuteMinutes = int.Parse(commute.Groups[1].Value, CultureInfo.InvariantCulture) };
-        foreach (var destination in new[] { "fpt", "hutech", "spkt", "su pham ky thuat", "dhqg", "nha van hoa sinh vien" })
-            if (value.Contains(destination, StringComparison.Ordinal)) state = state with { Destination = destination, Location = null, Keyword = null };
-        foreach (var location in new[] { "thu duc", "quan 9", "tang nhon phu", "long thanh my", "long truong", "hiep phu", "phuoc long", "linh trung", "linh xuan" })
-            if (value.Contains(location, StringComparison.Ordinal)) state = state with { Location = location, Keyword = null };
-        var unknown = new List<string>();
-        if (state.Destination is not null) unknown.Add("Chọn chính xác cơ sở trường/điểm đến để tính đường đi; tên trường không chứng minh phòng ở gần.");
-        if (state.MaxCommuteMinutes.HasValue) unknown.Add("Chọn điểm đến và phương tiện, sau đó tính tuyến đường cho danh sách ngắn.");
-        if (state.BudgetKind == "total") unknown.Add("Cần xác nhận đơn vị, các khoản phí và mức sử dụng trước khi kiểm tra tổng ngân sách.");
-        return state with { RequiredAmenities = required.ToArray(), ExcludedAmenities = excluded.ToArray(), Criteria = preferred.ToArray(), Unknown = unknown };
+        if (Regex.IsMatch(text, @"\bkhong(?: muon| can)? o ghep\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))) state = state with { ExcludeRoommateShare = true };
+        else if (text.Contains("chap nhan o ghep", StringComparison.Ordinal)) state = state with { ExcludeRoommateShare = false };
+        if (text.Contains("ca phi", StringComparison.Ordinal) || text.Contains("tong chi phi", StringComparison.Ordinal)) state = state with { BudgetBasis = "total" };
+        else if (text.Contains("chi tien thue", StringComparison.Ordinal)) state = state with { BudgetBasis = "rent" };
+        if (state.BudgetBasis == "total") unknown.Add("feeUnits"); else unknown.Remove("feeUnits");
+        if (text.Contains("thu duc", StringComparison.Ordinal)) state = state with { Location = "Thủ Đức" };
+        else if (text.Contains("quan 9", StringComparison.Ordinal)) state = state with { Location = "Quận 9" };
+        if (text.Contains("fpt", StringComparison.Ordinal)) { state = state with { Destination = "FPT" }; unknown.Add("destination"); }
+        var schools = new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            ["Sư phạm Kỹ thuật"] = ["spkt", "hcmute", "su pham ky thuat"],
+            ["Công nghệ Thông tin"] = ["uit", "cong nghe thong tin"],
+            ["Đại học Quốc tế"] = ["dai hoc quoc te"],
+            ["Bách khoa"] = ["bach khoa", "hcmut"],
+            ["Khoa học Tự nhiên"] = ["khoa hoc tu nhien", "hcmus"],
+            ["Kinh tế – Luật"] = ["kinh te luat", "uel"],
+            ["Nông Lâm"] = ["nong lam"],
+            ["Ngân hàng"] = ["dai hoc ngan hang"],
+            ["HUTECH"] = ["hutech"],
+            ["Văn Lang"] = ["van lang"],
+            ["Nguyễn Tất Thành"] = ["nguyen tat thanh"],
+        };
+        foreach (var (school, aliases) in schools)
+            if (aliases.Any(alias => Regex.IsMatch(text, $@"\b{Regex.Escape(alias)}\b", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))))
+            { state = state with { Destination = school }; unknown.Add("destination"); break; }
+        if (text.Contains("khu cong nghe cao", StringComparison.Ordinal) && state.Destination == "FPT")
+        { state = state with { Destination = "FPT Khu Công nghệ cao" }; unknown.Remove("destination"); }
+        if (text.Contains("bo diem den", StringComparison.Ordinal)) { state = state with { Destination = null }; unknown.Remove("destination"); }
+        var commute = CommuteLimit().Match(text);
+        if (commute.Success && int.TryParse(commute.Groups[1].Value, out var minutes))
+        {
+            if (minutes is >= 1 and <= 240) state = state with { MaxCommuteMinutes = minutes };
+            else unknown.Add("commute");
+        }
+        if (text.Contains("di bo", StringComparison.Ordinal)) state = state with { TravelMode = "WALKING" };
+        else if (text.Contains("xe buyt", StringComparison.Ordinal) || text.Contains("phuong tien cong cong", StringComparison.Ordinal)) state = state with { TravelMode = "TRANSIT" };
+        else if (text.Contains("o to", StringComparison.Ordinal)) state = state with { TravelMode = "DRIVING" };
+        else if (text.Contains("xe may", StringComparison.Ordinal)) { state = state with { TravelMode = null }; unknown.Add("motorcycleCoverage"); }
+        if (state.TravelMode is not null) unknown.Remove("motorcycleCoverage");
+        if (text.Contains("bo diem den", StringComparison.Ordinal)) { state = state with { MaxCommuteMinutes = null, TravelMode = null }; unknown.Remove("motorcycleCoverage"); }
+        // Naming a campus does not prove proximity. Routes must be explicitly calculated by the user.
+        if (state.Destination is not null || state.MaxCommuteMinutes.HasValue || commute.Success || unknown.Contains("motorcycleCoverage")) unknown.Add("commute"); else unknown.Remove("commute");
+        if (state.MaxCommuteMinutes.HasValue && state.Destination is null) unknown.Add("destination");
+        if (state.PriceMin > state.PriceMax) unknown.Add("priceRange"); else unknown.Remove("priceRange");
+        var areaRange = AreaRange().Match(text);
+        var area = Area().Match(text);
+        if (areaRange.Success)
+        {
+            if (TryArea(areaRange.Groups["min"].Value, out var minArea) && TryArea(areaRange.Groups["max"].Value, out var maxArea) && minArea <= maxArea)
+            { state = state with { AreaMin = minArea, AreaMax = maxArea }; unknown.Remove("area"); }
+            else unknown.Add("area");
+        }
+        else if (area.Success)
+        {
+            if (TryArea(area.Groups["amount"].Value, out var areaValue))
+            {
+                state = area.Groups["bound"].Value is "duoi" or "toi da" or "khong qua"
+                    ? state with { AreaMax = areaValue } : state with { AreaMin = areaValue };
+                unknown.Remove("area");
+            }
+            else unknown.Add("area");
+        }
+        if (text.Contains("bo dien tich", StringComparison.Ordinal)) { state = state with { AreaMin = null, AreaMax = null }; unknown.Remove("area"); }
+        if (state.AreaMin > state.AreaMax) unknown.Add("area");
+        return state with { RequiredAmenities = required.Order(StringComparer.Ordinal).ToArray(), ExcludedAmenities = excluded.Order(StringComparer.Ordinal).ToArray(), Criteria = optional.Order(StringComparer.Ordinal).ToArray(), Unknown = unknown.Order(StringComparer.Ordinal).ToArray() };
     }
 
-    public static AiParsedSearchCriteriaDto Empty() => new(null, null, null, null, null, null, []);
-
-    public static AiParsedSearchCriteriaDto Merge(AiParsedSearchCriteriaDto state, AiParsedSearchCriteriaDto update) => state with
+    private static bool TryMoney(string text, string unit, out decimal amount)
     {
-        Location = update.Location ?? state.Location,
-        Keyword = update.Keyword ?? state.Keyword,
-        PriceMin = update.PriceMin ?? state.PriceMin,
-        PriceMax = update.PriceMax ?? state.PriceMax,
-        AreaMin = update.AreaMin ?? state.AreaMin,
-        AreaMax = update.AreaMax ?? state.AreaMax,
-        Occupants = update.Occupants ?? state.Occupants,
-        Destination = update.Destination ?? state.Destination,
-        MaxCommuteMinutes = update.MaxCommuteMinutes ?? state.MaxCommuteMinutes,
-        BudgetKind = update.BudgetKind == "total" ? "total" : state.BudgetKind,
-        ExcludeShared = update.ExcludeShared || state.ExcludeShared,
-        RequiredAmenities = state.RequiredAmenities.Concat(update.RequiredAmenities).Distinct(StringComparer.Ordinal).ToArray(),
-        ExcludedAmenities = state.ExcludedAmenities.Concat(update.ExcludedAmenities).Distinct(StringComparer.Ordinal).ToArray(),
-        Criteria = state.Criteria.Concat(update.Criteria).Distinct(StringComparer.Ordinal).ToArray(),
-    };
+        var currency = unit is "vnd" or "dong" or "d";
+        var normalized = currency && Regex.IsMatch(text, @"^\d{1,3}(?:[.,]\d{3})+$", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)) ? text.Replace(",", "", StringComparison.Ordinal).Replace(".", "", StringComparison.Ordinal) : text.Replace(',', '.');
+        var valid = decimal.TryParse(normalized, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out amount);
+        amount *= unit is "tr" or "trieu" ? 1_000_000 : unit is "k" or "ngan" or "nghin" ? 1_000 : 1;
+        return valid && amount is > 0 and <= 1_000_000_000;
+    }
 
-    [GeneratedRegex(@"(\d+(?:[.,]\d+)?)\s*(?:trieu|tr|triệu)\b", RegexOptions.CultureInvariant)]
-    private static partial Regex MoneyPattern();
-    [GeneratedRegex(@"\b(\d{1,3}(?:[.,]\d{3}){2,3}|\d{6,9})\s*(?:dong|vnd)?\b", RegexOptions.CultureInvariant)]
-    private static partial Regex VndPattern();
-    [GeneratedRegex(@"(\d+)\s*nguoi\b", RegexOptions.CultureInvariant)]
-    private static partial Regex OccupantsPattern();
-    [GeneratedRegex(@"(?:duoi|toi da|khong qua)\s*(\d+)\s*phut", RegexOptions.CultureInvariant)]
-    private static partial Regex CommutePattern();
-    [GeneratedRegex(@"(?:(duoi|toi da|tu|toi thieu|tren)\s*)?(\d+(?:[.,]\d+)?)\s*(?:m2|m²|met vuong)\b", RegexOptions.CultureInvariant)]
-    private static partial Regex AreaPattern();
+    private static bool TryArea(string text, out decimal area) => decimal.TryParse(text.Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out area) && area is > 0 and <= 100_000;
+
+    [GeneratedRegex(@"(?<bound>tu|tren|it nhat|toi thieu|duoi|toi da|khong qua)?\s*(?<amount>\d+(?:[.,]\d+)?)\s*(?:m2|m²|met vuong)(?=$|[\s,.;!?])", RegexOptions.CultureInvariant)]
+    private static partial Regex Area();
+    [GeneratedRegex(@"(?:tu\s+)?(?<min>\d+(?:[.,]\d+)?)\s*(?:m2|m²|met vuong)?\s*(?:den|toi|-)\s*(?<max>\d+(?:[.,]\d+)?)\s*(?:m2|m²|met vuong)(?=$|[\s,.;!?])", RegexOptions.CultureInvariant)]
+    private static partial Regex AreaRange();
+
+    [GeneratedRegex(@"\b(phong|tro|thue|o ghep|ngan sach|gia|gan|bep|may lanh|re hon|nguoi|ca phi|diem den|tien thue|wifi|internet|thu cung|giu xe|wc rieng|ve sinh rieng|fpt|khu cong nghe cao|phut|di bo|o to|xe buyt|xe may|spkt|hcmute|uit|hcmut|hcmus|uel|hutech|dai hoc|truong|dien tich)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex RentalTerms();
+    [GeneratedRegex(@"(?<bound>duoi|toi da|khong qua|cao nhat|tu|tren)?\s*(?<amount>\d+(?:[.,]\d+)*)\s*(?<unit>trieu|tr|vnd|dong|nghin|ngan|k|d)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex Money();
+    [GeneratedRegex(@"(?:tu\s+)?(?<min>\d+(?:[.,]\d+)*)\s*(?<minUnit>trieu|tr|vnd|dong|nghin|ngan|k|d)?\s*(?:den|toi|-)\s*(?<max>\d+(?:[.,]\d+)*)\s*(?<unit>trieu|tr|vnd|dong|nghin|ngan|k|d)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex BudgetRange();
+    [GeneratedRegex(@"(?:duoi|toi da|khong qua|trong|<=|≤)\s*(\d{1,3})\s*phut\b", RegexOptions.CultureInvariant)]
+    private static partial Regex CommuteLimit();
+    [GeneratedRegex(@"\b(\d+)\s*nguoi\b", RegexOptions.CultureInvariant)]
+    private static partial Regex People();
 }

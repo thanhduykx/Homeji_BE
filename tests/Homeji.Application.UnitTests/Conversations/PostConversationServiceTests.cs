@@ -87,7 +87,7 @@ public sealed class PostConversationServiceTests
             notifications: null!,
             realtimePublisher: null!,
             new StubTimeProvider(UtcNow),
-            imageProcessor: null!);
+            imageProcessor: null!, marketplaceOrders: null!);
     }
 
     private static RentalWantedPost CreateWantedPost(Guid requesterId)

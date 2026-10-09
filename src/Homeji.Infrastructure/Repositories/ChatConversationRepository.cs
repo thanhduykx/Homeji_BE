@@ -48,4 +48,6 @@ public sealed class ChatConversationRepository : IChatConversationRepository
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    public void Remove(ChatConversation conversation) => _dbContext.ChatConversations.Remove(conversation);
 }

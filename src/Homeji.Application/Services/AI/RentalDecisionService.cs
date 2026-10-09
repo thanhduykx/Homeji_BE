@@ -16,7 +16,7 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
 {
     public async Task<RentalDecisionResponseDto> CompareAsync(RentalDecisionRequestDto request, CancellationToken cancellationToken)
     {
-        _ = userContext.GetRequiredUserId();
+        var currentUserId = userContext.GetRequiredUserId();
         var ids = request.PostIds.Distinct().ToArray();
         if (ids.Length is < 1 or > 10 || ids.Contains(Guid.Empty))
             throw Validation("postIds", "Chọn từ 1 đến 10 tin cho danh sách ngắn.");
@@ -26,6 +26,7 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
             && HomejiServiceArea.Contains(post.Latitude, post.Longitude)
             && !(post.Type == RentalPostType.RoomTransfer && post.OriginalLeaseEndsOn <= DateOnly.FromDateTime(now.UtcDateTime)))
             .ToDictionary(post => post.Id);
+        var visible = active.ToDictionary(entry => entry.Key, entry => RentalPostVisibility.ForViewer(RentalPostMapper.ToDto(entry.Value), currentUserId));
         IReadOnlyCollection<CommuteEstimateDto> routes = [];
         if (request.Destination is { } destination)
         {
@@ -34,10 +35,10 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
                 || destination.Mode is not ("DRIVE" or "WALK")
                 || destination.DepartureTime.HasValue && (destination.DepartureTime < now || destination.DepartureTime > now.AddDays(7)))
                 throw Validation("destination", "Chọn điểm đến trong phạm vi Homeji, đi bộ hoặc ô tô, và giờ đi trong 7 ngày tới.");
-            routes = await commuteClient.ComputeAsync(active.Values.Select(post => new CommuteOriginDto(post.Id, post.Latitude, post.Longitude)).ToArray(), destination, cancellationToken);
+            routes = await commuteClient.ComputeAsync(visible.Values.Select(post => new CommuteOriginDto(post.Id, post.Latitude, post.Longitude)).ToArray(), destination, cancellationToken);
         }
         var items = ids.Where(active.ContainsKey).Select(id => new RentalDecisionItemDto(
-            RentalPostMapper.ToDto(active[id]), RentalCostCalculator.Calculate(active[id], request.Scenario ?? new()),
+            visible[id], RentalCostCalculator.Calculate(active[id], request.Scenario ?? new()),
             routes.FirstOrDefault(route => route.PostId == id))).ToArray();
         var summary = items.Length > 1
             ? $"Chênh lệch giá thuê giữa các tin: {items.Max(item => item.Post.Price) - items.Min(item => item.Post.Price):N0} đồng/tháng. So sánh thêm diện tích và tiện ích theo nhu cầu; phí chưa đủ dữ liệu để kết luận phòng nào có tổng chi phí thấp nhất."

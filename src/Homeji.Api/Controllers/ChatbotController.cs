@@ -60,4 +60,15 @@ public sealed class ChatbotController : ControllerBase
     {
         return Ok(await _chatbot.SendMessageAsync(ChatbotViewMapper.ToDto(request), cancellationToken));
     }
+
+    [HttpDelete("conversations/{conversationId:guid}")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> DeleteConversation(Guid conversationId, CancellationToken cancellationToken)
+    {
+        await _chatbot.DeleteConversationAsync(conversationId, cancellationToken);
+        return NoContent();
+    }
 }

@@ -9,6 +9,8 @@ public interface IRoommateInvitationService
         CreateRoommateInvitationDto request,
         CancellationToken cancellationToken = default);
 
+    Task<RoommateInvitationDto> CreateIndependentAsync(CreateRoommateInvitationDto request, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<RoommateInvitationDto>> GetMineAsync(CancellationToken cancellationToken = default);
 
     Task<RoommateInvitationDto> AcceptAsync(Guid invitationId, CancellationToken cancellationToken = default);

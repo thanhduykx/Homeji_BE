@@ -14,6 +14,6 @@ public static class AiViewMapper
     public static AiHighlightRequestDto ToDto(AiHighlightRentalPostsViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
-        return new AiHighlightRequestDto(viewModel.Text, viewModel.MaxResults, viewModel.Intent);
+        return new AiHighlightRequestDto(viewModel.Text, viewModel.MaxResults, PreviousCriteria: viewModel.PreviousCriteria);
     }
 }

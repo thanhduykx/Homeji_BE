@@ -75,6 +75,7 @@ public static class DependencyInjection
                 }));
 
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
+        services.AddScoped<Homeji.Application.IRepositories.Roommates.IRoommateDirectoryRepository, RoommateDirectoryRepository>();
         services.AddScoped<IAccountEmailRepository, AccountEmailRepository>();
         services.AddScoped<IRentalPostRepository, RentalPostRepository>();
         services.AddScoped<IRentalSourceListingRepository, RentalSourceListingRepository>();
@@ -89,7 +90,6 @@ public static class DependencyInjection
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
         services.AddScoped<IUserSubscriptionRepository, UserSubscriptionRepository>();
         services.AddScoped<IChatConversationRepository, ChatConversationRepository>();
-        services.AddScoped<IChatHistoryStore, ChatHistoryStore>();
         services.Configure<GoogleCommuteOptions>(configuration.GetSection("Ai:Commute"));
         services.AddHttpClient<ICommuteClient, GoogleCommuteClient>();
         services.AddScoped<IViewingAppointmentRepository, ViewingAppointmentRepository>();

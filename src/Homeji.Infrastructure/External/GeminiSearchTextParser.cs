@@ -111,7 +111,7 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
             - Chuyển tiền Việt sang VND: "2tr", "2 triệu" => 2000000.
             - "cao nhất", "không được hơn", "tối đa" => price_max.
             - Chuẩn hóa criteria sang camelCase tiếng Anh nếu phù hợp: parking, freeTime, wifi, airConditioner, privateToilet, security, quiet, petFriendly, kitchen.
-            - Criteria chỉ là mong muốn. "Có/bắt buộc" đưa vào required_amenities dùng mã PARKING, FREE_TIME, WIFI, AIR_CONDITIONER, PRIVATE_TOILET, PET_FRIENDLY, KITCHEN, QUIET.
+            - Criteria chỉ là mong muốn. "Có/bắt buộc" đưa vào required_amenities dùng mã PARKING, FREE_TIME, WIFI, AIR_CONDITIONER, PRIVATE_BATHROOM, PET_FRIENDLY, KITCHEN, QUIET.
             - "Không cần máy lạnh" bỏ yêu cầu, không loại trừ phòng có máy lạnh. "Không có máy lạnh" đưa AIR_CONDITIONER vào excluded_amenities.
             - "Không ở ghép" => exclude_shared true. "Tổng/cả phí" => budget_kind total; "tiền thuê" => rent.
             - Tên trường vào destination; không tự gán địa chỉ trường thành location hay khẳng định gần trường.
@@ -168,9 +168,9 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
         {
             RequiredAmenities = GetStringArray(root, "required_amenities"),
             ExcludedAmenities = GetStringArray(root, "excluded_amenities"),
-            BudgetKind = GetString(root, "budget_kind") ?? "rent",
+            BudgetBasis = GetString(root, "budget_kind") ?? "rent",
             Occupants = ReadPositiveInteger(root, "occupants"),
-            ExcludeShared = root.TryGetProperty("exclude_shared", out var shared) && shared.ValueKind == JsonValueKind.True,
+            ExcludeRoommateShare = root.TryGetProperty("exclude_shared", out var shared) && shared.ValueKind == JsonValueKind.True,
             Destination = GetString(root, "destination"),
             MaxCommuteMinutes = ReadPositiveInteger(root, "max_commute_minutes"),
             Unknown = GetStringArray(root, "unknown"),

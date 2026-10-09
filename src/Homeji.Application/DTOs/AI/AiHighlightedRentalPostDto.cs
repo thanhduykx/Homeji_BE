@@ -8,9 +8,12 @@ public sealed record AiHighlightedRentalPostDto(
     IReadOnlyCollection<string> Reasons,
     string Tag)
 {
-    public IReadOnlyCollection<AiEvidenceDto> Evidence { get; init; } = [];
-    public decimal UserFit => Score;
-    public decimal CommercialBoost => Post.BoostScore;
+    public IReadOnlyCollection<AiRentalEvidenceDto> Evidence { get; init; } = [];
+    public IReadOnlyCollection<AiRentalReasonDto> ReasonEvidence { get; init; } = [];
+    public DateTimeOffset? UpdatedAt { get; init; }
+    public decimal CommercialBoost { get; init; }
+    public IReadOnlyCollection<string> UnconfirmedConstraints { get; init; } = [];
 }
 
-public sealed record AiEvidenceDto(Guid PostId, string SourceType, string Field, string Text, DateTimeOffset UpdatedAt);
+public sealed record AiRentalEvidenceDto(Guid PostId, string SourceType, string Field, string Value);
+public sealed record AiRentalReasonDto(string Text, Guid PostId, string SourceType, string Field, string Value);

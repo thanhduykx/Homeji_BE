@@ -14,6 +14,9 @@ public interface IUserProfileRepository
         IReadOnlyCollection<Guid> userIds,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<UserProfile>> GetDiscoverableByIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<UserProfile>>([]);
+
     Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<UserProfile>> GetMatchingRentersAsync(

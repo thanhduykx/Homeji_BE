@@ -59,7 +59,7 @@ def extract_muaban_listing(html, url, district, collected_at):
             "source_id": expected_id, "source_url": url, "title": title, "address": address,
             "district": district, "price": price, "area": area, "image_urls": images,
             "source_updated_at": listing["publish_at"], "collected_at": collected_at,
-            "source_status": "unconfirmed", "source_expires_at": listing["service_end"],
+            "source_status": "unconfirmed", "source_expires_at": listing["service_end"], "source_checked_at": collected_at,
             "rights_status": "not_confirmed", "availability_verified": False}
 
 
