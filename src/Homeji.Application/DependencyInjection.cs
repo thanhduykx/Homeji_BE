@@ -60,6 +60,7 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
         services.AddScoped<UserContext>();
+        services.AddScoped<IRentalDraftService, RentalDraftService>();
         services.AddScoped<IUserSessionRevocationService, UserSessionRevocationService>();
         services.TryAddSingleton<IUserSessionRevocationCache, NoOpUserSessionRevocationCache>();
         services.TryAddSingleton<IUserSessionRealtimePublisher, NoOpUserSessionRealtimePublisher>();

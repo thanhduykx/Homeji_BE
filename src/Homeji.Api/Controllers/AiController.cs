@@ -14,11 +14,21 @@ namespace Homeji.Api.Controllers;
 public sealed class AiController : ControllerBase
 {
     private readonly IAiSearchService _aiSearch;
+    private readonly IRentalDraftService _drafts;
 
-    public AiController(IAiSearchService aiSearch)
+    public AiController(IAiSearchService aiSearch, IRentalDraftService drafts)
     {
         _aiSearch = aiSearch;
+        _drafts = drafts;
     }
+
+    [HttpPost("rental-draft")]
+    [ProducesResponseType<RentalDraftResponseDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status503ServiceUnavailable)]
+    public async Task<ActionResult<RentalDraftResponseDto>> GenerateDraft(
+        [FromBody] RentalDraftRequestDto request, CancellationToken cancellationToken) =>
+        Ok(await _drafts.GenerateAsync(request, cancellationToken));
 
     [HttpPost("parse-search")]
     [ProducesResponseType<AiParsedSearchCriteriaDto>(StatusCodes.Status200OK)]
