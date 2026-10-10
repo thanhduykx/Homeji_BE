@@ -2,19 +2,44 @@
 
 Run this project explicitly; it is separate from the fast application-unit-test suite.
 It uses the real `ApplicationDbContext`, Npgsql repositories, rental service, validators
-and domain rules. It does **not** exercise HTTP authentication, storage upload or the browser.
+and domain rules. `RentalPostingHttpTests` also exercises the actual API controllers,
+JSON transport, authorization boundaries, validation and PostgreSQL persistence through
+an in-process TestServer. Its test-only identity scheme does **not** prove Supabase JWT
+verification. No storage file is uploaded and no real browser is driven by this project.
 
 ## Safety
 
 - Only `localhost` / `127.0.0.1` and database `homeji_ui_qa` are accepted.
-- No application configuration or production credentials are loaded.
+- Persistence tests do not load application configuration. The HTTP factory uses the
+  API's default configuration but explicitly replaces its connection with the guarded
+  loopback database, disables startup migrations/background jobs, and uses a dummy
+  Supabase project. It never uses production credentials or calls payment/auth services.
 - Use a dedicated non-superuser role with ownership of this disposable QA schema, not
   a production/application role. The role needs schema creation for `EnsureCreated`.
 - Each test rolls back its inserted rows. No `DROP DATABASE`, cleanup SQL or production
   migrations are run. `EnsureCreated` verifies the current EF model, not migration history.
 - Missing configuration fails explicitly; passing tests are never silently skipped.
 
-## Reproduce with Docker (PowerShell)
+## Optional persistence verification without Docker
+
+Docker is not required for the application, deployment, or independent test suites.
+If a dedicated local PostgreSQL database is already available, set `HOMEJI_TEST_DB`
+to its connection string. The loopback host and `homeji_ui_qa` database restrictions
+above still apply. Do not point these tests at production to bypass the safety guard.
+The current workflow does not install or start a database server.
+
+The independently runnable checks are:
+
+```powershell
+dotnet test tests/Homeji.Application.UnitTests --no-restore
+dotnet test tests/Homeji.Api.IntegrationTests --no-restore
+```
+
+Database-dependent API cases are reported as skipped when their configuration is
+absent; this is not proof of persistence. On 2026-10-04 these commands returned
+133 passed, and 71 passed / 8 skipped respectively.
+
+## Optional Docker reproduction (PowerShell)
 
 The password below is public, test-only and must never be used outside this loopback container.
 Check that the container name and host port are unused before creating it.
@@ -44,6 +69,15 @@ container/volume deletion is performed.
   before the fix, so the legacy-only case cannot mask a broken production upload flow.
 - Seller inventory query returns active/sold/archived listings with media, in creation
   order, and excludes another seller's listing.
+- HTTP cases for vacant rooms, roommate shares and room transfers: anonymous draft
+  creation returns 401; another owner's edit returns 403; invalid coordinates/unowned
+  media return 400; submission without images returns 422. Successful create returns
+  201 with a detail URL. Updated details and three owned Cloudinary metadata payloads
+  submit as Pending and are checked using a fresh PostgreSQL query.
 
-Actual upload, API transport/authentication and migration compatibility still require
-separate end-to-end verification.
+Actual file upload, Supabase JWT authentication and migration compatibility still require
+separate end-to-end verification. New HTTP cases currently compile but have **not passed**:
+the 2026-10-04 run stopped at the loopback database guard because the dedicated local
+PostgreSQL database was unavailable. The user requested continuing without Docker;
+these optional persistence checks remain unverified, not a prerequisite to independent
+UI/build/unit/API checks. This is environment failure, not evidence that the HTTP workflow passes.

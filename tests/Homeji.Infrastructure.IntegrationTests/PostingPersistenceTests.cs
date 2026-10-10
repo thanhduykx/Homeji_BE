@@ -109,7 +109,7 @@ public sealed class PostingPersistenceTests
             profiles, conversations: null!, appointments: null!, TimeProvider.System);
     }
 
-    private static async Task<ApplicationDbContext> OpenTestDatabaseAsync()
+    internal static async Task<ApplicationDbContext> OpenTestDatabaseAsync()
     {
         var connection = Environment.GetEnvironmentVariable("HOMEJI_TEST_DB")
             ?? throw new InvalidOperationException("Set HOMEJI_TEST_DB to an isolated local homeji_ui_qa database.");
