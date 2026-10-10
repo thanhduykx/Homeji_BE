@@ -97,7 +97,8 @@ public sealed class AiSearchService : IAiSearchService
         if (!_options.GroundedSearchEnabled) throw new ForbiddenAccessException("Tìm phòng theo nhu cầu hiện đang tắt. Bạn có thể dùng bộ lọc thường.");
         AiSearchTelemetry.Requests.Add(1);
         var text = ValidateText(request.Text);
-        ValidatePreviousCriteria(request.PreviousCriteria);
+        ValidateCriteria(request.PreviousCriteria, "previousCriteria");
+        ValidateCriteria(request.Criteria, "criteria");
         var parsed = NormalizeParsedCriteria(request.Criteria ?? await ParseNaturalLanguageAsync(
             text, request.PreviousCriteria is null ? null : NormalizeParsedCriteria(request.PreviousCriteria), cancellationToken));
         var maxResults = Math.Clamp(
@@ -207,7 +208,7 @@ public sealed class AiSearchService : IAiSearchService
         return normalized;
     }
 
-    private static void ValidatePreviousCriteria(AiParsedSearchCriteriaDto? criteria)
+    private static void ValidateCriteria(AiParsedSearchCriteriaDto? criteria, string field)
     {
         if (criteria is null) return;
         if (criteria.Criteria is null || criteria.Criteria.Count > 20 || criteria.Criteria.Any(value => value is null || value.Length > 60) ||
@@ -218,7 +219,7 @@ public sealed class AiSearchService : IAiSearchService
             criteria.PriceMin is <= 0 or > 1_000_000_000 || criteria.PriceMax is <= 0 or > 1_000_000_000 ||
             criteria.AreaMin is <= 0 or > 100_000 || criteria.AreaMax is <= 0 or > 100_000 ||
             criteria.Occupants is < 1 or > 20 || criteria.MaxCommuteMinutes is < 1 or > 240 || criteria.TravelMode is not (null or "DRIVING" or "WALKING" or "TRANSIT") || criteria.BudgetBasis is not ("rent" or "total"))
-            throw new RequestValidationException(new Dictionary<string, string[]> { ["previousCriteria"] = ["Tiêu chí cũ không hợp lệ. Hãy bắt đầu nhu cầu mới."] });
+            throw new RequestValidationException(new Dictionary<string, string[]> { [field] = [field == "previousCriteria" ? "Tiêu chí cũ không hợp lệ. Hãy bắt đầu nhu cầu mới." : "Tiêu chí tìm kiếm không hợp lệ. Hãy kiểm tra ngân sách và điều kiện bắt buộc."] });
     }
 
     private static AiParsedSearchCriteriaDto NormalizeParsedCriteria(AiParsedSearchCriteriaDto criteria)

@@ -18,6 +18,20 @@ public sealed class RentalSearchIntentTests
     }
 
     [Fact]
+    public void ChangingLocationChip_PreservesBudgetAmenitiesOccupantsAndArea()
+    {
+        var initial = RentalSearchIntent.Apply("Phòng Thủ Đức dưới 4tr có bếp cho 2 người từ 20 đến 30m2");
+        var updated = RentalSearchIntent.Apply("Đổi khu vực sang Quận 9", initial);
+        Assert.Equal("Quận 9", updated.Location);
+        Assert.Equal(4_000_000, updated.PriceMax);
+        Assert.Equal(2, updated.Occupants);
+        Assert.Equal(20, updated.AreaMin);
+        Assert.Equal(30, updated.AreaMax);
+        Assert.Contains("KITCHEN", updated.RequiredAmenities);
+        Assert.Empty(updated.Unknown);
+    }
+
+    [Fact]
     public void InvalidCapacityOrArea_RequiresClarificationAndCanBeCorrected()
     {
         var state = RentalSearchIntent.Apply("Phòng cho 200 người từ 30 đến 20m2 không muốn ở ghép");

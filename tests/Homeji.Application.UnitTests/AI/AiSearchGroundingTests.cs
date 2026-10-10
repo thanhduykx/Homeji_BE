@@ -166,6 +166,68 @@ public sealed class AiSearchGroundingTests
         Assert.DoesNotContain("KITCHEN", result.Criteria.RequiredAmenities);
     }
 
+    [Theory]
+    [InlineData("zeroBudget")]
+    [InlineData("negativeBudget")]
+    [InlineData("oversizedBudget")]
+    [InlineData("tooManyOccupants")]
+    [InlineData("zeroArea")]
+    [InlineData("unsupportedRequiredAmenity")]
+    [InlineData("unsupportedExcludedAmenity")]
+    [InlineData("unsupportedUnknown")]
+    [InlineData("nullRequiredAmenities")]
+    public async Task ExplicitMalformedHardConstraints_AreRejectedWithoutRetrieval(string invalidField)
+    {
+        var valid = new AiParsedSearchCriteriaDto(null, null, null, 4_000_000, null, null, []);
+        var criteria = invalidField switch
+        {
+            "zeroBudget" => valid with { PriceMax = 0 },
+            "negativeBudget" => valid with { PriceMax = -1 },
+            "oversizedBudget" => valid with { PriceMax = 1_000_000_001 },
+            "tooManyOccupants" => valid with { Occupants = 21 },
+            "zeroArea" => valid with { AreaMin = 0 },
+            "unsupportedRequiredAmenity" => valid with { RequiredAmenities = ["UNSUPPORTED"] },
+            "unsupportedExcludedAmenity" => valid with { ExcludedAmenities = ["UNSUPPORTED"] },
+            "unsupportedUnknown" => valid with { Unknown = ["unsupported"] },
+            "nullRequiredAmenities" => valid with { RequiredAmenities = null! },
+            _ => throw new InvalidOperationException(),
+        };
+        var repository = new CandidateRepository([Post(3_000_000, [])]);
+        var error = await Assert.ThrowsAsync<RequestValidationException>(() => Service(repository)
+            .HighlightRentalPostsAsync(new("Tìm phòng", Criteria: criteria)));
+        Assert.Contains("criteria", error.Errors.Keys);
+        Assert.Null(repository.LastSearch);
+    }
+
+    [Fact]
+    public async Task PartialExplicitCriteria_RemainSupportedWithNullableOptionalFields()
+    {
+        var repository = new CandidateRepository([Post(3_000_000, [])]);
+        var response = await Service(repository).HighlightRentalPostsAsync(new("Tìm phòng",
+            Criteria: new AiParsedSearchCriteriaDto(null, null, null, null, null, null, [])));
+        Assert.Single(response.Posts);
+        Assert.NotNull(repository.LastSearch);
+    }
+
+    [Fact]
+    public async Task LocationChipEdit_MergesModelLocationWithoutResettingHardConstraints()
+    {
+        var previous = RentalSearchIntent.Apply("Phòng Thủ Đức dưới 4tr có bếp cho 2 người từ 20 đến 30m2");
+        var repository = new CandidateRepository([]);
+        var parser = new ResultParser(new("Quận 9", null, null, null, null, null, []));
+        var service = new AiSearchService(parser, repository, new SubscriptionRepository(), null!,
+            Options.Create(new AiSearchOptions()), TimeProvider.System);
+        var response = await service.HighlightRentalPostsAsync(new("Đổi khu vực sang Quận 9", PreviousCriteria: previous));
+        Assert.Equal("Quận 9", response.Criteria.Location);
+        Assert.Equal(4_000_000, response.Criteria.PriceMax);
+        Assert.Equal(2, response.Criteria.Occupants);
+        Assert.Contains("KITCHEN", response.Criteria.RequiredAmenities);
+        Assert.Equal(20, repository.LastSearch!.MinArea);
+        Assert.Equal(30, repository.LastSearch.MaxArea);
+        Assert.Equal(4_000_000, repository.LastSearch.MaxPrice);
+        Assert.Equal(2, repository.LastSearch.MinAvailableSlots);
+    }
+
     private sealed class ResultParser(AiParsedSearchCriteriaDto result) : IAiSearchTextParser
     {
         public Task<AiParsedSearchCriteriaDto> ParseAsync(string text, CancellationToken cancellationToken = default) => Task.FromResult(result);
