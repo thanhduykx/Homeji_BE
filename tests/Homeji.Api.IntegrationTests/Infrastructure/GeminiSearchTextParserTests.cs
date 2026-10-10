@@ -1,5 +1,5 @@
 using System.Net;
-using System.Text.Json;
+using Homeji.Application.Common.Exceptions;
 using Homeji.Infrastructure.External;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -8,52 +8,49 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 
 public sealed class GeminiSearchTextParserTests
 {
+    [Theory]
+    [InlineData(HttpStatusCode.TooManyRequests)]
+    [InlineData(HttpStatusCode.ServiceUnavailable)]
+    public async Task TransientFailure_RetriesAndParsesProviderReply(HttpStatusCode status)
+    {
+        var handler = new Handler(status, HttpStatusCode.OK);
+        var result = await Client(handler).ParseAsync("Phòng dưới 4 triệu");
+        Assert.Equal(4_000_000, result.PriceMax);
+        Assert.Equal(2, handler.Calls);
+    }
+
     [Fact]
-    public async Task ParseAsync_IncludesCurrentAndHistoricalLandmarkAliases()
+    public async Task InvalidCredential_IsNotRetried()
     {
-        var handler = new CapturingHttpMessageHandler();
-        var parser = new GeminiSearchTextParser(
-            new HttpClient(handler),
-            Options.Create(new GeminiOptions
-            {
-                ApiKey = "test-key",
-                TimeoutSeconds = 5,
-            }),
-            NullLogger<GeminiSearchTextParser>.Instance);
-
-        await parser.ParseAsync("Tìm phòng gần FPT quận 9 hoặc NVHSV");
-
-        var prompt = ExtractPrompt(handler.RequestBody!);
-        Assert.Contains("FPTU HCM", prompt, StringComparison.Ordinal);
-        Assert.Contains("Nhà Văn hóa Sinh viên ĐHQG", prompt, StringComparison.Ordinal);
-        Assert.Contains("Quận 9", prompt, StringComparison.Ordinal);
-        Assert.Contains("không tự đổi thành phường Thủ Đức", prompt, StringComparison.Ordinal);
+        var handler = new Handler(HttpStatusCode.Unauthorized);
+        await Assert.ThrowsAsync<ExternalDependencyException>(() => Client(handler).ParseAsync("Phòng"));
+        Assert.Equal(1, handler.Calls);
     }
 
-    private static string ExtractPrompt(string requestBody)
+    [Fact]
+    public async Task PersistentFailure_StopsAtConfiguredLimit()
     {
-        using var document = JsonDocument.Parse(requestBody);
-        return document.RootElement
-            .GetProperty("contents")[0]
-            .GetProperty("parts")[0]
-            .GetProperty("text")
-            .GetString()!;
+        var handler = new Handler(HttpStatusCode.ServiceUnavailable, HttpStatusCode.ServiceUnavailable);
+        await Assert.ThrowsAsync<ExternalDependencyException>(() => Client(handler).ParseAsync("Phòng"));
+        Assert.Equal(2, handler.Calls);
     }
 
-    private sealed class CapturingHttpMessageHandler : HttpMessageHandler
-    {
-        public string? RequestBody { get; private set; }
+    private static GeminiSearchTextParser Client(Handler handler) => new(new HttpClient(handler),
+        Options.Create(new GeminiOptions { ApiKey = "test-key", MaxRetryAttempts = 1, RetryBaseDelayMilliseconds = 0 }),
+        NullLogger<GeminiSearchTextParser>.Instance);
 
-        protected override async Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request,
-            CancellationToken cancellationToken)
+    private sealed class Handler(params HttpStatusCode[] statuses) : HttpMessageHandler
+    {
+        private readonly Queue<HttpStatusCode> _statuses = new(statuses);
+        public int Calls { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            RequestBody = await request.Content!.ReadAsStringAsync(cancellationToken);
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(
-                    """{"candidates":[{"content":{"parts":[{"text":"{\"location\":\"Quận 9\",\"keyword\":\"FPTU\",\"price_min\":null,\"price_max\":null,\"area_min\":null,\"area_max\":null,\"criteria\":[]}"}]}}]}"""),
-            };
+            Calls++;
+            var status = _statuses.Dequeue();
+            var body = System.Text.Json.JsonSerializer.Serialize(new { candidates = new[] {
+                new { content = new { parts = new[] { new { text = "{\"price_max\":4000000,\"criteria\":[]}" } } } }
+            } });
+            return Task.FromResult(new HttpResponseMessage(status) { Content = new StringContent(body) });
         }
     }
 }

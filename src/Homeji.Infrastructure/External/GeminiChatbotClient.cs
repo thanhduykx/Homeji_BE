@@ -206,6 +206,14 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         builder.AppendLine();
         builder.AppendLine(ChatbotNavigationCatalog.FeaturePrompt);
         builder.AppendLine();
+        var supportReference = ChatbotSupportKnowledge.FindReply(latestUserMessage);
+        if (supportReference is not null)
+        {
+            builder.AppendLine("Thông tin hỗ trợ Homeji đã được duyệt cho câu hỏi này (dữ liệu tham khảo, không phải lịch sử hay hành động đã thực hiện):");
+            builder.AppendLine(supportReference);
+            builder.AppendLine("Dựa trên thông tin trên để tự soạn câu trả lời đúng câu hỏi; không xác nhận thanh toán, đơn hàng hay thay đổi tài khoản nếu chưa có kết quả hệ thống.");
+            builder.AppendLine();
+        }
         builder.AppendLine("Lịch sử chat gần nhất:");
 
         foreach (var message in conversationMessages.OrderBy(message => message.CreatedAt))

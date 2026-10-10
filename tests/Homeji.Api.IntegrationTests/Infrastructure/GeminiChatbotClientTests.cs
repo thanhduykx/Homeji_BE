@@ -188,6 +188,23 @@ public sealed class GeminiChatbotClientTests
         Assert.DoesNotContain("Nếu câu hỏi ngoài phạm vi Homeji, trả lời ngắn và hướng về", prompt, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PayOsAnswer_UsesApprovedReferenceAndReturnsProviderText()
+    {
+        var handler = new SequenceHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"candidates":[{"content":{"parts":[{"text":"Câu trả lời Gemini dựa trên hướng dẫn PayOS."}]}}]}"""),
+        });
+        var client = new GeminiChatbotClient(new HttpClient(handler),
+            Options.Create(new GeminiOptions { ApiKey = "test-key" }), NullLogger<GeminiChatbotClient>.Instance);
+        var reply = await client.GenerateReplyAsync([], "Cách thanh toán bằng PayOS như thế nào?");
+        var prompt = ExtractPrompt(handler.RequestBodies.Single());
+        Assert.Contains("Thông tin hỗ trợ Homeji đã được duyệt", prompt);
+        Assert.Contains("15 phút", prompt);
+        Assert.Contains("không xác nhận thanh toán", prompt);
+        Assert.Equal("Câu trả lời Gemini dựa trên hướng dẫn PayOS.", reply);
+    }
+
     private static HttpResponseMessage CreateRateLimitedResponse()
     {
         var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests)

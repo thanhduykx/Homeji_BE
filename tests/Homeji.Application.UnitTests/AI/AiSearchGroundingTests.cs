@@ -1,3 +1,4 @@
+using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.AI;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IRepositories.RentalPosts;
@@ -116,11 +117,38 @@ public sealed class AiSearchGroundingTests
     }
 
     [Fact]
-    public async Task ProviderFailure_FallsBackToExplicitConstraints()
+    public async Task ProviderFailure_DoesNotPresentRulesAsGeminiResults()
     {
-        var good = Post(3_000_000, ["KITCHEN"]);
-        var response = await Service(new([good, Post(5_000_000, ["KITCHEN"])])).HighlightRentalPostsAsync(new("Phòng dưới 4tr có bếp"));
-        Assert.Equal(good.Id, Assert.Single(response.Posts).Post.Id);
+        var repository = new CandidateRepository([Post(3_000_000, ["KITCHEN"])]);
+        await Assert.ThrowsAsync<ExternalDependencyException>(() => Service(repository)
+            .HighlightRentalPostsAsync(new("Phòng dưới 4tr có bếp")));
+        Assert.Null(repository.LastSearch);
+    }
+
+    [Fact]
+    public async Task FollowUp_StillCallsGeminiAndPreservesUserConstraints()
+    {
+        var parser = new CountingParser();
+        var repository = new CandidateRepository([Post(3_000_000, ["KITCHEN"])]);
+        var service = new AiSearchService(parser, repository, new SubscriptionRepository(), null!,
+            Options.Create(new AiSearchOptions()), TimeProvider.System);
+        var initial = await service.HighlightRentalPostsAsync(new("Phòng dưới 4tr có bếp có máy lạnh"));
+        var followUp = await service.HighlightRentalPostsAsync(new("Không cần máy lạnh", PreviousCriteria: initial.Criteria));
+        Assert.Equal(2, parser.Calls);
+        Assert.Equal(4_000_000, followUp.Criteria.PriceMax);
+        Assert.Contains("KITCHEN", followUp.Criteria.RequiredAmenities);
+        Assert.DoesNotContain("AIR_CONDITIONER", followUp.Criteria.RequiredAmenities);
+        Assert.Single(followUp.Posts);
+    }
+
+    private sealed class CountingParser : IAiSearchTextParser
+    {
+        public int Calls { get; private set; }
+        public Task<AiParsedSearchCriteriaDto> ParseAsync(string text, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(new AiParsedSearchCriteriaDto(null, null, null, null, null, null, []));
+        }
     }
 
     private static AiSearchService Service(CandidateRepository posts, SubscriptionRepository? subscriptions = null) =>

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Globalization;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -64,22 +65,30 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
             },
         };
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
+        var maxAttempts = Math.Clamp(_options.MaxRetryAttempts + 1, 1, 4);
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            Content = JsonContent.Create(payload, options: JsonOptions),
-        };
-        request.Headers.Add("X-goog-api-key", _options.ApiKey);
+            using var request = new HttpRequestMessage(HttpMethod.Post, _options.Endpoint)
+            {
+                Content = JsonContent.Create(payload, options: JsonOptions),
+            };
+            request.Headers.Add("X-goog-api-key", _options.ApiKey);
+            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (response.IsSuccessStatusCode)
+                return ParseCriteriaJson(ExtractModelText(responseText));
 
-        using var response = await _httpClient.SendAsync(request, cancellationToken);
-        var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-        {
             LogGeminiParsingFailed(_logger, (int)response.StatusCode, null);
-            throw new ExternalDependencyException("Bộ phân tích AI tạm thời không khả dụng.");
-        }
+            if (response.StatusCode is not (HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable)
+                || attempt == maxAttempts)
+                throw new ExternalDependencyException("Gemini tạm thời không khả dụng. Bạn có thể thử lại sau.");
 
-        var modelText = ExtractModelText(responseText);
-        return ParseCriteriaJson(modelText);
+            var delay = response.Headers.RetryAfter?.Delta
+                ?? TimeSpan.FromMilliseconds(Math.Clamp(_options.RetryBaseDelayMilliseconds, 0, 10_000) * Math.Pow(2, attempt - 1));
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Clamp(delay.TotalMilliseconds, 0,
+                Math.Clamp(_options.MaxRetryDelaySeconds, 0, 30) * 1000)), cancellationToken);
+        }
+        throw new InvalidOperationException("Gemini parser retry loop completed unexpectedly.");
     }
 
     private static string BuildPrompt(string text)

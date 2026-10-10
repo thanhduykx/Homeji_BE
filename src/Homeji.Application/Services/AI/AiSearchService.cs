@@ -58,17 +58,25 @@ public sealed class AiSearchService : IAiSearchService
         CancellationToken cancellationToken = default)
     {
         var text = ValidateText(request.Text);
-        var explicitCriteria = RentalSearchIntent.Apply(text);
+        return await ParseNaturalLanguageAsync(text, null, cancellationToken);
+    }
+
+    private async Task<AiParsedSearchCriteriaDto> ParseNaturalLanguageAsync(
+        string text, AiParsedSearchCriteriaDto? previous, CancellationToken cancellationToken)
+    {
         try
         {
             var parsed = NormalizeParsedCriteria(await _parser.ParseAsync(text, cancellationToken));
-            // Model suggestions remain soft; explicit requirements and prices come from user text.
-            return explicitCriteria with { Keyword = explicitCriteria.Destination is null ? parsed.Keyword : null };
+            var explicitCriteria = RentalSearchIntent.Apply(text, previous);
+            // Gemini interprets language; verified user constraints remain authoritative for retrieval.
+            return explicitCriteria with
+            {
+                Keyword = explicitCriteria.Destination is null ? parsed.Keyword ?? explicitCriteria.Keyword : null,
+            };
         }
         catch (Exception error) when (error is ExternalDependencyException or ExternalServiceUnavailableException or HttpRequestException or System.Text.Json.JsonException || (error is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            AiSearchTelemetry.ParserFallbacks.Add(1);
-            return explicitCriteria;
+            throw new ExternalDependencyException("Gemini tạm thời không khả dụng. Bạn có thể dùng bộ lọc thông thường hoặc thử lại.");
         }
     }
 
@@ -80,9 +88,8 @@ public sealed class AiSearchService : IAiSearchService
         AiSearchTelemetry.Requests.Add(1);
         var text = ValidateText(request.Text);
         ValidatePreviousCriteria(request.PreviousCriteria);
-        var parsed = NormalizeParsedCriteria(request.Criteria ?? (request.PreviousCriteria is not null
-            ? RentalSearchIntent.Apply(text, NormalizeParsedCriteria(request.PreviousCriteria))
-            : await ParseSearchAsync(new AiParseSearchRequestDto(text), cancellationToken)));
+        var parsed = NormalizeParsedCriteria(request.Criteria ?? await ParseNaturalLanguageAsync(
+            text, request.PreviousCriteria is null ? null : NormalizeParsedCriteria(request.PreviousCriteria), cancellationToken));
         var maxResults = Math.Clamp(
             request.MaxResults <= 0 ? _options.MaxHighlightedPosts : request.MaxResults,
             1,

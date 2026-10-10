@@ -19,18 +19,39 @@ public sealed class ChatbotServiceTests
     private static readonly DateTimeOffset UtcNow = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 
     [Theory]
-    [InlineData("hi", "Xin chào")]
-    [InlineData("Cách thanh toán bằng PayOS như thế nào?", "PayOS")]
-    public async Task KnownSupportQuestion_AnswersWithoutCallingUnavailableProvider(string message, string expected)
+    [InlineData("hi")]
+    [InlineData("Cách thanh toán bằng PayOS như thế nào?")]
+    public async Task KnownSupportQuestion_CallsGeminiAndDisclosesProviderFailure(string message)
     {
         var repository = new InMemoryChatConversationRepository();
         var ai = new CountingUnavailableClient();
         var reply = await CreateService(repository, ai, historyStorageEnabled: false)
             .SendMessageAsync(new(null, message));
-        Assert.Contains(expected, reply.AssistantMessage.Content, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("không khả dụng", reply.AssistantMessage.Content, StringComparison.OrdinalIgnoreCase);
-        Assert.Equal(0, ai.Calls);
+        Assert.Contains("không khả dụng", reply.AssistantMessage.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(1, ai.Calls);
         Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Theory]
+    [InlineData("hi")]
+    [InlineData("Cách thanh toán bằng PayOS như thế nào?")]
+    public async Task KnownSupportQuestion_ReturnsActualGeminiReply(string message)
+    {
+        var ai = new SuccessfulClient();
+        var response = await CreateService(new InMemoryChatConversationRepository(), ai, historyStorageEnabled: false)
+            .SendMessageAsync(new(null, message));
+        Assert.Equal("Câu trả lời thực từ Gemini.", response.AssistantMessage.Content);
+        Assert.Equal(1, ai.Calls);
+    }
+
+    private sealed class SuccessfulClient : IChatbotAiClient
+    {
+        public int Calls { get; private set; }
+        public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string latestUserMessage, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult("Câu trả lời thực từ Gemini.");
+        }
     }
 
     private sealed class CountingUnavailableClient : IChatbotAiClient
