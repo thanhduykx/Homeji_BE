@@ -67,7 +67,17 @@ public sealed class AiSearchService : IAiSearchService
         try
         {
             var parsed = NormalizeParsedCriteria(await _parser.ParseAsync(text, cancellationToken));
-            var explicitCriteria = RentalSearchIntent.Apply(text, previous);
+            var interpreted = (previous ?? parsed) with
+            {
+                Location = parsed.Location ?? previous?.Location,
+                Keyword = parsed.Keyword ?? previous?.Keyword,
+                PriceMin = parsed.PriceMin ?? previous?.PriceMin,
+                PriceMax = parsed.PriceMax ?? previous?.PriceMax,
+                AreaMin = parsed.AreaMin ?? previous?.AreaMin,
+                AreaMax = parsed.AreaMax ?? previous?.AreaMax,
+                Criteria = (previous?.Criteria ?? []).Concat(parsed.Criteria).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            };
+            var explicitCriteria = RentalSearchIntent.Apply(text, interpreted);
             // Gemini interprets language; verified user constraints remain authoritative for retrieval.
             return explicitCriteria with
             {

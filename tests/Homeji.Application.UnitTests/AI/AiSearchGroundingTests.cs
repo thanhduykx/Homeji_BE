@@ -141,6 +141,36 @@ public sealed class AiSearchGroundingTests
         Assert.Single(followUp.Posts);
     }
 
+    [Fact]
+    public async Task ModelInterpretation_HandlesLanguageOutsideExplicitPatterns()
+    {
+        var parser = new ResultParser(new(null, null, null, 3_500_000, 20, null, ["quiet"]));
+        var service = new AiSearchService(parser, new CandidateRepository([]), new SubscriptionRepository(), null!,
+            Options.Create(new AiSearchOptions()), TimeProvider.System);
+        var result = await service.ParseSearchAsync(new("Ngân sách ba triệu rưỡi, rộng hai mươi mét vuông trở lên, ưu tiên yên tĩnh"));
+        Assert.Equal(3_500_000, result.PriceMax);
+        Assert.Equal(20, result.AreaMin);
+        Assert.Contains("quiet", result.Criteria);
+    }
+
+    [Fact]
+    public async Task ExplicitConstraints_OverrideConflictingModelInterpretation()
+    {
+        var parser = new ResultParser(new(null, null, null, 9_000_000, null, null, []));
+        var service = new AiSearchService(parser, new CandidateRepository([]), new SubscriptionRepository(), null!,
+            Options.Create(new AiSearchOptions()), TimeProvider.System);
+        var previous = RentalSearchIntent.Apply("Phòng dưới 4tr cho 2 người có bếp");
+        var result = await service.HighlightRentalPostsAsync(new("Dưới 3tr không cần bếp", PreviousCriteria: previous));
+        Assert.Equal(3_000_000, result.Criteria.PriceMax);
+        Assert.Equal(2, result.Criteria.Occupants);
+        Assert.DoesNotContain("KITCHEN", result.Criteria.RequiredAmenities);
+    }
+
+    private sealed class ResultParser(AiParsedSearchCriteriaDto result) : IAiSearchTextParser
+    {
+        public Task<AiParsedSearchCriteriaDto> ParseAsync(string text, CancellationToken cancellationToken = default) => Task.FromResult(result);
+    }
+
     private sealed class CountingParser : IAiSearchTextParser
     {
         public int Calls { get; private set; }
