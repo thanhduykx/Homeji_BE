@@ -10,6 +10,9 @@ public sealed class RentalSearchValidationTests
     [InlineData("minAvailableSlots=21")]
     [InlineData("excludedAmenities=")]
     [InlineData("ids=not-a-guid")]
+    [InlineData("ownerRole=3")]
+    [InlineData("ownerRole=99")]
+    [InlineData("ownerRole=unknown")]
     public async Task Invalid_shortlist_filters_return_400_before_database_access(string query)
     {
         using var factory = new HomejiApiFactory();

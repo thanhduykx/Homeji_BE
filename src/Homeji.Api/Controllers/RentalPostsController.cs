@@ -44,6 +44,7 @@ public sealed class RentalPostsController : ControllerBase
         [FromQuery] bool excludeRoommateShare = false,
         [FromQuery] Guid[]? ids = null,
         [FromQuery] RentalPostType? type = null,
+        [FromQuery] UserRole? ownerRole = null,
         CancellationToken cancellationToken = default)
     {
         var result = await _rentalPostService.SearchAsync(
@@ -66,7 +67,7 @@ public sealed class RentalPostsController : ControllerBase
                 excludedAmenities,
                 excludeRoommateShare,
                 ids,
-                Type: type),
+                Type: type, OwnerRole: ownerRole),
             cancellationToken);
 
         return Ok(result);

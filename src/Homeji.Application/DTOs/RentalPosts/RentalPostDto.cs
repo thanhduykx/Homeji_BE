@@ -42,4 +42,6 @@ public sealed record RentalPostDto(
     bool IsOwnerVerified = false,
     bool IsOwnerPremium = false,
     string? OwnerBadge = null,
-    bool IsSynthetic = false);
+    bool IsSynthetic = false,
+    UserRole? OwnerRole = null,
+    string? OwnerSchool = null);

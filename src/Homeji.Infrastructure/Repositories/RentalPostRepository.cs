@@ -49,6 +49,8 @@ public sealed class RentalPostRepository : IRentalPostRepository
         if (search.ExcludeSynthetic || search.Ids is { Count: > 0 }) query = query.Where(post => !post.IsSynthetic);
         if (search.ExcludeRoommateShare)
             query = query.Where(post => post.Type != RentalPostType.RoommateShare);
+        if (search.OwnerRole.HasValue)
+            query = query.Where(post => _dbContext.UserProfiles.Any(author => author.Id == post.OwnerId && author.Role == search.OwnerRole.Value));
         if (search.Type.HasValue)
             query = query.Where(post => post.Type == search.Type.Value);
         foreach (var code in (search.ExcludedAmenities ?? []).Select(value => value.Trim().ToUpperInvariant()).Distinct(StringComparer.Ordinal))
@@ -60,7 +62,9 @@ public sealed class RentalPostRepository : IRentalPostRepository
             query = query.Where(post =>
                 EF.Functions.ILike(post.Title, keyword)
                 || EF.Functions.ILike(post.Description, keyword)
-                || EF.Functions.ILike(post.Address, keyword));
+                || EF.Functions.ILike(post.Address, keyword)
+                || (search.OwnerRole == UserRole.Renter && _dbContext.UserProfiles.Any(author => author.Id == post.OwnerId
+                    && author.School != null && EF.Functions.ILike(author.School, keyword))));
         }
 
         if (search.MinPrice.HasValue)

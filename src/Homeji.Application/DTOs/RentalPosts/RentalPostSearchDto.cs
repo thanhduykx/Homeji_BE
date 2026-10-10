@@ -22,4 +22,5 @@ public sealed record RentalPostSearchDto(
     bool ExcludeRoommateShare = false,
     IReadOnlyCollection<Guid>? Ids = null,
     bool ExcludeSynthetic = false,
-    RentalPostType? Type = null);
+    RentalPostType? Type = null,
+    UserRole? OwnerRole = null);

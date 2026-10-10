@@ -64,14 +64,7 @@ public sealed class RentalPostService : IRentalPostService
     public async Task<RentalPostDto> CreateDraftAsync(CreateRentalPostDraftDto request, CancellationToken cancellationToken = default)
     {
         var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        if (request.Type == RentalPostType.RoomTransfer)
-        {
-            UserContext.EnsureRenter(profile);
-        }
-        else
-        {
-            UserContext.EnsureLandlord(profile);
-        }
+        EnsureCanAuthor(profile, request.Type);
 
         var post = RentalPost.CreateDraft(profile.Id, request.Type, _timeProvider.GetUtcNow());
         await _posts.AddAsync(post, cancellationToken);
@@ -89,6 +82,8 @@ public sealed class RentalPostService : IRentalPostService
                 ["type"] = ["A room-transfer draft cannot be converted to or from a landlord rental listing."],
             });
         }
+        var author = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        EnsureCanAuthor(author, request.Type);
         await ValidateAsync(_updateValidator, request, cancellationToken);
         var violations = await _moderation.ValidateAsync(request.Description ?? string.Empty, cancellationToken);
         if (violations.Count > 0)
@@ -223,6 +218,8 @@ public sealed class RentalPostService : IRentalPostService
         var dto = RentalPostMapper.ToDto(post) with
         {
             OwnerDisplayName = owner?.DisplayName,
+            OwnerRole = owner?.Role,
+            OwnerSchool = owner?.School,
             OwnerPhone = owner?.Phone,
             OwnerAvatarPath = owner?.AvatarPath,
             IsOwnerVerified = owner?.LandlordVerificationStatus == LandlordVerificationStatus.Verified,
@@ -236,6 +233,8 @@ public sealed class RentalPostService : IRentalPostService
         RentalPostSearchDto request,
         CancellationToken cancellationToken = default)
     {
+        if (request.OwnerRole.HasValue && request.OwnerRole.Value is not (UserRole.Renter or UserRole.Landlord))
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["ownerRole"] = ["Vai trò tác giả phải là người thuê hoặc chủ trọ."] });
         if (request.Type.HasValue && !Enum.IsDefined(request.Type.Value))
             throw new RequestValidationException(new Dictionary<string, string[]> { ["type"] = ["Loại tin phòng không hợp lệ."] });
         if (request.Ids?.Count > 10 || request.ExcludedAmenities?.Count > 20 || request.ExcludedAmenities?.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > RentalPost.MaxAmenityCodeLength) == true || request.MinAvailableSlots is < 1 or > 20)
@@ -268,12 +267,20 @@ public sealed class RentalPostService : IRentalPostService
             premiumByUserId = new Dictionary<Guid, UserSubscription>();
         }
 
+        var authors = (await _profiles.GetByIdsAsync(posts.Select(x => x.OwnerId).Distinct().ToArray(), cancellationToken)).ToDictionary(x => x.Id);
         var result = posts
             .Select(post =>
             {
                 var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
                 var boostScore = CalculateBoostScore(post, isPremium, now);
-                var summary = RentalPostMapper.ToSummaryDto(post, isPremium, boostScore);
+                var author = authors.GetValueOrDefault(post.OwnerId);
+                var summary = RentalPostMapper.ToSummaryDto(post, isPremium, boostScore) with
+                {
+                    OwnerId = post.OwnerId, OwnerRole = author?.Role, OwnerDisplayName = author?.DisplayName,
+                    OwnerAvatarPath = author?.AvatarPath, OwnerSchool = author?.School,
+                    AvailableSlots = post.AvailableSlots, MaxOccupants = post.MaxOccupants,
+                    DescriptionExcerpt = PlainTextExcerpt(post.Description),
+                };
                 return RentalPostVisibility.ForPublicSearch(summary);
             })
             .OrderByDescending(post => post.IsOwnerPremium)
@@ -394,7 +401,7 @@ public sealed class RentalPostService : IRentalPostService
 
     private static bool HasSearchCriteria(RentalPostSearchDto search)
     {
-        return search.Type.HasValue || !string.IsNullOrWhiteSpace(search.Keyword)
+        return search.OwnerRole.HasValue || search.Type.HasValue || !string.IsNullOrWhiteSpace(search.Keyword)
             || search.MinPrice.HasValue
             || search.MaxPrice.HasValue
             || search.MinArea.HasValue
@@ -415,15 +422,23 @@ public sealed class RentalPostService : IRentalPostService
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
         UserContext.EnsureOwner(owner.Id, post.OwnerId);
-        if (post.Type == RentalPostType.RoomTransfer)
-        {
-            UserContext.EnsureRenter(owner);
-        }
-        else
-        {
-            UserContext.EnsureLandlord(owner);
-        }
+        EnsureCanAuthor(owner, post.Type);
         return post;
+    }
+
+    private static void EnsureCanAuthor(UserProfile author, RentalPostType type)
+    {
+        if (type == RentalPostType.RoomTransfer) UserContext.EnsureRenter(author);
+        else if (type == RentalPostType.RoommateShare && author.Role == UserRole.Renter) return;
+        else UserContext.EnsureLandlord(author);
+    }
+
+    private static string PlainTextExcerpt(string description)
+    {
+        var text = System.Text.RegularExpressions.Regex.Replace(description, "<[^>]*>", " ",
+            System.Text.RegularExpressions.RegexOptions.NonBacktracking, TimeSpan.FromMilliseconds(100));
+        text = System.Net.WebUtility.HtmlDecode(text).Trim();
+        return text.Length <= 240 ? text : text[..240];
     }
 
     private static async Task ValidateAsync<T>(IValidator<T> validator, T request, CancellationToken cancellationToken)
