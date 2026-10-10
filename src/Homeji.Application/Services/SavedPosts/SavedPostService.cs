@@ -66,17 +66,18 @@ public sealed class SavedPostService : ISavedPostService
         var renter = await GetRequiredRenterAsync(cancellationToken);
         var userId = renter.Id;
         var saved = await _savedPosts.GetByUserAsync(userId, cancellationToken);
-        var posts = new List<RentalPostSummaryDto>();
-        foreach (var item in saved)
-        {
-            var post = await _posts.GetByIdWithMediaAsync(item.RentalPostId, cancellationToken);
-            if (post is { Status: RentalPostStatus.Active })
-            {
-                posts.Add(RentalPostMapper.ToSummaryDto(post));
-            }
-        }
+        if (saved.Count == 0) return [];
 
-        return posts;
+        var postsById = (await _posts.GetByIdsWithMediaAsync(
+            saved.Select(item => item.RentalPostId).Distinct().ToArray(), cancellationToken))
+            .Where(post => post.Status == RentalPostStatus.Active)
+            .ToDictionary(post => post.Id);
+
+        // Batch loading has no save-date ordering; retain the saved list's chronology.
+        return saved
+            .Where(item => postsById.ContainsKey(item.RentalPostId))
+            .Select(item => RentalPostMapper.ToSummaryDto(postsById[item.RentalPostId]))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<RoommateCandidateDto>> GetRoommateCandidatesAsync(Guid postId, CancellationToken cancellationToken = default)
