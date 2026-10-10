@@ -53,10 +53,11 @@ public sealed class SavedPostService : ISavedPostService
     {
         var renter = await GetRequiredRenterAsync(cancellationToken);
         var userId = renter.Id;
-        var post = await GetActivePostAsync(postId, cancellationToken);
+        // Removing a personal saved preference must also work after a post becomes unavailable.
+        var post = await _posts.GetByIdAsync(postId, cancellationToken);
         if (await _savedPosts.RemoveAsync(userId, postId, cancellationToken))
         {
-            post.ApplySaveDelta(-1);
+            post?.ApplySaveDelta(-1);
             await _savedPosts.SaveChangesAsync(cancellationToken);
         }
     }
