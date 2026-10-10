@@ -13,4 +13,3 @@ Use `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `won
 ### Domain docs
 
 This repository uses a single-context layout: root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
-

@@ -24,4 +24,3 @@ GitHub shares issue and PR numbers. Confirm a referenced number is an issue befo
 ## Repository scope
 
 Backend work belongs in this repository; frontend work belongs in `fogit-hd/EXE101_Homeji`. For a change spanning both, create linked issues in the respective repositories and record dependencies explicitly.
-

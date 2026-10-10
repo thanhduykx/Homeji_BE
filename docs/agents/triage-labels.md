@@ -9,4 +9,3 @@
 | `wontfix` | `wontfix` | Will not be actioned. |
 
 Use the tracker label corresponding to the canonical role. Inspect existing GitHub labels before applying them; this mapping does not itself provision remote labels. Preserve unrelated labels when changing triage state.
-
