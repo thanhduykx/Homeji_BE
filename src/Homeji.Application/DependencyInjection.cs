@@ -68,6 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IUserProfileService, UserProfileService>();
         services.AddScoped<IRentalPostService, RentalPostService>();
         services.AddScoped<IRentalSourceListingService, RentalSourceListingService>();
+        services.AddScoped<IFoodSourcePlaceService, FoodSourcePlaceService>();
         services.AddScoped<ISavedPostService, SavedPostService>();
         services.AddScoped<IRoommateInvitationService, RoommateInvitationService>();
         services.AddScoped<IRoommateDirectoryService, RoommateDirectoryService>();
@@ -81,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IWebsiteTrafficService, WebsiteTrafficService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IAiSearchService, AiSearchService>();
+        services.AddScoped<IRentalDecisionService, RentalDecisionService>();
         services.AddScoped<IChatbotService, ChatbotService>();
         services.AddScoped<IMarketplacePostService, MarketplacePostService>();
         services.AddScoped<IViewingAppointmentService, ViewingAppointmentService>();

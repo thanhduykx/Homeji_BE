@@ -1,0 +1,108 @@
+{
+  "research_date": "2026-10-11",
+  "import_status": "executed_and_verified",
+  "availability_verified": false,
+  "maps_status": "address_search_links_not_verified_place_pins",
+  "image_status": "urls_extracted_from_own_source_gallery; image_fetch_failed; physical_match_and_rights_not_confirmed",
+  "food_places": [
+    {
+      "id": "5099783a-32a0-4b43-9c4b-2c5d4f6f1011",
+      "name": "Bánh Tráng Trộn Má Bé",
+      "address": "95 Đường 475, Phước Long B, Quận 9 cũ, TP.HCM",
+      "source_url": "https://www.nhatot.com/kinh-nghiem/dia-diem-an-vat-quan-9.html",
+      "additional_source_url": "https://www.foody.vn/%28A%28%26%20%20%20%20amp%3Bquot%3B-cpjdosfhwxnr-%26%20%20%20%20amp%3Bquot%3B%29%29/ho-chi-minh/khu-vuc-tp-thu-duc/tren-duong-duong-475",
+      "verification_note": "Địa chỉ có trong bài viết Nhà Tốt và danh mục Foody. Chưa xác nhận quán còn hoạt động; Maps là tìm kiếm theo địa chỉ."
+    },
+    {
+      "id": "5099783a-32a0-4b43-9c4b-2c5d4f6f1012",
+      "name": "Helios – Ăn Vặt & Trà Sữa",
+      "address": "17 Đinh Củng Viên, Phước Long A, Quận 9 cũ, TP.HCM",
+      "source_url": "https://shopeefood.vn/ho-chi-minh/helios-an-vat-tra-sua-dinh-cung-vien",
+      "additional_source_url": "https://www.nhatot.com/kinh-nghiem/dia-diem-an-vat-quan-9.html",
+      "verification_note": "Địa chỉ có trên ShopeeFood và bài viết Nhà Tốt. Chưa xác nhận quán còn hoạt động; Maps là tìm kiếm theo địa chỉ."
+    },
+    {
+      "id": "5099783a-32a0-4b43-9c4b-2c5d4f6f1013",
+      "name": "Ăn Vặt Xứ Nẫu",
+      "address": "77 Đường Làng Tăng Phú, Tăng Nhơn Phú A, Quận 9 cũ, TP.HCM",
+      "source_url": "https://vinwonders.com/vi/wonderpedia/news/an-vat-quan-9-tphcm/",
+      "additional_source_url": "https://www.nhatot.com/kinh-nghiem/dia-diem-an-vat-quan-9.html",
+      "verification_note": "Địa chỉ có trong bài viết VinWonders và Nhà Tốt. Chưa xác nhận quán còn hoạt động; Maps là tìm kiếm theo địa chỉ."
+    },
+    {
+      "id": "5099783a-32a0-4b43-9c4b-2c5d4f6f1014",
+      "name": "Tiệm Chè Đà Lạt Hương Dung",
+      "address": "196 Nguyễn Văn Tăng, Long Thạnh Mỹ, Quận 9 cũ, TP.HCM",
+      "source_url": "https://www.nhatot.com/kinh-nghiem/dia-diem-an-vat-quan-9.html",
+      "verification_note": "Địa chỉ có trong bài viết Nhà Tốt, chưa đối chiếu nguồn thứ hai. Chưa xác nhận quán còn hoạt động; Maps là tìm kiếm theo địa chỉ."
+    },
+    {
+      "id": "5099783a-32a0-4b43-9c4b-2c5d4f6f1015",
+      "name": "Chóp Chép – Bánh Tráng Trộn Tóp Mỡ Lòng Đào",
+      "address": "1 Đường số 1, Quận 9 cũ, TP.HCM (nguồn chưa ghi phường)",
+      "source_url": "https://www.nhatot.com/kinh-nghiem/dia-diem-an-vat-quan-9.html",
+      "verification_note": "Nguồn chưa ghi rõ phường; địa chỉ chưa đủ để xác định chính xác vị trí. Chưa xác nhận quán còn hoạt động; Maps chỉ là tìm kiếm."
+    }
+  ],
+  "rentals": [
+    {
+      "id": "7d7ca99d-0101-4c11-8111-000000711972",
+      "source_id": "711972",
+      "source_url": "https://phongtro123.com/con-duy-nhat-1-phong-cho-thue-976-nguyen-duy-trinh-pr711972.html",
+      "title": "Phòng trong nhà nguyên căn – 976/2 Nguyễn Duy Trinh",
+      "address": "976/2 Đường Nguyễn Duy Trinh, Phường Long Trường, TP.HCM",
+      "price": 2300000,
+      "area": 20,
+      "source_updated_at": "2026-08-22T19:25:00+07:00",
+      "source_expires_at": "2026-10-21T19:25:00+07:00",
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/08/22/1787401427046-120031049874458534-910286588504228269-d681a630d3313aca9fd7f30dbcd05c10_1787401500.jpg"
+      ]
+    },
+    {
+      "id": "7d7ca99d-0101-4c11-8111-000000711906",
+      "source_id": "711906",
+      "source_url": "https://phongtro123.com/cho-nu-thue-phong-dang-can-ho-mini-pr711906.html",
+      "title": "Phòng mini cho nữ – 24 Đường số 6, cạnh chợ Phước Bình",
+      "address": "24 Đường số 6, Phường Phước Long, TP.HCM",
+      "price": 2700000,
+      "area": 16,
+      "source_updated_at": "2026-08-21T15:46:00+07:00",
+      "source_expires_at": "2026-10-20T15:46:00+07:00",
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/08/21/img-4773_1787301919.jpg"
+      ]
+    }
+  ],
+  "excluded": [
+    {
+      "source_id": "200197",
+      "address": "86/22T Đình Phong Phú",
+      "source_url": "https://phongtro123.com/tinh-thanh/ho-chi-minh/tung-bung-khai-truong-khu-tro-cao-cap-q9-uu-tien-nhan-vien-van-phong-lh-0909-55-26-29-ms-ngoc.html",
+      "image_url": "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/10/19/a62c662b-9ca3-4ba5-bdd5-e047bba30bc8_1760837389.jpg",
+      "reason": "Nguồn ghi Đã cho thuê, hết hạn 18/08/2026. Không nhập vào danh sách phòng."
+    },
+    {
+      "source_id": "650756",
+      "source_url": "https://phongtro123.com/phong-moi-dep-gan-nga-4-thu-duc-khu-cnc-20m2-co-gac-vi-tri-tien-loi-pr650756.html",
+      "reason": "Địa chỉ mâu thuẫn 216/34 và 261/34 Đình Phong Phú; tin hết hạn 28/06/2026."
+    },
+    {
+      "source_id": "126488",
+      "source_url": "https://phongtro123.com/tinh-thanh/ho-chi-minh/cho-thue-phong-tai-134-binh-loi-p-13quan-binh-thanh.html",
+      "reason": "Tin tại 56 Đường 385 hết hạn từ 19/08/2020."
+    }
+  ],
+  "source_checked_at": "2026-10-11T09:14:12.690Z",
+  "import_result": {
+    "completed_at": "2026-10-11T12:48:49.4661734+00:00",
+    "project": "pzxxzcrgpfsbdkyrdvng",
+    "inserted_food": 5,
+    "inserted_rental": 1,
+    "preserved_existing_source_ids": [
+      "711906"
+    ],
+    "receipt": "docs/quan9-data-import-receipt-20261011.json",
+    "deployed": false
+  }
+}
