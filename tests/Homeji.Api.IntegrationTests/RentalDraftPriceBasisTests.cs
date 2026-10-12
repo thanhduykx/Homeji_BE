@@ -36,13 +36,16 @@ public sealed class RentalDraftPriceBasisTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var draft = await response.Content.ReadFromJsonAsync<RentalDraftResponseDto>();
         Assert.NotNull(draft);
-        Assert.Equal("Bản nháp thử nghiệm", draft.Title);
+        Assert.Contains("«Tìm người ở ghép»", draft.Title, StringComparison.Ordinal);
+        Assert.Contains("25 m²", draft.Title, StringComparison.Ordinal);
+        Assert.Contains("3.000.000", draft.Title, StringComparison.Ordinal);
+        Assert.Contains(expected == "person" ? "đồng/người/tháng" : expected == "room" ? "đồng/phòng/tháng" : "chưa xác nhận giá theo phòng hay theo người", draft.Description, StringComparison.Ordinal);
         Assert.Equal(expected == "unknown", draft.Missing.Any(value => value.Contains("Đơn vị tiền thuê")));
         Assert.Equal(1, ai.Calls);
-        using var facts = JsonDocument.Parse(ai.Prompt[(ai.Prompt.LastIndexOf("Dữ liệu: ", StringComparison.Ordinal) + "Dữ liệu: ".Length)..]);
+        using var facts = JsonDocument.Parse(ai.Prompt[(ai.Prompt.LastIndexOf("Catalog: ", StringComparison.Ordinal) + "Catalog: ".Length)..]);
         Assert.Equal(expected, facts.RootElement.GetProperty("priceBasis").GetString());
-        Assert.Equal(3000000m, facts.RootElement.GetProperty("rentVnd").GetDecimal());
-        Assert.Contains("person là đồng/người/tháng; room là đồng/phòng/tháng", ai.Prompt);
+        Assert.True(facts.RootElement.GetProperty("rentKnown").GetBoolean());
+        Assert.DoesNotContain("Linh Trung", ai.Prompt, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -64,6 +67,20 @@ public sealed class RentalDraftPriceBasisTests
         using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.True(problem.RootElement.GetProperty("errors").TryGetProperty("priceBasis", out _));
         Assert.Equal(0, ai.Calls);
+    }
+
+    [Theory]
+    [InlineData("{\"title\":\"Đã xác minh\",\"description\":\"Giá 1 đồng\"}")]
+    [InlineData("{\"titleVariantId\":\"brief\",\"sections\":[]}")]
+    public async Task Provider_free_prose_or_missing_facts_returns_dependency_error_not_a_draft(string output)
+    {
+        var ai = new CapturingClient(output);
+        using var factory = CreateFactory(ai);
+        using var client = CreateClient(factory);
+        using var response = await client.PostAsJsonAsync(new Uri("/api/ai/rental-draft", UriKind.Relative), CreatePayload());
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
+        Assert.Equal(1, ai.Calls);
+        Assert.DoesNotContain("Giá 1 đồng", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
     }
 
     private static Dictionary<string, object> CreatePayload() => new()
@@ -90,7 +107,7 @@ public sealed class RentalDraftPriceBasisTests
             BaseAddress = new Uri("https://localhost"), AllowAutoRedirect = false,
         });
 
-    private sealed class CapturingClient : IChatbotAiClient
+    private sealed class CapturingClient(string? output = null) : IChatbotAiClient
     {
         public int Calls { get; private set; }
         public string Prompt { get; private set; } = "";
@@ -100,7 +117,7 @@ public sealed class RentalDraftPriceBasisTests
         {
             Calls++;
             Prompt = latestUserMessage;
-            return Task.FromResult("""{"title":"Bản nháp thử nghiệm","description":"Thông tin cần chủ tin kiểm tra trước khi áp dụng."}""");
+            return Task.FromResult(output ?? """{"titleVariantId":"brief","sections":[{"factId":"type","variantId":"direct"},{"factId":"address","variantId":"direct"},{"factId":"rent","variantId":"direct"},{"factId":"area","variantId":"direct"},{"factId":"amenities","variantId":"direct"},{"factId":"confirmation","variantId":"direct"}]}""");
         }
     }
 
