@@ -18,3 +18,9 @@ The backend recognizes the exact normalized dedicated command and clears only Ke
 The API request shape is unchanged. Deploy backend command handling before publishing the frontend clear control: an older backend may retain the keyword. Existing keyword parsing remains supported. No database migration or database writes are needed. Both local branches were synchronized with origin/main before publishing.
 
 Advanced Routes and long-term history remain disabled.
+
+## Exact public URL verified later on 2026-10-12
+
+The required frontend origin https://exe101-homeji.onrender.com/ subsequently served index-CVpcSBgs.js containing the keyword chip and clear command. Authenticated browser verification on that exact origin produced a title-keyword chip; Enter populated the clear command and focused the textarea; submitting removed only the keyword while retaining the street, budget ceiling, occupancy, kitchen and roommate exclusion. Local screenshot: output/quality/full-audit/keyword-clear-production.png.
+
+The earlier deployment report was premature while that URL still served the prior bundle. The alternate -qlcu service is not the user's public release target. No URL or OAuth-origin migration was performed. This one live Gemini refinement does not establish the full accuracy or latency benchmark. The owning Render service for the original frontend URL remains unidentified in the currently visible workspace; future releases must be verified directly at the required public origin.

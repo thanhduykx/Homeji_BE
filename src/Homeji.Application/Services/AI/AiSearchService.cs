@@ -233,6 +233,10 @@ public sealed class AiSearchService : IAiSearchService
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(20)
             .ToArray();
+        var unknown = (criteria.Unknown ?? []).Where(value => value is "budget" or "feeUnits" or "destination" or "commute" or "priceRange" or "motorcycleCoverage" or "area" or "occupants")
+            .ToHashSet(StringComparer.Ordinal);
+        // Source listings have no fee-completeness marker; a client cannot certify a total budget by clearing Unknown.
+        if (criteria.BudgetBasis == "total") unknown.Add("feeUnits");
 
         return criteria with
         {
@@ -245,7 +249,7 @@ public sealed class AiSearchService : IAiSearchService
             Criteria = normalizedCriteria,
             RequiredAmenities = NormalizeAmenityCodes(criteria.RequiredAmenities ?? []),
             ExcludedAmenities = NormalizeAmenityCodes(criteria.ExcludedAmenities ?? []),
-            Unknown = (criteria.Unknown ?? []).Where(value => value is "budget" or "feeUnits" or "destination" or "commute" or "priceRange" or "motorcycleCoverage" or "area" or "occupants").Distinct().ToArray(),
+            Unknown = unknown.ToArray(),
             Occupants = criteria.Occupants is >= 1 and <= 20 ? criteria.Occupants : null,
             BudgetBasis = criteria.BudgetBasis == "total" ? "total" : "rent",
         };
@@ -267,7 +271,7 @@ public sealed class AiSearchService : IAiSearchService
             resultReasons.Add(new("Phù hợp khu vực người dùng yêu cầu.", post.Id, "listing", ContainsNormalized(post.Address, criteria.Location) ? "address" : "title", ContainsNormalized(post.Address, criteria.Location) ? post.Address : post.Title));
         }
 
-        if (criteria.PriceMax.HasValue && post.Price <= criteria.PriceMax.Value)
+        if (post.Price > 0 && criteria.PriceMax.HasValue && post.Price <= criteria.PriceMax.Value)
         {
             score += 25;
             resultReasons.Add(new(criteria.BudgetBasis == "total" ? "Tiền thuê không vượt trần; tổng cả phí cần xác nhận." : "Giá nằm trong ngân sách tối đa.", post.Id, "listing", "price", post.Price.ToString(System.Globalization.CultureInfo.InvariantCulture)));
@@ -277,7 +281,7 @@ public sealed class AiSearchService : IAiSearchService
             score += 5;
         }
 
-        if (criteria.BudgetBasis != "total" && criteria.PriceMin.HasValue && post.Price >= criteria.PriceMin.Value)
+        if (post.Price > 0 && criteria.BudgetBasis != "total" && criteria.PriceMin.HasValue && post.Price >= criteria.PriceMin.Value)
         {
             score += 5;
         }
@@ -340,6 +344,7 @@ public sealed class AiSearchService : IAiSearchService
         post.Latitude is >= 10.7m and <= 10.93m && post.Longitude is >= 106.72m and <= 106.9m &&
         (string.IsNullOrWhiteSpace(criteria.Location) || ContainsNormalized(post.Address, criteria.Location) || ContainsNormalized(post.Title, criteria.Location)) &&
         (string.IsNullOrWhiteSpace(criteria.Keyword) || ContainsNormalized(post.Address, criteria.Keyword) || ContainsNormalized(post.Title, criteria.Keyword) || ContainsNormalized(post.Description, criteria.Keyword)) &&
+        ((!criteria.PriceMin.HasValue && !criteria.PriceMax.HasValue) || post.Price > 0) &&
         (criteria.BudgetBasis == "total" || !criteria.PriceMin.HasValue || post.Price >= criteria.PriceMin) &&
         (!criteria.PriceMax.HasValue || post.Price <= criteria.PriceMax) &&
         (!criteria.AreaMin.HasValue || post.Area >= criteria.AreaMin) &&

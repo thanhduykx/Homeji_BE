@@ -125,6 +125,55 @@ public sealed class AiSearchGroundingTests
         Assert.Contains("feeUnits", Assert.Single(result.Posts).UnconfirmedConstraints);
     }
 
+    [Theory]
+    [InlineData("rent", true, 0)]
+    [InlineData("rent", true, -1)]
+    [InlineData("rent", false, 0)]
+    [InlineData("total", true, 0)]
+    [InlineData("total", true, -1)]
+    [InlineData("total", false, 0)]
+    [InlineData("total", false, -1)]
+    public async Task Budget_never_treats_missing_source_rent_as_a_matching_price(string basis, bool ceiling, decimal missingRent)
+    {
+        var missing = Post(3_000_000, ["KITCHEN"]);
+        // Simulate old persisted values rejected by the current draft validation.
+        typeof(RentalPost).GetProperty(nameof(RentalPost.Price))!.SetValue(missing, missingRent);
+        var valid = Post(3_000_000, ["KITCHEN"]);
+        var criteria = new AiParsedSearchCriteriaDto("Thủ Đức", null, ceiling ? null : 2_000_000,
+            ceiling ? 4_000_000 : null, null, null, []) { BudgetBasis = basis };
+        // Deliberately return every candidate to prove the application boundary enforces the constraint.
+        var response = await Service(new([missing, valid])).HighlightRentalPostsAsync(new("Tìm phòng", Criteria: criteria));
+        Assert.Equal(valid.Id, Assert.Single(response.Posts).Post.Id);
+        Assert.DoesNotContain(response.Posts.SelectMany(item => item.ReasonEvidence), reason => reason.PostId == missing.Id);
+    }
+
+    [Fact]
+    public async Task Missing_rent_without_budget_is_not_claimed_as_a_price_match()
+    {
+        var missing = Post(3_000_000, ["KITCHEN"]);
+        typeof(RentalPost).GetProperty(nameof(RentalPost.Price))!.SetValue(missing, 0m);
+        var criteria = new AiParsedSearchCriteriaDto("Thủ Đức", null, null, null, null, null, []);
+        var response = await Service(new([missing])).HighlightRentalPostsAsync(new("Tìm phòng", Criteria: criteria));
+        var card = Assert.Single(response.Posts);
+        Assert.DoesNotContain(card.ReasonEvidence, reason => reason.Field == "price");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Explicit_total_budget_cannot_claim_fee_completeness_by_omitting_unknowns(bool alreadyUnknown)
+    {
+        var criteria = new AiParsedSearchCriteriaDto(null, null, null, 4_000_000, null, null, [])
+        {
+            BudgetBasis = "total", Unknown = alreadyUnknown ? ["feeUnits"] : [],
+        };
+        var response = await Service(new([Post(3_000_000, [])])).HighlightRentalPostsAsync(new("Tìm phòng", Criteria: criteria));
+        Assert.Equal("feeUnits", Assert.Single(response.Criteria.Unknown));
+        var card = Assert.Single(response.Posts);
+        Assert.Equal("feeUnits", Assert.Single(card.UnconfirmedConstraints));
+        Assert.Contains(card.ReasonEvidence, reason => reason.Field == "price" && reason.Text.Contains("cần xác nhận", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Premium_DoesNotChangeUserFitScoreOrOrdering()
     {
