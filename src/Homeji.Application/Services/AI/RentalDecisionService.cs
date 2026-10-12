@@ -2,6 +2,7 @@ using Homeji.Application.Common;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.AI;
 using Homeji.Application.IRepositories.RentalPosts;
+using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Admin;
 using Homeji.Application.Mappers.RentalPosts;
@@ -12,7 +13,8 @@ using Homeji.Domain.Enums;
 namespace Homeji.Application.Services.AI;
 
 public sealed class RentalDecisionService(IRentalPostRepository posts, UserContext userContext,
-    ICommuteClient commuteClient, IAdminModerationService moderation, TimeProvider timeProvider) : IRentalDecisionService
+    ICommuteClient commuteClient, IAdminModerationService moderation, TimeProvider timeProvider,
+    IUserProfileRepository profiles) : IRentalDecisionService
 {
     public async Task<RentalDecisionResponseDto> CompareAsync(RentalDecisionRequestDto request, CancellationToken cancellationToken)
     {
@@ -26,7 +28,10 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
             && HomejiServiceArea.Contains(post.Latitude, post.Longitude)
             && !(post.Type == RentalPostType.RoomTransfer && post.OriginalLeaseEndsOn <= DateOnly.FromDateTime(now.UtcDateTime)))
             .ToDictionary(post => post.Id);
-        var visible = active.ToDictionary(entry => entry.Key, entry => RentalPostVisibility.ForViewer(RentalPostMapper.ToDto(entry.Value), currentUserId));
+        var owners = active.Count == 0 ? [] : await profiles.GetByIdsAsync(active.Values.Select(post => post.OwnerId).Distinct().ToArray(), cancellationToken);
+        var ownerRoles = owners.ToDictionary(profile => profile.Id, profile => profile.Role);
+        var visible = active.ToDictionary(entry => entry.Key, entry => RentalPostVisibility.ForViewer(
+            RentalPostMapper.ToDto(entry.Value) with { OwnerRole = ownerRoles.TryGetValue(entry.Value.OwnerId, out var role) ? role : null }, currentUserId));
         IReadOnlyCollection<CommuteEstimateDto> routes = [];
         if (request.Destination is { } destination)
         {
@@ -38,10 +43,13 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
             routes = await commuteClient.ComputeAsync(visible.Values.Select(post => new CommuteOriginDto(post.Id, post.Latitude, post.Longitude)).ToArray(), destination, cancellationToken);
         }
         var items = ids.Where(active.ContainsKey).Select(id => new RentalDecisionItemDto(
-            visible[id], RentalCostCalculator.Calculate(active[id], request.Scenario ?? new()),
+            visible[id], RentalCostCalculator.Calculate(active[id], request.Scenario ?? new(), visible[id].OwnerRole),
             routes.FirstOrDefault(route => route.PostId == id))).ToArray();
-        var summary = items.Length > 1
-            ? $"Chênh lệch giá thuê giữa các tin: {items.Max(item => item.Post.Price) - items.Min(item => item.Post.Price):N0} đồng/tháng. So sánh thêm diện tích và tiện ích theo nhu cầu; phí chưa đủ dữ liệu để kết luận phòng nào có tổng chi phí thấp nhất."
+        var comparable = items.Length > 1 && items.All(item => item.Post.Price > 0 && item.Cost.PriceBasis != "unknown")
+            && items.Select(item => item.Cost.PriceBasis).Distinct().Count() == 1;
+        var summary = comparable
+            ? $"Chênh lệch giá thuê giữa các tin: {items.Max(item => item.Post.Price) - items.Min(item => item.Post.Price):N0} đồng/{(items[0].Cost.PriceBasis == "person" ? "người" : "phòng")}/tháng. So sánh thêm diện tích và tiện ích theo nhu cầu; phí chưa đủ dữ liệu để kết luận phòng nào có tổng chi phí thấp nhất."
+            : items.Length > 1 ? "Không thể so sánh chênh lệch giá thuê: các tin khác đơn vị theo phòng/người hoặc chưa xác nhận giá/đơn vị. Cần xác nhận cùng đơn vị trước khi so sánh."
             : "Dữ liệu theo chủ tin; chi phí là kịch bản tham khảo, cần xác nhận các khoản thiếu trước khi quyết định.";
         return new(items, ids.Where(id => !active.ContainsKey(id)).ToArray(), summary);
     }

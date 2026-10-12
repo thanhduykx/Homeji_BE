@@ -7,7 +7,7 @@ namespace Homeji.Application.Services.AI;
 
 public static class RentalCostCalculator
 {
-    public static RentalCostEstimateDto Calculate(RentalPost post, RentalCostScenarioDto scenario)
+    public static RentalCostEstimateDto Calculate(RentalPost post, RentalCostScenarioDto scenario, UserRole? ownerRole = null)
     {
         string[] validUnits = ["unknown", "month", "person", "kwh", "m3"];
         if (scenario.Occupants is < 1 or > 50 || scenario.ElectricityKwh is < 0 or > 10000 || scenario.WaterM3 is < 0 or > 1000
@@ -24,12 +24,19 @@ public static class RentalCostCalculator
             if (rate <= 0 || unit == "unknown") { unknown.Add(label + ": chưa xác nhận đơn giá/đơn vị; 0 không có nghĩa miễn phí."); return 0; }
             return rate * (unit == "person" ? scenario.Occupants : unit is "kwh" or "m3" ? usage : 1);
         }
-        var subtotal = post.Price + Fee("Điện", post.ElectricityPrice, scenario.ElectricityUnit, scenario.ElectricityKwh, scenario.ElectricityFreeConfirmed)
+        var priceBasis = ResolvePriceBasis(post.Type, ownerRole);
+        var hasRent = post.Price > 0;
+        if (!hasRent) unknown.Add("Giá thuê chưa xác nhận; 0 không có nghĩa miễn phí.");
+        var fees = Fee("Điện", post.ElectricityPrice, scenario.ElectricityUnit, scenario.ElectricityKwh, scenario.ElectricityFreeConfirmed)
             + Fee("Nước", post.WaterPrice, scenario.WaterUnit, scenario.WaterM3, scenario.WaterFreeConfirmed)
             + Fee("Internet", post.InternetPrice, scenario.InternetUnit, 1, scenario.InternetFreeConfirmed)
             + (scenario.OtherMonthlyFees ?? 0);
         // Existing posts have no authoritative fixed-fee completeness marker.
         if (!scenario.OtherMonthlyFees.HasValue) unknown.Add("Phí cố định khác (giữ xe, dịch vụ, rác): cần hỏi chủ phòng.");
+        if (priceBasis != "room") unknown.Add(priceBasis == "person"
+            ? "Giá thuê theo người; các khoản phí và tiền cọc chưa xác nhận cùng đơn vị nên không cộng thành tổng hoặc tự quy đổi theo số người."
+            : "Chưa xác nhận giá thuê theo phòng hay theo người; không cộng các khoản phí hoặc tự quy đổi theo số người.");
+        decimal? subtotal = priceBasis == "room" && (hasRent || fees > 0) ? (hasRent ? post.Price : 0) + fees : null;
         var questions = new List<string>
         {
             "Điện tính theo kWh, tháng hay đầu người? Đơn giá có bao gồm thuế/phụ phí?",
@@ -38,9 +45,12 @@ public static class RentalCostCalculator
             "Giờ giấc ra vào và quy định nuôi thú cưng như thế nào?",
         };
         if (post.Deposit <= 0) questions.Add("Tiền cọc chưa được xác nhận; có thực sự không thu cọc?");
-        return new RentalCostEstimateDto(post.Id, subtotal, unknown.Count == 0 ? subtotal : null,
-            (post.Deposit > 0 || scenario.DepositFreeConfirmed) && scenario.OtherInitialFees.HasValue
+        return new RentalCostEstimateDto(post.Id, subtotal, hasRent && unknown.Count == 0 ? subtotal : null,
+            priceBasis == "room" && hasRent && (post.Deposit > 0 || scenario.DepositFreeConfirmed) && scenario.OtherInitialFees.HasValue
                 ? post.Price + post.Deposit + (post.Type == RentalPostType.RoomTransfer ? post.PassFee : 0) + scenario.OtherInitialFees.Value : null,
-            unknown, questions, "ownerListing + userScenario", post.UpdatedAt);
+            unknown, questions, "ownerListing + userScenario", post.UpdatedAt, priceBasis);
     }
+
+    public static string ResolvePriceBasis(RentalPostType type, UserRole? ownerRole) => type != RentalPostType.RoommateShare
+        ? "room" : ownerRole switch { UserRole.Renter => "person", UserRole.Landlord => "room", _ => "unknown" };
 }

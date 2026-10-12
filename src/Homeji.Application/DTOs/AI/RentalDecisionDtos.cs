@@ -5,9 +5,9 @@ public sealed record RentalCostScenarioDto(int Occupants = 1, decimal Electricit
     string InternetUnit = "unknown", decimal? OtherMonthlyFees = null, decimal? OtherInitialFees = null,
     bool ElectricityFreeConfirmed = false, bool WaterFreeConfirmed = false, bool InternetFreeConfirmed = false,
     bool DepositFreeConfirmed = false);
-public sealed record RentalCostEstimateDto(Guid PostId, decimal KnownMonthlySubtotal,
+public sealed record RentalCostEstimateDto(Guid PostId, decimal? KnownMonthlySubtotal,
     decimal? EstimatedMonthlyTotal, decimal? InitialPayment, IReadOnlyCollection<string> Unknown,
-    IReadOnlyCollection<string> Questions, string SourceType, DateTimeOffset UpdatedAt);
+    IReadOnlyCollection<string> Questions, string SourceType, DateTimeOffset UpdatedAt, string PriceBasis = "unknown");
 public sealed record CommuteDestinationDto(string Label, decimal Latitude, decimal Longitude,
     string Mode = "WALK", DateTimeOffset? DepartureTime = null);
 public sealed record CommuteOriginDto(Guid PostId, decimal Latitude, decimal Longitude);
