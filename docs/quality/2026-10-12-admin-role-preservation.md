@@ -16,3 +16,5 @@ This is a domain guard, with no schema, endpoint or payload change. Profile crea
 - git diff --check passed.
 
 The named production identity admin@gmail.com was separately restored from Renter to Admin using a bounded, confirmed-identity update. Other administrator profiles remain unchanged pending the owner's decision. Production management navigation was verified on the original frontend URL; production preference submission is not included in these test results.
+
+Deployment: commit 98b6f0c is Live on the Render service serving https://homeji-be.onrender.com (deploy dep-db6b4pbrjlhs73bi5s6g, duration 2m14s). GET /health/ready returned 200 Healthy after deployment. This confirms deployment/readiness, not a production lifestyle write.
