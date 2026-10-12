@@ -4,7 +4,7 @@ using Homeji.Application.DTOs.AI;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IServices.AI;
-using Homeji.Application.IServices.Admin;
+using Homeji.Application.IRepositories.Admin;
 using Homeji.Application.Services.AI;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
@@ -74,7 +74,7 @@ public sealed class RentalDecisionPriceBasisTests
         var repository = Stub<IRentalPostRepository>((method, _) => method.Name == nameof(IRentalPostRepository.GetByIdsWithMediaAsync)
             ? Task.FromResult(posts) : throw new InvalidOperationException(method.Name));
         var commute = Stub<ICommuteClient>((method, _) => throw new InvalidOperationException(method.Name));
-        var moderation = Stub<IAdminModerationService>((method, _) => throw new InvalidOperationException(method.Name));
+        var moderation = Stub<IAdminWorkQueueRepository>((method, _) => throw new InvalidOperationException(method.Name));
         return new(repository, new UserContext(new CurrentUser(Guid.NewGuid()), profiles), commute, moderation, TimeProvider.System, profiles);
     }
 

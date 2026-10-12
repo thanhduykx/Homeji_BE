@@ -4,7 +4,7 @@ using Homeji.Application.DTOs.AI;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Application.IRepositories.Profiles;
 using Homeji.Application.IServices.AI;
-using Homeji.Application.IServices.Admin;
+using Homeji.Application.IRepositories.Admin;
 using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
@@ -13,7 +13,7 @@ using Homeji.Domain.Enums;
 namespace Homeji.Application.Services.AI;
 
 public sealed class RentalDecisionService(IRentalPostRepository posts, UserContext userContext,
-    ICommuteClient commuteClient, IAdminModerationService moderation, TimeProvider timeProvider,
+    ICommuteClient commuteClient, IAdminWorkQueueRepository workQueue, TimeProvider timeProvider,
     IUserProfileRepository profiles) : IRentalDecisionService
 {
     public async Task<RentalDecisionResponseDto> CompareAsync(RentalDecisionRequestDto request, CancellationToken cancellationToken)
@@ -76,13 +76,24 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
     public async Task<AdminAssistantSummaryDto> GetAdminSummaryAsync(CancellationToken cancellationToken)
     {
         UserContext.EnsureAdmin(await userContext.GetRequiredProfileAsync(cancellationToken));
-        var pending = await moderation.GetPendingRentalPostsAsync(cancellationToken);
-        var reports = await moderation.GetReportsAsync(ReportStatus.New, cancellationToken);
-        return new(timeProvider.GetUtcNow(), pending.Count, reports.Count,
-            pending.Take(10).Select(post => new AdminAssistantTaskDto("posts", post.Id, post.Title))
-                .Concat(reports.Take(10).Select(report => new AdminAssistantTaskDto("reports", report.Id, "Báo cáo cần xem xét"))).ToArray(),
-            $"Hiện có {pending.Count} tin chờ duyệt và {reports.Count} báo cáo chờ xử lý. Đây là số đang chờ tại thời điểm tính, không phải số phát sinh riêng hôm nay. Mở từng mục để kiểm tra và quyết định.");
+        var snapshot = await workQueue.GetSnapshotAsync(cancellationToken);
+        return new(timeProvider.GetUtcNow(), snapshot.PendingPosts, snapshot.PendingReports,
+            snapshot.Posts.Take(10).Select(post => new AdminAssistantTaskDto("posts", post.Id, post.Title))
+                .Concat(snapshot.Reports.Take(10).Select(report => new AdminAssistantTaskDto("reports", report.Id,
+                    $"{ReportLabel(report.TargetType)}: {report.Reason[..Math.Min(report.Reason.Length, 120)]}"))).ToArray(),
+            $"Hiện có {snapshot.PendingPosts} tin chờ duyệt và {snapshot.PendingReports} báo cáo chờ xử lý. Đây là số đang chờ tại thời điểm tính, không phải số phát sinh riêng hôm nay. Mở từng mục để kiểm tra và quyết định.");
     }
+
+    private static string ReportLabel(ReportTargetType type) => type switch
+    {
+        ReportTargetType.RentalPost => "Báo cáo tin phòng",
+        ReportTargetType.User => "Báo cáo người dùng",
+        ReportTargetType.RoommateInvitation => "Báo cáo lời mời ở ghép",
+        ReportTargetType.MarketplacePost => "Báo cáo tin chợ",
+        ReportTargetType.RentalReview => "Báo cáo đánh giá",
+        ReportTargetType.RentalWantedPost => "Báo cáo tin tìm phòng",
+        _ => "Báo cáo cần xem xét"
+    };
 
     private static RequestValidationException Validation(string field, string message) => new(new Dictionary<string, string[]> { [field] = [message] });
 }

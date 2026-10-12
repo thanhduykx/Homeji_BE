@@ -102,6 +102,7 @@ public static class DependencyInjection
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IWalletWithdrawalRepository, WalletWithdrawalRepository>();
         services.AddScoped<IAdminAnalyticsRepository, AdminAnalyticsRepository>();
+        services.AddScoped<Homeji.Application.IRepositories.Admin.IAdminWorkQueueRepository, AdminWorkQueueRepository>();
         services.AddScoped<IWebsiteTrafficRepository, WebsiteTrafficRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
