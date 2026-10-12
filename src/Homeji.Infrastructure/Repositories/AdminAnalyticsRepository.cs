@@ -1,4 +1,5 @@
 using Homeji.Application.IRepositories.Admin;
+using Homeji.Application.Services.AI;
 using Homeji.Domain.Enums;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
@@ -20,22 +21,7 @@ public sealed class AdminAnalyticsRepository : IAdminAnalyticsRepository
         CancellationToken cancellationToken = default)
     {
         var totalUsers = await _dbContext.UserProfiles.AsNoTracking().CountAsync(cancellationToken);
-        var rentals = await _dbContext.RentalPosts
-            .AsNoTracking()
-            .Where(post => post.Status == RentalPostStatus.Active || post.CreatedAt >= from)
-            .Where(post => post.CreatedAt <= until)
-            .Select(post => new AdminAnalyticsRentalRow(
-                post.Id,
-                post.Status,
-                post.Address,
-                post.Latitude,
-                post.Longitude,
-                post.Price,
-                post.Area,
-                post.ViewCount,
-                post.SaveCount,
-                post.CreatedAt))
-            .ToListAsync(cancellationToken);
+        var rentals = await BuildRentalSnapshotQuery(from, until).ToListAsync(cancellationToken);
         var newUsers = await _dbContext.UserProfiles
             .AsNoTracking()
             .Where(profile => profile.CreatedAt >= from && profile.CreatedAt <= until)
@@ -73,4 +59,16 @@ public sealed class AdminAnalyticsRepository : IAdminAnalyticsRepository
             saves,
             viewingRequests);
     }
+
+    internal IQueryable<AdminAnalyticsRentalRow> BuildRentalSnapshotQuery(DateTimeOffset periodFrom, DateTimeOffset periodUntil) =>
+        from post in _dbContext.RentalPosts.AsNoTracking()
+        where (post.Status == RentalPostStatus.Active || post.CreatedAt >= periodFrom) && post.CreatedAt <= periodUntil
+        join profile in _dbContext.UserProfiles.AsNoTracking() on post.OwnerId equals profile.Id into owners
+        from owner in owners.DefaultIfEmpty()
+        select new AdminAnalyticsRentalRow(post.Id, post.Status, post.Address, post.Latitude, post.Longitude,
+            post.Price, post.Area, post.ViewCount, post.SaveCount, post.CreatedAt,
+            ResolvePriceBasis(post.Type, owner == null ? null : owner.Role));
+
+    internal static string ResolvePriceBasis(RentalPostType type, UserRole? ownerRole) =>
+        RentalCostCalculator.ResolvePriceBasis(type, ownerRole) switch { "room" => "room_month", "person" => "person_month", _ => "unknown" };
 }

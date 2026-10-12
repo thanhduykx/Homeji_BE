@@ -138,6 +138,74 @@ public sealed class AdminAnalyticsCalculatorTests
             area => area.AreaName == "phường Bình An, TP. Dĩ An").MedianMonthlyPrice);
     }
 
+    [Fact]
+    public void Mixed_units_missing_prices_and_missing_area_never_enter_room_price_statistics()
+    {
+        var now = new DateTimeOffset(2026, 10, 12, 9, 0, 0, VietnamOffset);
+        var room = Rental("phường Linh Trung", 3_000_000, 20, 10, 2, now);
+        var noArea = room with { Id = Guid.NewGuid(), Price = 5_000_000, Area = 0 };
+        var person = room with { Id = Guid.NewGuid(), Price = 500_000, PriceBasis = "person_month" };
+        var unknown = room with { Id = Guid.NewGuid(), Price = 100_000, PriceBasis = "unknown" };
+        var missing = room with { Id = Guid.NewGuid(), Price = 0 };
+        var inactive = room with { Id = Guid.NewGuid(), Price = 100_000_000, Status = RentalPostStatus.Archived };
+        var source = new AdminAnalyticsSource(10, [room, noArea, person, unknown, missing, inactive], [],
+            [new(UserActivityType.ViewedRentalPost, person.Id, now)], [new(unknown.Id, now)], [new(missing.Id, ViewingAppointmentStatus.Pending, now)]);
+        var result = AdminAnalyticsCalculator.Calculate(source, now.AddDays(-6), now, 7);
+        Assert.Equal(5, result.Kpis.ActiveListings);
+        Assert.Equal(4_000_000, result.Kpis.MedianMonthlyPrice);
+        Assert.Equal(150_000, result.Kpis.AveragePricePerSquareMeter);
+        Assert.Equal(2, result.Kpis.PriceSampleCount);
+        Assert.Equal(3, result.Kpis.ExcludedPriceCount);
+        Assert.Equal(1, result.Kpis.PriceAreaSampleCount);
+        Assert.Equal("room_month", result.Kpis.PriceBasis);
+        var area = Assert.Single(result.Areas);
+        Assert.Equal(5, area.ActiveListings);
+        Assert.Equal(4_000_000, area.MedianMonthlyPrice);
+        Assert.Equal(150_000, area.AveragePricePerSquareMeter);
+        Assert.Equal(2, area.PriceSampleCount);
+        Assert.Equal(3, area.ExcludedPriceCount);
+        Assert.Equal(1, area.PriceAreaSampleCount);
+        Assert.Equal(1, area.TotalViews);
+        Assert.Equal(1, area.TotalSaves);
+        Assert.Equal(1, area.ViewingRequests);
+    }
+
+    [Theory]
+    [InlineData("unknown", 3_000_000)]
+    [InlineData("person_month", 1_000_000)]
+    [InlineData("room_month", 0)]
+    [InlineData("room_month", -1)]
+    [InlineData(null, 3_000_000)]
+    public void Missing_eligible_prices_are_disclosed_and_never_recommended(string? basis, decimal price)
+    {
+        var now = new DateTimeOffset(2026, 10, 12, 9, 0, 0, VietnamOffset);
+        var rows = Enumerable.Range(0, 8).Select(_ => Rental("phường Linh Trung", price, 20, 0, 0, now) with { PriceBasis = basis! }).ToArray();
+        var views = rows.SelectMany(row => Enumerable.Range(0, 30).Select(_ => new AdminAnalyticsActivityRow(UserActivityType.ViewedRentalPost, row.Id, now))).ToArray();
+        var result = AdminAnalyticsCalculator.Calculate(new(10, rows, [], views, [], []), now.AddDays(-6), now, 7);
+        Assert.Equal(0, result.Kpis.PriceSampleCount);
+        Assert.Equal(8, result.Kpis.ExcludedPriceCount);
+        Assert.Equal(0, result.Kpis.MedianMonthlyPrice);
+        Assert.Equal(0, result.Kpis.AveragePricePerSquareMeter);
+        var area = Assert.Single(result.Areas);
+        Assert.Equal(240, area.TotalViews);
+        Assert.Equal("insufficient_data", area.PriceSignal);
+        Assert.Equal("low", area.Confidence);
+    }
+
+    [Fact]
+    public void Many_active_listings_and_views_cannot_replace_a_missing_price_area_sample()
+    {
+        var now = new DateTimeOffset(2026, 10, 12, 9, 0, 0, VietnamOffset);
+        var rows = Enumerable.Range(0, 8).Select(index => Rental("phường Linh Trung", 3_000_000, index == 0 ? 20 : 0, 0, 0, now)).ToArray();
+        var views = rows.SelectMany(row => Enumerable.Range(0, 30).Select(_ => new AdminAnalyticsActivityRow(UserActivityType.ViewedRentalPost, row.Id, now))).ToArray();
+        var result = AdminAnalyticsCalculator.Calculate(new(10, rows, [], views, [], []), now.AddDays(-6), now, 7);
+        Assert.Equal(8, result.Kpis.PriceSampleCount);
+        Assert.Equal(1, result.Kpis.PriceAreaSampleCount);
+        var area = Assert.Single(result.Areas);
+        Assert.Equal("insufficient_data", area.PriceSignal);
+        Assert.Equal("low", area.Confidence);
+    }
+
     private static AdminAnalyticsRentalRow Rental(
         string address,
         decimal price,
@@ -155,5 +223,6 @@ public sealed class AdminAnalyticsCalculatorTests
             area,
             views,
             saves,
-            createdAt);
+            createdAt,
+            PriceBasis: "room_month");
 }

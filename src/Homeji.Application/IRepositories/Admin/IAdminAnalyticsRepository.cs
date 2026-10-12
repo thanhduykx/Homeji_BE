@@ -28,7 +28,8 @@ public sealed record AdminAnalyticsRentalRow(
     decimal Area,
     int ViewCount,
     int SaveCount,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string PriceBasis = "unknown");
 
 public sealed record AdminAnalyticsActivityRow(
     UserActivityType Type,

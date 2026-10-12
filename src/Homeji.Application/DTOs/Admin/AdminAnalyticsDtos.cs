@@ -19,7 +19,11 @@ public sealed record AdminProductKpisDto(
     int Saves,
     int ViewingRequests,
     decimal SaveToViewRate,
-    decimal ViewingRequestToSaveRate);
+    decimal ViewingRequestToSaveRate,
+    int PriceSampleCount = 0,
+    int ExcludedPriceCount = 0,
+    int PriceAreaSampleCount = 0,
+    string PriceBasis = "room_month");
 
 public sealed record AdminAnalyticsTrendPointDto(
     DateOnly Date,
@@ -44,4 +48,8 @@ public sealed record AdminAreaInsightDto(
     decimal DemandIndex,
     string PriceSignal,
     string Recommendation,
-    string Confidence);
+    string Confidence,
+    int PriceSampleCount = 0,
+    int ExcludedPriceCount = 0,
+    int PriceAreaSampleCount = 0,
+    string PriceBasis = "room_month");

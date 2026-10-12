@@ -75,11 +75,11 @@ public static class AdminAnalyticsCalculator
             .Where(rental => rental.Status == RentalPostStatus.Active)
             .ToArray();
         var prices = activeRentals
-            .Where(rental => rental.Price > 0)
+            .Where(HasComparableRoomPrice)
             .Select(rental => rental.Price)
             .ToArray();
         var pricePerSquareMeter = activeRentals
-            .Where(rental => rental.Price > 0 && rental.Area > 0)
+            .Where(rental => HasComparableRoomPrice(rental) && rental.Area > 0)
             .Select(rental => rental.Price / rental.Area)
             .ToArray();
         var searches = source.Activities.Count(activity => activity.Type == UserActivityType.RentalSearch);
@@ -99,7 +99,10 @@ public static class AdminAnalyticsCalculator
             saves,
             viewingRequests,
             Percentage(saves, listingViews),
-            Percentage(viewingRequests, saves));
+            Percentage(viewingRequests, saves),
+            prices.Length,
+            activeRentals.Length - prices.Length,
+            pricePerSquareMeter.Length);
 
         var trend = BuildTrend(source, localFrom, periodDays);
         var areas = BuildAreas(source, activeRentals);
@@ -163,9 +166,8 @@ public static class AdminAnalyticsCalculator
         var globalSaveRate = Ratio(globalSaves, globalViews);
         var globalRequestsPerListing = Ratio(
             activeRentals.Sum(rental => requestsByRental.GetValueOrDefault(rental.Id)), activeRentals.Length);
-        var globalPricePerSquareMeter = Average(activeRentals
-            .Where(rental => rental.Area > 0)
-            .Select(rental => rental.Price / rental.Area));
+        var globalPriceAreaSamples = activeRentals.Where(rental => HasComparableRoomPrice(rental) && rental.Area > 0).ToArray();
+        var globalPricePerSquareMeter = Average(globalPriceAreaSamples.Select(rental => rental.Price / rental.Area));
 
         return activeRentals
             .Where(rental => rental.Latitude is >= -90 and <= 90
@@ -181,9 +183,9 @@ public static class AdminAnalyticsCalculator
                 var periodRequests = rentals.Sum(rental => requestsByRental.GetValueOrDefault(rental.Id));
                 var saveRate = Ratio(totalSaves, totalViews);
                 var requestsPerListing = Ratio(periodRequests, rentals.Length);
-                var areaPricePerSquareMeter = Average(rentals
-                    .Where(rental => rental.Area > 0)
-                    .Select(rental => rental.Price / rental.Area));
+                var priceSamples = rentals.Where(HasComparableRoomPrice).ToArray();
+                var priceAreaSamples = priceSamples.Where(rental => rental.Area > 0).ToArray();
+                var areaPricePerSquareMeter = Average(priceAreaSamples.Select(rental => rental.Price / rental.Area));
                 var demandIndex = DemandIndex(
                     saveRate,
                     globalSaveRate,
@@ -191,9 +193,9 @@ public static class AdminAnalyticsCalculator
                     globalRequestsPerListing,
                     periodSaves);
                 // Sample gates are operational safeguards, not statistical confidence intervals.
-                var confidence = rentals.Length >= 8 && totalViews >= 200 ? "high"
-                    : rentals.Length >= 4 && totalViews >= 50 ? "medium" : "low";
-                if (areaPricePerSquareMeter <= 0 || globalPricePerSquareMeter <= 0) confidence = "low";
+                var confidence = priceAreaSamples.Length >= 8 && totalViews >= 200 ? "high"
+                    : priceAreaSamples.Length >= 4 && totalViews >= 50 ? "medium" : "low";
+                if (globalPriceAreaSamples.Length < 4 || areaPricePerSquareMeter <= 0 || globalPricePerSquareMeter <= 0) confidence = "low";
                 var (signal, recommendation) = PriceRecommendation(
                     demandIndex,
                     areaPricePerSquareMeter,
@@ -205,7 +207,7 @@ public static class AdminAnalyticsCalculator
                     rentals.Average(rental => (double)rental.Latitude),
                     rentals.Average(rental => (double)rental.Longitude),
                     rentals.Length,
-                    Median(rentals.Select(rental => rental.Price)),
+                    Median(priceSamples.Select(rental => rental.Price)),
                     areaPricePerSquareMeter,
                     totalViews,
                     totalSaves,
@@ -214,7 +216,10 @@ public static class AdminAnalyticsCalculator
                     demandIndex,
                     signal,
                     recommendation,
-                    confidence);
+                    confidence,
+                    priceSamples.Length,
+                    rentals.Length - priceSamples.Length,
+                    priceAreaSamples.Length);
             })
             .OrderByDescending(area => area.DemandIndex)
             .ThenByDescending(area => area.ActiveListings)
@@ -242,7 +247,7 @@ public static class AdminAnalyticsCalculator
         {
             return (
                 "test_increase",
-                "Nhu cầu cao, giá/m² chưa vượt thị trường. Có thể thử tăng 3–5% trên một nhóm tin và đo lại chuyển đổi.");
+                "Tương tác cao hơn mẫu tin Homeji, giá cả phòng/m² chưa cao hơn mẫu so sánh. Có thể thử tăng 3–5% trên một nhóm tin và đo lại; đây không phải kết luận về giá thị trường.");
         }
 
         if (demandIndex <= 75 && priceRatio >= 1.1m)
@@ -330,6 +335,8 @@ public static class AdminAnalyticsCalculator
 
     private static decimal Ratio(int numerator, int denominator) =>
         denominator <= 0 ? 0 : (decimal)numerator / denominator;
+
+    private static bool HasComparableRoomPrice(AdminAnalyticsRentalRow rental) => rental.PriceBasis == "room_month" && rental.Price > 0;
 
     private static decimal Percentage(int numerator, int denominator) =>
         decimal.Round(Ratio(numerator, denominator) * 100, 1);
