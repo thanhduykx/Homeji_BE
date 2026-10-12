@@ -119,7 +119,8 @@ public sealed class UserProfile
             throw new DomainException("Ngân sách tối đa phải lớn hơn 0.");
         }
 
-        Role = role;
+        // Lifestyle preferences cannot remove authority granted through administrator provisioning.
+        if (Role != UserRole.Admin) Role = role;
         SleepHabit = sleepHabit;
         PetPreference = petPreference;
         SmokingPreference = smokingPreference;

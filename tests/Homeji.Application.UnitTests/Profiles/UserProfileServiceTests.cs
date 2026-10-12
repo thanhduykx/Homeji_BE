@@ -6,6 +6,7 @@ using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.Services.Profiles;
 using Homeji.Application.Services.Profiles.Validation;
 using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Application.UnitTests.Profiles;
 
@@ -65,6 +66,40 @@ public sealed class UserProfileServiceTests
         var service = CreateService(new InMemoryUserProfileRepository());
 
         await Assert.ThrowsAsync<NotFoundException>(() => service.GetMyProfileAsync());
+    }
+
+    [Fact]
+    public async Task Profile_and_lifestyle_updates_preserve_existing_administrator()
+    {
+        var repository = new InMemoryUserProfileRepository();
+        var admin = UserProfile.Create(UserId, "Admin", UtcNow);
+        admin.SetRole(UserRole.Admin, UtcNow);
+        await repository.UpsertAsync(admin);
+        var service = CreateService(repository);
+        var profile = await service.UpsertMyProfileAsync(new UpdateMyProfileDto("Admin renamed"));
+        Assert.Equal(UserRole.Admin, profile.Role);
+        var lifestyle = await service.UpdateMyLifestyleAsync(new(UserRole.Renter, SleepHabit.EarlyBird,
+            PetPreference.NoPets, SmokingPreference.NonSmoking, 3_000_000, "Linh Trung"));
+        Assert.Equal(UserRole.Admin, lifestyle.Role);
+        Assert.Equal(UserRole.Admin, repository.Profile!.Role);
+        Assert.Equal("Linh Trung", lifestyle.PreferredArea);
+        Assert.True(lifestyle.OnboardingCompleted);
+    }
+
+    [Theory]
+    [InlineData(UserRole.Renter)]
+    [InlineData(UserRole.Landlord)]
+    public async Task Lifestyle_api_service_rejects_self_promotion_to_administrator(UserRole role)
+    {
+        var repository = new InMemoryUserProfileRepository();
+        var profile = UserProfile.Create(UserId, "User", UtcNow);
+        profile.SetRole(role, UtcNow);
+        await repository.UpsertAsync(profile);
+        var service = CreateService(repository);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.UpdateMyLifestyleAsync(new(UserRole.Admin,
+            SleepHabit.EarlyBird, PetPreference.NoPets, SmokingPreference.NonSmoking, null, null)));
+        Assert.Equal(role, repository.Profile!.Role);
+        Assert.False(repository.Profile.OnboardingCompleted);
     }
 
     private static UserProfileService CreateService(InMemoryUserProfileRepository repository)
