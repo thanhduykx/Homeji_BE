@@ -32,10 +32,13 @@ public static partial class RentalSearchIntent
 
     public static bool IsRentalQuery(string message) => RentalTerms().IsMatch(Normalize(message));
 
+    public static bool IsKeywordClearCommand(string message) => Normalize(message).Trim() == "bo tu khoa";
+
     public static AiParsedSearchCriteriaDto Apply(string message, AiParsedSearchCriteriaDto? previous = null)
     {
         var text = Normalize(message);
         var state = previous ?? new AiParsedSearchCriteriaDto(null, null, null, null, null, null, []);
+        if (IsKeywordClearCommand(message)) return state with { Keyword = null };
         if (text.Contains("tim lai", StringComparison.Ordinal) || text.Contains("bat dau lai", StringComparison.Ordinal))
             state = new AiParsedSearchCriteriaDto(null, null, null, null, null, null, []);
         var required = state.RequiredAmenities.ToHashSet(StringComparer.Ordinal);

@@ -13,6 +13,52 @@ namespace Homeji.Application.UnitTests.AI;
 
 public sealed class AiSearchGroundingTests
 {
+    [Theory]
+    [InlineData("Bỏ từ khóa")]
+    [InlineData("Bo tu khoa")]
+    public async Task KeywordChipEdit_DiscardsStaleProviderKeywordAndPreservesOtherConstraints(string edit)
+    {
+        var previous = RentalSearchIntent.Apply("Phòng Thủ Đức từ 2 đến 4tr có bếp không có máy lạnh không ở ghép cho 2 người từ 20 đến 30m2")
+            with { Keyword = "ban công", Criteria = ["quiet"] };
+        var parser = new ResultParser(new("Quận 9", "ban công", null, 9_000_000, null, null, ["security"]));
+        var repository = new CandidateRepository([]);
+        var service = new AiSearchService(parser, repository, new SubscriptionRepository(), null!,
+            Options.Create(new AiSearchOptions()), TimeProvider.System);
+
+        var response = await service.HighlightRentalPostsAsync(new(edit, PreviousCriteria: previous));
+
+        Assert.Equal(1, parser.Calls);
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize(previous with { Keyword = null }),
+            System.Text.Json.JsonSerializer.Serialize(response.Criteria));
+        Assert.Equal(2_000_000, repository.LastSearch!.MinPrice);
+        Assert.Equal(4_000_000, repository.LastSearch.MaxPrice);
+        Assert.Equal(2, repository.LastSearch.MinAvailableSlots);
+        Assert.Equal(20, repository.LastSearch.MinArea);
+        Assert.Equal(30, repository.LastSearch.MaxArea);
+    }
+
+    [Fact]
+    public async Task KeywordChipEdit_StillReportsProviderFailureWithoutRetrieval()
+    {
+        var repository = new CandidateRepository([]);
+        await Assert.ThrowsAsync<ExternalDependencyException>(() => Service(repository).HighlightRentalPostsAsync(
+            new("Bỏ từ khóa", PreviousCriteria: new(null, "ban công", null, null, null, null, []))));
+        Assert.Null(repository.LastSearch);
+    }
+
+    [Fact]
+    public async Task KeywordParsing_InitialAndNewProviderKeywordRemainSupported()
+    {
+        var parser = new ResultParser(new(null, "ban công", null, null, null, null, []));
+        var service = new AiSearchService(parser, new CandidateRepository([]), new SubscriptionRepository(), null!,
+            Options.Create(new AiSearchOptions()), TimeProvider.System);
+
+        Assert.Equal("ban công", (await service.ParseSearchAsync(new("Tìm phòng có ban công"))).Keyword);
+        Assert.Equal("ban công", (await service.HighlightRentalPostsAsync(new("Tìm thêm ban công",
+            PreviousCriteria: new(null, "gác", null, 4_000_000, null, null, [])))).Criteria.Keyword);
+        Assert.Null((await service.ParseSearchAsync(new("Bỏ từ khóa"))).Keyword);
+    }
+
     [Fact]
     public async Task TransferCards_UsePublicLocationInEvidenceAndMapFocus()
     {
@@ -230,7 +276,12 @@ public sealed class AiSearchGroundingTests
 
     private sealed class ResultParser(AiParsedSearchCriteriaDto result) : IAiSearchTextParser
     {
-        public Task<AiParsedSearchCriteriaDto> ParseAsync(string text, CancellationToken cancellationToken = default) => Task.FromResult(result);
+        public int Calls { get; private set; }
+        public Task<AiParsedSearchCriteriaDto> ParseAsync(string text, CancellationToken cancellationToken = default)
+        {
+            Calls++;
+            return Task.FromResult(result);
+        }
     }
 
     private sealed class CountingParser : IAiSearchTextParser

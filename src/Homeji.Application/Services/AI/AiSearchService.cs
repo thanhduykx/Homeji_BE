@@ -67,6 +67,9 @@ public sealed class AiSearchService : IAiSearchService
         try
         {
             var parsed = NormalizeParsedCriteria(await _parser.ParseAsync(text, cancellationToken));
+            // A dedicated chip edit changes only its named constraint, even if the model repeats stale values.
+            if (RentalSearchIntent.IsKeywordClearCommand(text))
+                return RentalSearchIntent.Apply(text, previous ?? parsed);
             var interpreted = (previous ?? parsed) with
             {
                 Location = parsed.Location ?? previous?.Location,

@@ -5,6 +5,28 @@ namespace Homeji.Application.UnitTests.AI;
 public sealed class RentalSearchIntentTests
 {
     [Theory]
+    [InlineData("Bỏ từ khóa")]
+    [InlineData("Bo tu khoa")]
+    [InlineData("  BỎ TỪ KHÓA  ")]
+    public void ClearKeyword_ChangesOnlyKeyword(string edit)
+    {
+        var previous = RentalSearchIntent.Apply("Phòng Thủ Đức từ 2 đến 4tr cho 2 người có bếp không có máy lạnh không ở ghép từ 20 đến 30m2")
+            with { Keyword = "ban công", Criteria = ["quiet"] };
+
+        Assert.Equal(previous with { Keyword = null }, RentalSearchIntent.Apply(edit, previous));
+    }
+
+    [Theory]
+    [InlineData("Không bỏ từ khóa")]
+    [InlineData("Bỏ từ khóa ban công")]
+    [InlineData("Có thể bỏ từ khóa không?")]
+    public void KeywordClearMention_IsNotAnExactClearCommand(string message)
+    {
+        Assert.False(RentalSearchIntent.IsKeywordClearCommand(message));
+        Assert.Equal("ban công", RentalSearchIntent.Apply(message, new(null, "ban công", null, null, null, null, [])).Keyword);
+    }
+
+    [Theory]
     [InlineData("Phòng từ 20 đến 30 m²", 20d, 30d)]
     [InlineData("phong tu 20m2 den 30m2", 20d, 30d)]
     [InlineData("Phòng ít nhất 25,5 mét vuông", 25.5, null)]
