@@ -17,7 +17,7 @@ public sealed class AiSearchService : IAiSearchService
 {
     private const string AiHighlightTag = "Phù hợp theo dữ liệu tin";
     private const int MaxSearchTextLength = 1_000;
-    private const int MaxCandidatePosts = 100;
+    private const int CandidatePageSize = 100;
 
     private static readonly Dictionary<string, string[]> CriterionSynonyms =
         new(StringComparer.OrdinalIgnoreCase)
@@ -114,7 +114,7 @@ public sealed class AiSearchService : IAiSearchService
             return new AiHighlightResponseDto(parsed, [], AiHighlightTag, null, null, null);
 
         var search = new RentalPostSearchDto(
-            null, // Accent-normalized location/keyword matching is applied to the bounded candidate set.
+            null, // Accent-normalized text matching is evaluated across bounded pages below.
             parsed.BudgetBasis == "total" ? null : parsed.PriceMin,
             parsed.PriceMax,
             parsed.AreaMin,
@@ -125,16 +125,35 @@ public sealed class AiSearchService : IAiSearchService
             106.9m,
             parsed.RequiredAmenities,
             1,
-            MaxCandidatePosts,
+            CandidatePageSize,
             MinAvailableSlots: parsed.Occupants,
             ExcludedAmenities: parsed.ExcludedAmenities,
             ExcludeRoommateShare: parsed.ExcludeRoommateShare,
             ExcludeSynthetic: true);
 
         var retrievalStarted = System.Diagnostics.Stopwatch.GetTimestamp();
-        var posts = await _posts.SearchActiveAsync(search, cancellationToken);
-        AiSearchTelemetry.RetrievalDuration.Record(System.Diagnostics.Stopwatch.GetElapsedTime(retrievalStarted).TotalMilliseconds);
         var now = _timeProvider.GetUtcNow();
+        var today = RentalPublicAvailability.VietnamDate(now);
+        IReadOnlyList<RentalPost> posts = [];
+        // Text matching cannot be pushed into accent-sensitive ILike. Scan structured-filtered
+        // pages, retaining only the global best results rather than truncating before matching.
+        for (var page = 1; ; page++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var candidates = await _posts.SearchActiveAsync(search with { Page = page }, cancellationToken);
+            posts = posts.Concat(candidates.Where(post => MeetsConstraints(post, parsed, today)))
+                .DistinctBy(post => post.Id)
+                .Select(post => (Post: post, Score: CalculateAiScore(post, parsed, out _)))
+                .Where(item => item.Score > 0)
+                .OrderByDescending(item => item.Score)
+                .ThenBy(item => item.Post.Price)
+                .ThenBy(item => item.Post.Id)
+                .Take(maxResults)
+                .Select(item => item.Post)
+                .ToArray();
+            if (candidates.Count < CandidatePageSize) break;
+        }
+        AiSearchTelemetry.RetrievalDuration.Record(System.Diagnostics.Stopwatch.GetElapsedTime(retrievalStarted).TotalMilliseconds);
         var premiumByUserId = await _subscriptions.GetActivePremiumByUserIdsAsync(
             posts.Select(post => post.OwnerId).ToArray(),
             now,

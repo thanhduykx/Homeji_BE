@@ -323,6 +323,47 @@ public sealed class AiSearchGroundingTests
         Assert.Equal(2, repository.LastSearch.MinAvailableSlots);
     }
 
+    [Fact]
+    public async Task Street_match_beyond_first_candidate_page_is_not_reported_as_missing()
+    {
+        var matching = Post(3_000_000, [], description: "Đường Võ Văn Ngân, gần trường");
+        var candidates = Enumerable.Range(0, 100).Select(_ => Post(3_000_000, [])).Append(matching).ToArray();
+        var response = await Service(new CandidateRepository(candidates, paginate: true)).HighlightRentalPostsAsync(
+            new("Tìm phòng đường Võ Văn Ngân", Criteria: new("thu duc", "vo van ngan", null, 4_000_000, null, null, [])));
+        Assert.Equal(matching.Id, Assert.Single(response.Posts).Post.Id);
+    }
+    [Fact]
+    public async Task Older_better_fit_outranks_newer_matches_without_relaxing_hard_constraints()
+    {
+        var newer = Enumerable.Range(0, 100).Select(_ => Post(3_000_000, [], description: "Đường Võ Văn Ngân")).ToArray();
+        var best = Post(3_500_000, ["KITCHEN"], description: "Đường Võ Văn Ngân");
+        var overBudget = Post(5_000_000, ["KITCHEN"], description: "Đường Võ Văn Ngân");
+        var excluded = Post(2_000_000, ["KITCHEN", "AIR_CONDITIONER"], description: "Đường Võ Văn Ngân");
+        var criteria = new AiParsedSearchCriteriaDto("thu duc", "vo van ngan", null, 4_000_000, null, null, ["KITCHEN"])
+        { ExcludedAmenities = ["AIR_CONDITIONER"] };
+        var response = await Service(new CandidateRepository(newer.Append(best).Append(overBudget).Append(excluded).ToArray(), paginate: true))
+            .HighlightRentalPostsAsync(new("Tìm phòng", MaxResults: 1, Criteria: criteria));
+        Assert.Equal(best.Id, Assert.Single(response.Posts).Post.Id);
+    }
+
+    [Fact]
+    public async Task Exact_full_page_with_no_matches_terminates_as_empty()
+    {
+        var candidates = Enumerable.Range(0, 100).Select(_ => Post(3_000_000, [])).ToArray();
+        var response = await Service(new CandidateRepository(candidates, paginate: true)).HighlightRentalPostsAsync(
+            new("Tìm phòng", Criteria: new(null, "vo van ngan", null, null, null, null, [])));
+        Assert.Empty(response.Posts);
+    }
+
+    [Fact]
+    public async Task Cancellation_between_candidate_pages_does_not_return_partial_search_results()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var candidates = Enumerable.Range(0, 100).Select(_ => Post(3_000_000, [])).ToArray();
+        var service = Service(new CandidateRepository(candidates, paginate: true, afterRead: cancellation.Cancel));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.HighlightRentalPostsAsync(
+            new("Tìm phòng", Criteria: new(null, null, null, null, null, null, [])), cancellation.Token));
+    }
     private sealed class ResultParser(AiParsedSearchCriteriaDto result) : IAiSearchTextParser
     {
         public int Calls { get; private set; }
@@ -361,10 +402,10 @@ public sealed class AiSearchGroundingTests
         public Task<AiParsedSearchCriteriaDto> ParseAsync(string text, CancellationToken cancellationToken = default) => throw new HttpRequestException("Provider offline");
     }
 
-    private sealed class CandidateRepository(IReadOnlyList<RentalPost> posts) : IRentalPostRepository
+    private sealed class CandidateRepository(IReadOnlyList<RentalPost> posts, bool paginate = false, Action? afterRead = null) : IRentalPostRepository
     {
         public RentalPostSearchDto? LastSearch { get; private set; }
-        public Task<IReadOnlyList<RentalPost>> SearchActiveAsync(RentalPostSearchDto search, CancellationToken cancellationToken = default) { LastSearch = search; return Task.FromResult(posts); }
+        public Task<IReadOnlyList<RentalPost>> SearchActiveAsync(RentalPostSearchDto search, CancellationToken cancellationToken = default) { LastSearch = search; afterRead?.Invoke(); return Task.FromResult<IReadOnlyList<RentalPost>>(paginate ? posts.Skip((search.Page - 1) * search.PageSize).Take(search.PageSize).ToArray() : posts); }
         public Task<RentalPost?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<RentalPost?> GetByIdWithMediaAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<RentalPost>> GetPendingAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
