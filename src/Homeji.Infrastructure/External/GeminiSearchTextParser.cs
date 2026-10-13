@@ -43,6 +43,10 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
         CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
+        // The entire retry sequence shares a deadline, including backoff and body reads.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(_options.TimeoutSeconds, 5, 30)));
+        var providerToken = deadline.Token;
 
         var payload = new
         {
@@ -73,8 +77,8 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
                 Content = JsonContent.Create(payload, options: JsonOptions),
             };
             request.Headers.Add("X-goog-api-key", _options.ApiKey);
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var response = await _httpClient.SendAsync(request, providerToken);
+            var responseText = await response.Content.ReadAsStringAsync(providerToken);
             if (response.IsSuccessStatusCode)
                 return ParseCriteriaJson(ExtractModelText(responseText));
 
@@ -86,7 +90,7 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
             var delay = response.Headers.RetryAfter?.Delta
                 ?? TimeSpan.FromMilliseconds(Math.Clamp(_options.RetryBaseDelayMilliseconds, 0, 10_000) * Math.Pow(2, attempt - 1));
             await Task.Delay(TimeSpan.FromMilliseconds(Math.Clamp(delay.TotalMilliseconds, 0,
-                Math.Clamp(_options.MaxRetryDelaySeconds, 0, 30) * 1000)), cancellationToken);
+                Math.Clamp(_options.MaxRetryDelaySeconds, 0, 30) * 1000)), providerToken);
         }
         throw new InvalidOperationException("Gemini parser retry loop completed unexpectedly.");
     }

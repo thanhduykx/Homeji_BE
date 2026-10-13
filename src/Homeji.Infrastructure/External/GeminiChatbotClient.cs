@@ -48,6 +48,10 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
+        // The entire retry sequence shares a deadline, including backoff and body reads.
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadline.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(_options.TimeoutSeconds, 5, 30)));
+        var providerToken = deadline.Token;
 
         var payload = new
         {
@@ -75,8 +79,8 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             };
             request.Headers.Add("X-goog-api-key", _options.ApiKey);
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
-            var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var response = await _httpClient.SendAsync(request, providerToken);
+            var responseText = await response.Content.ReadAsStringAsync(providerToken);
             if (response.IsSuccessStatusCode)
             {
                 try
@@ -96,7 +100,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             {
                 if (retryAfter > TimeSpan.Zero)
                 {
-                    await Task.Delay(retryAfter, cancellationToken);
+                    await Task.Delay(retryAfter, providerToken);
                 }
 
                 continue;
