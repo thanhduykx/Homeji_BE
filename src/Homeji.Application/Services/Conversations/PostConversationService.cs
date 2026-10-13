@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Conversations;
@@ -64,7 +65,7 @@ public sealed class PostConversationService : IPostConversationService
         UserContext.EnsureRenter(renter);
         var post = await _rentalPosts.GetByIdAsync(rentalPostId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), rentalPostId);
-        if (post.Status != RentalPostStatus.Active)
+        if (!RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.Today(_timeProvider)))
         {
             throw new NotFoundException(nameof(RentalPost), rentalPostId);
         }

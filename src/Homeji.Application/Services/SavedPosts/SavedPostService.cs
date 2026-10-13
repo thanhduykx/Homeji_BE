@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.DTOs.SavedPosts;
@@ -68,10 +69,11 @@ public sealed class SavedPostService : ISavedPostService
         var userId = renter.Id;
         var saved = await _savedPosts.GetByUserAsync(userId, cancellationToken);
         if (saved.Count == 0) return [];
+        var today = RentalPublicAvailability.Today(_timeProvider);
 
         var postsById = (await _posts.GetByIdsWithMediaAsync(
             saved.Select(item => item.RentalPostId).Distinct().ToArray(), cancellationToken))
-            .Where(post => post.Status == RentalPostStatus.Active)
+            .Where(post => RentalPublicAvailability.IsPublicActive(post, today))
             .ToDictionary(post => post.Id);
 
         // Batch loading has no save-date ordering; retain the saved list's chronology.
@@ -121,7 +123,7 @@ public sealed class SavedPostService : ISavedPostService
     {
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
-        if (post.Status != RentalPostStatus.Active)
+        if (!RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.Today(_timeProvider)))
         {
             throw new NotFoundException(nameof(RentalPost), postId);
         }

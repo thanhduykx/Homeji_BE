@@ -24,9 +24,8 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
             throw Validation("postIds", "Chọn từ 1 đến 10 tin cho danh sách ngắn.");
         var now = timeProvider.GetUtcNow();
         var found = await posts.GetByIdsWithMediaAsync(ids, cancellationToken);
-        var active = found.Where(post => post.Status == RentalPostStatus.Active && !post.IsSynthetic
-            && HomejiServiceArea.Contains(post.Latitude, post.Longitude)
-            && !(post.Type == RentalPostType.RoomTransfer && post.OriginalLeaseEndsOn <= DateOnly.FromDateTime(now.UtcDateTime)))
+        var active = found.Where(post => RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.VietnamDate(now)) && !post.IsSynthetic
+            && HomejiServiceArea.Contains(post.Latitude, post.Longitude))
             .ToDictionary(post => post.Id);
         var owners = active.Count == 0 ? [] : await profiles.GetByIdsAsync(active.Values.Select(post => post.OwnerId).Distinct().ToArray(), cancellationToken);
         var ownerRoles = owners.ToDictionary(profile => profile.Id, profile => profile.Role);

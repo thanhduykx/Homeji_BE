@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Roommates;
@@ -68,7 +69,7 @@ public sealed class RoommateInvitationService : IRoommateInvitationService
 
         var post = await _posts.GetByIdAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
-        if (post.Status != RentalPostStatus.Active)
+        if (!RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.Today(_timeProvider)))
         {
             throw new NotFoundException(nameof(RentalPost), postId);
         }

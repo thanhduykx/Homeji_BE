@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Appointments;
@@ -46,7 +47,7 @@ public sealed class ViewingAppointmentService : IViewingAppointmentService
         var requesterId = renter.Id;
         var post = await _posts.GetByIdAsync(rentalPostId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), rentalPostId);
-        if (post.Status != RentalPostStatus.Active)
+        if (!RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.Today(_timeProvider)))
         {
             throw new NotFoundException(nameof(RentalPost), rentalPostId);
         }

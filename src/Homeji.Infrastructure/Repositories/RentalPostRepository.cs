@@ -1,4 +1,5 @@
 using Homeji.Application.DTOs.RentalPosts;
+using Homeji.Application.Common;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
@@ -11,10 +12,12 @@ public sealed class RentalPostRepository : IRentalPostRepository
 {
     private const int MaxPageSize = 100;
     private readonly ApplicationDbContext _dbContext;
+    private readonly TimeProvider _timeProvider;
 
-    public RentalPostRepository(ApplicationDbContext dbContext)
+    public RentalPostRepository(ApplicationDbContext dbContext, TimeProvider? timeProvider = null)
     {
         _dbContext = dbContext;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public Task<RentalPost?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
@@ -39,11 +42,13 @@ public sealed class RentalPostRepository : IRentalPostRepository
 
     internal IQueryable<RentalPost> BuildActiveSearchQuery(RentalPostSearchDto search)
     {
+        var today = RentalPublicAvailability.Today(_timeProvider);
         var query = _dbContext.RentalPosts
             .AsNoTracking()
             .Include(post => post.Media)
             .Include(post => post.Amenities)
-            .Where(post => post.Status == RentalPostStatus.Active);
+            .Where(post => post.Status == RentalPostStatus.Active)
+            .Where(post => post.Type != RentalPostType.RoomTransfer || post.OriginalLeaseEndsOn == null || post.OriginalLeaseEndsOn >= today);
         if (search.Ids is { Count: > 0 })
             query = query.Where(post => search.Ids.Contains(post.Id));
         if (search.ExcludeSynthetic || search.Ids is { Count: > 0 }) query = query.Where(post => !post.IsSynthetic);

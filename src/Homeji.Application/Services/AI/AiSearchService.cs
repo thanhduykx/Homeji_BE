@@ -1,4 +1,5 @@
 using Homeji.Application.Common.Exceptions;
+using Homeji.Application.Common;
 using Homeji.Application.DTOs.AI;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IRepositories.RentalPosts;
@@ -139,7 +140,7 @@ public sealed class AiSearchService : IAiSearchService
             now,
             cancellationToken);
         var rankedPosts = posts
-            .Where(post => MeetsConstraints(post, parsed))
+            .Where(post => MeetsConstraints(post, parsed, RentalPublicAvailability.VietnamDate(now)))
             .Select(post =>
             {
                 var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
@@ -339,8 +340,8 @@ public sealed class AiSearchService : IAiSearchService
         .Where(RentalSearchIntent.AmenityAliases.ContainsKey)
         .Distinct(StringComparer.Ordinal).Take(20).ToArray();
 
-    private static bool MeetsConstraints(RentalPost post, AiParsedSearchCriteriaDto criteria) =>
-        post.Status == RentalPostStatus.Active && !post.IsSynthetic &&
+    private static bool MeetsConstraints(RentalPost post, AiParsedSearchCriteriaDto criteria, DateOnly today) =>
+        RentalPublicAvailability.IsPublicActive(post, today) && !post.IsSynthetic &&
         post.Latitude is >= 10.7m and <= 10.93m && post.Longitude is >= 106.72m and <= 106.9m &&
         (string.IsNullOrWhiteSpace(criteria.Location) || ContainsNormalized(post.Address, criteria.Location) || ContainsNormalized(post.Title, criteria.Location)) &&
         (string.IsNullOrWhiteSpace(criteria.Keyword) || ContainsNormalized(post.Address, criteria.Keyword) || ContainsNormalized(post.Title, criteria.Keyword) || ContainsNormalized(post.Description, criteria.Keyword)) &&

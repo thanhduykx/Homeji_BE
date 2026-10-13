@@ -1,4 +1,5 @@
 using System.Globalization;
+using Homeji.Application.Common;
 using Homeji.Application.Abstractions.Notifications;
 using Homeji.Application.Abstractions.Presence;
 using Homeji.Application.Abstractions.Authentication;
@@ -259,6 +260,7 @@ public sealed class AdminModerationService : IAdminModerationService
         var admin = await EnsureAdminAsync(cancellationToken);
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
+        RentalPublicAvailability.EnsureTransferNotExpired(post, RentalPublicAvailability.Today(_timeProvider));
         post.Approve(
             _timeProvider.GetUtcNow(),
             post.Type == RentalPostType.RoomTransfer ? admin.Id : null,

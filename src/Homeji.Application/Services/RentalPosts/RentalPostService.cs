@@ -1,3 +1,4 @@
+using Homeji.Application.Common;
 using FluentValidation;
 using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.RentalPosts;
@@ -155,6 +156,7 @@ public sealed class RentalPostService : IRentalPostService
     public async Task<RentalPostDto> SubmitAsync(Guid postId, CancellationToken cancellationToken = default)
     {
         var post = await GetOwnedPostAsync(postId, cancellationToken);
+        RentalPublicAvailability.EnsureTransferNotExpired(post, RentalPublicAvailability.Today(_timeProvider));
         var violations = await _moderation.ValidateAsync(post.Description, cancellationToken);
         if (violations.Count > 0)
         {
@@ -190,6 +192,12 @@ public sealed class RentalPostService : IRentalPostService
         if (post.Status != RentalPostStatus.Active && !isOwner)
         {
             throw new NotFoundException(nameof(RentalPost), postId);
+        }
+
+        if (RentalPublicAvailability.IsExpiredTransfer(post.Type, post.OriginalLeaseEndsOn, RentalPublicAvailability.Today(_timeProvider)) && !isOwner)
+        {
+            var viewer = currentUserId.HasValue ? await _profiles.GetByIdAsync(currentUserId.Value, cancellationToken) : null;
+            if (viewer?.Role != UserRole.Admin) throw new NotFoundException(nameof(RentalPost), postId);
         }
 
         post.IncrementViewCount();
@@ -269,6 +277,7 @@ public sealed class RentalPostService : IRentalPostService
 
         var authors = (await _profiles.GetByIdsAsync(posts.Select(x => x.OwnerId).Distinct().ToArray(), cancellationToken)).ToDictionary(x => x.Id);
         var result = posts
+            .Where(post => RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.VietnamDate(now)))
             .Select(post =>
             {
                 var isPremium = premiumByUserId.ContainsKey(post.OwnerId);
@@ -365,7 +374,8 @@ public sealed class RentalPostService : IRentalPostService
         }
 
         var posts = await _posts.GetByIdsWithMediaAsync(ids, cancellationToken);
-        if (posts.Count != ids.Length || posts.Any(post => post.Status != RentalPostStatus.Active))
+        var today = RentalPublicAvailability.Today(_timeProvider);
+        if (posts.Count != ids.Length || posts.Any(post => !RentalPublicAvailability.IsPublicActive(post, today)))
         {
             throw new NotFoundException(nameof(RentalPost), "comparison selection");
         }
