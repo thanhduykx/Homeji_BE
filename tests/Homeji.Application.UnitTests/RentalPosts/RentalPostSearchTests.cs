@@ -16,6 +16,22 @@ namespace Homeji.Application.UnitTests.RentalPosts;
 
 public sealed class RentalPostSearchTests
 {
+    [Fact]
+    public async Task Synthetic_active_post_is_hidden_from_search_comparison_and_public_detail()
+    {
+        var ownerId = Guid.NewGuid();
+        var synthetic = CreateActiveTransfer(ownerId);
+        var real = CreateActiveTransfer(ownerId);
+        typeof(RentalPost).GetProperty(nameof(RentalPost.IsSynthetic))!.SetValue(synthetic, true);
+        var service = CreateComparisonService(null, [synthetic, real]);
+        var result = await service.SearchAsync(new RentalPostSearchDto(null, null, null, null, null, null, null, null, null, []));
+        Assert.Equal(real.Id, Assert.Single(result).Id);
+        Assert.DoesNotContain(result, item => item.Id == synthetic.Id);
+        await Assert.ThrowsAsync<NotFoundException>(() => service.GetDetailAsync(synthetic.Id));
+        await Assert.ThrowsAsync<NotFoundException>(() => service.CompareAsync(new CompareRentalPostsDto([synthetic.Id, real.Id])));
+        Assert.Equal(0, synthetic.ViewCount);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(999)]
@@ -197,13 +213,13 @@ public sealed class RentalPostSearchTests
         public Task<IReadOnlyList<RentalPost>> SearchActiveAsync(
             RentalPostSearchDto search,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<RentalPost>>([]);
+            Task.FromResult<IReadOnlyList<RentalPost>>(posts ?? []);
 
         public Task<RentalPost?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
         public Task<RentalPost?> GetByIdWithMediaAsync(Guid id, CancellationToken cancellationToken = default) =>
-            throw new NotSupportedException();
+            Task.FromResult((posts ?? []).SingleOrDefault(post => post.Id == id));
 
         public Task<IReadOnlyList<RentalPost>> GetPendingAsync(CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

@@ -12,7 +12,7 @@ public static class RentalPublicAvailability
     public static DateOnly Today(TimeProvider clock) => VietnamDate(clock.GetUtcNow());
     public static bool IsExpiredTransfer(RentalPostType type, DateOnly? leaseEndsOn, DateOnly today) =>
         type == RentalPostType.RoomTransfer && leaseEndsOn.HasValue && leaseEndsOn.Value < today;
-    public static bool IsPublicActive(RentalPost post, DateOnly today) => post.Status == RentalPostStatus.Active
+    public static bool IsPublicActive(RentalPost post, DateOnly today) => post.Status == RentalPostStatus.Active && !post.IsSynthetic
         && !IsExpiredTransfer(post.Type, post.OriginalLeaseEndsOn, today);
 
     public static void EnsureTransferNotExpired(RentalPost post, DateOnly today)

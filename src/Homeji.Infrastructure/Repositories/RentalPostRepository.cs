@@ -47,11 +47,10 @@ public sealed class RentalPostRepository : IRentalPostRepository
             .AsNoTracking()
             .Include(post => post.Media)
             .Include(post => post.Amenities)
-            .Where(post => post.Status == RentalPostStatus.Active)
+            .Where(post => post.Status == RentalPostStatus.Active && !post.IsSynthetic)
             .Where(post => post.Type != RentalPostType.RoomTransfer || post.OriginalLeaseEndsOn == null || post.OriginalLeaseEndsOn >= today);
         if (search.Ids is { Count: > 0 })
             query = query.Where(post => search.Ids.Contains(post.Id));
-        if (search.ExcludeSynthetic || search.Ids is { Count: > 0 }) query = query.Where(post => !post.IsSynthetic);
         if (search.ExcludeRoommateShare)
             query = query.Where(post => post.Type != RentalPostType.RoommateShare);
         if (search.OwnerRole.HasValue)

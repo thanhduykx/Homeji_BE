@@ -189,7 +189,7 @@ public sealed class RentalPostService : IRentalPostService
 
         var currentUserId = _userContext.TryGetUserId();
         var isOwner = currentUserId is { } userId && post.OwnerId == userId;
-        if (post.Status != RentalPostStatus.Active && !isOwner)
+        if ((post.Status != RentalPostStatus.Active || post.IsSynthetic) && !isOwner)
         {
             throw new NotFoundException(nameof(RentalPost), postId);
         }

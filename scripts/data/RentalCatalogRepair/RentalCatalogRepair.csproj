@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><EnableNETAnalyzers>false</EnableNETAnalyzers><EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild><TreatWarningsAsErrors>false</TreatWarningsAsErrors></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../../src/Homeji.Infrastructure/Homeji.Infrastructure.csproj" /></ItemGroup>
+</Project>

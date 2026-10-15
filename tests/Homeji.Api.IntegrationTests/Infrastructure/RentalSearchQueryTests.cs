@@ -8,6 +8,17 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class RentalSearchQueryTests
 {
     [Fact]
+    public void Default_public_search_excludes_synthetic_before_pagination()
+    {
+        using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql("Host=127.0.0.1;Database=translation_only;Username=translation_only;Password=unused").Options);
+        var request = new RentalPostSearchDto(null, null, null, null, null, null, null, null, null, [], Page: 2);
+        var sql = new RentalPostRepository(db).BuildActiveSearchQuery(request).ToQueryString();
+        Assert.Matches(@"NOT \(\w+\.is_synthetic\)", sql);
+        Assert.True(sql.IndexOf(".is_synthetic", StringComparison.Ordinal) < sql.IndexOf("LIMIT", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Roommate_type_is_filtered_in_postgres_before_pagination()
     {
         using var db = new ApplicationDbContext(new DbContextOptionsBuilder<ApplicationDbContext>()
