@@ -33,33 +33,45 @@ public sealed class RentalSourceListing
     public static RentalSourceListing Create(
         string sourceId, string sourceUrl, string title, string address, string district,
         decimal price, decimal area, IEnumerable<string> imageUrls,
-        DateTimeOffset? sourceUpdatedAt, DateTimeOffset collectedAt)
+        DateTimeOffset? sourceUpdatedAt, DateTimeOffset collectedAt, string source = "phongtro123")
     {
         var images = imageUrls.Distinct(StringComparer.Ordinal).ToArray();
+        var validSourceUrl = source switch
+        {
+            "phongtro123" => IsHttpsUrl(sourceUrl, "phongtro123.com", "www.phongtro123.com"),
+            "mogi" => IsHttpsUrl(sourceUrl, "mogi.vn", "www.mogi.vn"),
+            _ => false,
+        };
+        var validImageHosts = source switch
+        {
+            "phongtro123" => new[] { "pt123.cdn.static123.com" },
+            "mogi" => new[] { "cloud.mogi.vn" },
+            _ => [],
+        };
         if (string.IsNullOrWhiteSpace(sourceId) || sourceId.Length > 80
             || sourceId.Any(character => !char.IsAsciiDigit(character))
-            || !IsHttpsUrl(sourceUrl, "phongtro123.com") || sourceUrl.Length > 1000
+            || !validSourceUrl || sourceUrl.Length > 1000
             || string.IsNullOrWhiteSpace(title) || title.Length > 200
             || string.IsNullOrWhiteSpace(address) || address.Length > 500
             || district is not ("quan-9" or "thu-duc")
             || price is <= 0 or > 100_000_000 || area is <= 0 or > 1000
             || images.Length is < 1 or > 10
-            || images.Any(url => url.Length > 1000 || !IsHttpsUrl(url, "pt123.cdn.static123.com")))
+            || images.Any(url => url.Length > 1000 || !IsHttpsUrl(url, validImageHosts)))
         {
             throw new DomainException("Tin nguồn hoặc ảnh không hợp lệ; chỉ hỗ trợ Quận 9 và Thủ Đức.");
         }
 
         return new RentalSourceListing
         {
-            Id = Guid.NewGuid(), Source = "phongtro123", SourceId = sourceId,
+            Id = Guid.NewGuid(), Source = source, SourceId = sourceId,
             SourceUrl = sourceUrl, Title = title.Trim(), Address = address.Trim(), District = district,
             Price = price, Area = area, ImageUrls = images,
             SourceUpdatedAt = sourceUpdatedAt, CollectedAt = collectedAt,
         };
     }
 
-    private static bool IsHttpsUrl(string value, string host) =>
+    private static bool IsHttpsUrl(string value, params string[] hosts) =>
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
-        && uri.Scheme == Uri.UriSchemeHttps && uri.Host.Equals(host, StringComparison.OrdinalIgnoreCase)
+        && uri.Scheme == Uri.UriSchemeHttps && hosts.Contains(uri.Host, StringComparer.OrdinalIgnoreCase)
         && uri.IsDefaultPort && string.IsNullOrEmpty(uri.UserInfo);
 }
