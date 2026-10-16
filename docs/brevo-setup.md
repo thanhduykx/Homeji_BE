@@ -8,7 +8,11 @@
 
 Đã kiểm tra trực tiếp `POST /api/account/forgot-password` với email sender có tài khoản Homeji: HTTP 200; Brevo events ghi nhận email “Đặt lại mật khẩu Homeji” ở trạng thái `requests`, `delivered`, `opened`. Không mở link reset hoặc thay đổi mật khẩu. Hai callback đăng ký và đặt lại mật khẩu mặc định đã có trong allowlist Supabase. Chưa tạo thêm người dùng thật để kiểm tra signup; luồng này được kiểm tra tự động bằng HTTP handler giả.
 
-Phạm vi đã cấu hình là backend local ở `C:/homeji`. Chưa commit/push, triển khai code hoặc cập nhật Environment của Render. Blueprint Render đã khai báo lựa chọn Brevo và các secret cần nhập; service Render đang tồn tại cần cập nhật Environment trực tiếp khi triển khai code. File local chứa credential được Git ignore và không publish. Sender Gmail đã xác minh; log thư thật cho thấy Brevo dùng địa chỉ gửi thuộc `brevosend.com` thay cho domain Gmail. Domain riêng vẫn là hướng nâng cấp cho nhận diện và deliverability.
+Đã push mã tích hợp lên `main` trong commit `64bd7a3dea02f3fd3b633aa51cf4f50e9a7c3169` và cập nhật Environment của Render Homeji_BE. Deployment cuối `dep-db96hjft5n8s73e6bpkg` có trạng thái **Deploy succeeded | Live**, dùng cùng commit trên.
+
+Ngày 17/10/2026 đã kiểm chứng production: `/health/live` HTTP 200; `POST /api/account/forgot-password` HTTP 200 với thông báo “Đã gửi email khôi phục mật khẩu.” Thao tác từ trang quên mật khẩu của frontend production cũng tạo email mới trong Brevo, có `requests`, `delivered`, sau đó `opened`. Không đổi mật khẩu của người dùng. 146 kiểm thử API Release đạt, 13 ca yêu cầu database test được bỏ qua. Nhánh deploy dựa trên `origin/main` mới nhất trước khi ghép Brevo; các chỉnh sửa AI đang dở trong checkout chính được giữ nguyên.
+
+Deployment đầu đã phát hiện `Invalid API key` do giá trị credential bị che được lưu thành placeholder. Đã thay bằng credential thật đã kiểm chứng, kiểm tra khớp giá trị trước khi lưu và redeploy thành công. Không lưu key trong Git hoặc tài liệu. File local chứa credential được Git ignore và không publish. Sender Gmail đã xác minh; log thư thật cho thấy Brevo dùng địa chỉ gửi thuộc `brevosend.com` thay cho domain Gmail. Domain riêng vẫn là hướng nâng cấp cho nhận diện và deliverability.
 
 ## Tạo tài khoản và sender
 
