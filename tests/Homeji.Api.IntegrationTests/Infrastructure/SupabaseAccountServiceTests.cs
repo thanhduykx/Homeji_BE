@@ -13,6 +13,82 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class SupabaseAccountServiceTests
 {
     [Fact]
+    public async Task BrevoRegistration_WithoutServiceKey_DoesNotFallBackToSupabaseMailer()
+    {
+        using var handler = new CountingHttpMessageHandler();
+        var service = CreateService(new StubAccountEmailRepository(false), handler, "Brevo", serviceRoleKey: "");
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.RegisterAsync(
+            new RegisterAccountDto("user@example.com", "password123", "New User", null)));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task BrevoRecovery_RejectsUntrustedRedirectBeforeGeneratingLink()
+    {
+        using var handler = new CountingHttpMessageHandler();
+        var service = CreateService(new StubAccountEmailRepository(true), handler, "Brevo");
+        var error = await Assert.ThrowsAsync<RequestValidationException>(() => service.ForgotPasswordAsync(
+            new ForgotPasswordDto("user@example.com", "https://untrusted.example/reset")));
+        Assert.Contains("redirectTo", error.Errors.Keys);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_Brevo_GeneratesRecoveryLinkAndUsesEmailSender()
+    {
+        using var handler = new CountingHttpMessageHandler("""
+            {"properties":{"action_link":"https://project.supabase.co/auth/v1/verify?token=recovery&type=recovery"},
+             "user":{"id":"c664dbea-992b-4ba7-8702-bf5740e82034","email":"user@example.com"}}
+            """);
+        var sender = new StubAccountEmailSender();
+        var service = CreateService(new StubAccountEmailRepository(true), handler, "Brevo", sender);
+
+        _ = await service.ForgotPasswordAsync(new ForgotPasswordDto(" User@Example.COM ", null));
+
+        Assert.Equal("/auth/v1/admin/generate_link", handler.LastRequestUri!.AbsolutePath);
+        Assert.Contains("\"type\":\"recovery\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("\"email\":\"user@example.com\"", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Contains("https://homeji.example/reset-password", handler.LastRequestBody, StringComparison.Ordinal);
+        Assert.Equal("Bearer test-service-role-key", handler.LastAuthorization);
+        Assert.Contains("type=recovery", sender.ResetUrl, StringComparison.Ordinal);
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_UnknownEmail_DoesNotGenerateLinkOrSend()
+    {
+        using var handler = new CountingHttpMessageHandler();
+        var sender = new StubAccountEmailSender();
+        var service = CreateService(new StubAccountEmailRepository(false), handler, "Brevo", sender);
+        var result = await service.ForgotPasswordAsync(new ForgotPasswordDto("unknown@example.com", null));
+        Assert.Equal("Đã gửi email khôi phục mật khẩu.", result.Message);
+        Assert.Equal(0, handler.RequestCount);
+        Assert.Null(sender.ResetUrl);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_EmailFailure_DoesNotDeleteExistingUser()
+    {
+        using var handler = new CountingHttpMessageHandler("""
+            {"action_link":"https://project.supabase.co/verify?type=recovery",
+             "user":{"id":"c664dbea-992b-4ba7-8702-bf5740e82034"}}
+            """);
+        var service = CreateService(new StubAccountEmailRepository(true), handler, "Brevo", new StubAccountEmailSender { Succeeds = false });
+        await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => service.ForgotPasswordAsync(new ForgotPasswordDto("user@example.com", null)));
+        Assert.Equal(1, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task ForgotPassword_Smtp_PreservesSupabaseRecoveryEndpoint()
+    {
+        using var handler = new CountingHttpMessageHandler();
+        var service = CreateService(new StubAccountEmailRepository(true), handler);
+        _ = await service.ForgotPasswordAsync(new ForgotPasswordDto("user@example.com", null));
+        Assert.Equal("/auth/v1/recover", handler.LastRequestUri!.AbsolutePath);
+        Assert.Equal("Bearer test-key", handler.LastAuthorization);
+    }
+
+    [Fact]
     public async Task GetEmailAvailabilityAsync_NormalizesEmailAndReturnsAvailability()
     {
         var repository = new StubAccountEmailRepository(exists: true);
@@ -162,7 +238,8 @@ public sealed class SupabaseAccountServiceTests
             options,
             new StubAccountEmailSender(),
             repository,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupabaseAccountService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupabaseAccountService>.Instance,
+            Options.Create(new EmailDeliveryOptions()));
 
         var request = new RegisterAccountDto(
             "fallback@gmail.com",
@@ -210,7 +287,8 @@ public sealed class SupabaseAccountServiceTests
             options,
             new StubAccountEmailSender(),
             repository,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupabaseAccountService>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<SupabaseAccountService>.Instance,
+            Options.Create(new EmailDeliveryOptions()));
 
         var request = new RegisterAccountDto(
             "fallback@gmail.com",
@@ -285,23 +363,28 @@ public sealed class SupabaseAccountServiceTests
 
     private static SupabaseAccountService CreateService(
         IAccountEmailRepository repository,
-        HttpMessageHandler? handler = null)
+        HttpMessageHandler? handler = null,
+        string provider = "Smtp",
+        StubAccountEmailSender? emailSender = null,
+        string serviceRoleKey = "test-service-role-key")
     {
         var httpClient = new HttpClient(handler ?? new CountingHttpMessageHandler());
         var options = Options.Create(new SupaBaseAuthOptions
         {
             ProjectUrl = "https://project.supabase.co",
             ApiKey = "test-key",
-            ServiceRoleKey = "test-service-role-key",
+            ServiceRoleKey = serviceRoleKey,
             RegistrationRedirectUrl = "https://homeji.example/auth/callback",
+            PasswordResetRedirectUrl = "https://homeji.example/reset-password",
         });
 
         return new SupabaseAccountService(
             httpClient,
             options,
-            new StubAccountEmailSender(),
+            emailSender ?? new StubAccountEmailSender(),
             repository,
-            NullLogger<SupabaseAccountService>.Instance);
+            NullLogger<SupabaseAccountService>.Instance,
+            Options.Create(new EmailDeliveryOptions { Provider = provider }));
     }
 
     private sealed class StubAccountEmailRepository(bool exists) : IAccountEmailRepository
@@ -346,6 +429,17 @@ public sealed class SupabaseAccountServiceTests
 
     private sealed class StubAccountEmailSender : IAccountEmailSender
     {
+        public bool Succeeds { get; init; } = true;
+
+        public string? ResetUrl { get; private set; }
+
+        public Task<EmailSendResultDto> SendPasswordResetAsync(
+            string email, string resetUrl, CancellationToken cancellationToken = default)
+        {
+            ResetUrl = resetUrl;
+            return Task.FromResult(new EmailSendResultDto(Succeeds, "Email result."));
+        }
+
         public Task<EmailSendResultDto> SendRegistrationConfirmationAsync(
             string email,
             string? displayName,

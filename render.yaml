@@ -10,6 +10,14 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: Email__Provider
+        value: Brevo
+      - key: Email__Brevo__ApiKey
+        sync: false
+      - key: Email__Brevo__FromEmail
+        sync: false
+      - key: Supabase__ServiceRoleKey
+        sync: false
       - key: Database__ApplyMigrationsOnStartup
         value: "true"
       - key: ConnectionStrings__DefaultConnection

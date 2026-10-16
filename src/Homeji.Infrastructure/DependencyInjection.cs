@@ -106,6 +106,24 @@ public static class DependencyInjection
         services.AddScoped<IWebsiteTrafficRepository, WebsiteTrafficRepository>();
 
         services.Configure<SupaBaseAuthOptions>(configuration.GetSection("Supabase"));
+        services.AddOptions<EmailDeliveryOptions>()
+            .Bind(configuration.GetSection("Email"))
+            .Validate(options => options.UsesBrevo || string.Equals(options.Provider, "Smtp", StringComparison.OrdinalIgnoreCase),
+                "Email:Provider must be Brevo or Smtp.")
+            .ValidateOnStart();
+        var usesBrevo = string.Equals(configuration["Email:Provider"], "Brevo", StringComparison.OrdinalIgnoreCase);
+        services.AddOptions<BrevoOptions>()
+            .Bind(configuration.GetSection("Email:Brevo"))
+            .Validate(options => !usesBrevo || (!string.IsNullOrWhiteSpace(options.ApiKey)
+                && !options.ApiKey.Any(char.IsControl)
+                && System.Net.Mail.MailAddress.TryCreate(options.FromEmail, out _)
+                && options.TimeoutSeconds is >= 5 and <= 120),
+                "Brevo requires a valid API key, sender email, and timeout of 5-120 seconds.")
+            .ValidateOnStart();
+        services.AddOptions<SupaBaseAuthOptions>()
+            .Validate(options => !usesBrevo || !string.IsNullOrWhiteSpace(options.ServiceRoleKey),
+                "Supabase:ServiceRoleKey is required when Email:Provider is Brevo.")
+            .ValidateOnStart();
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
@@ -117,7 +135,15 @@ public static class DependencyInjection
         services.Configure<AiSearchOptions>(configuration.GetSection(AiSearchOptions.SectionName));
         services.Configure<GeminiOptions>(configuration.GetSection(GeminiOptions.SectionName));
         services.Configure<ChatbotOptions>(configuration.GetSection(ChatbotOptions.SectionName));
-        services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
+        if (usesBrevo)
+        {
+            services.AddHttpClient<IAccountEmailSender, BrevoAccountEmailSender>()
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        }
+        else
+        {
+            services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
+        }
         services.AddHttpClient<IAccountService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();

@@ -28,16 +28,19 @@ public sealed class SupabaseAccountService : IAccountService
     private readonly HttpClient _httpClient;
     private readonly ILogger<SupabaseAccountService> _logger;
     private readonly SupaBaseAuthOptions _options;
+    private readonly EmailDeliveryOptions _emailOptions;
 
     public SupabaseAccountService(
         HttpClient httpClient,
         IOptions<SupaBaseAuthOptions> options,
         IAccountEmailSender accountEmailSender,
         IAccountEmailRepository accountEmailRepository,
-        ILogger<SupabaseAccountService> logger)
+        ILogger<SupabaseAccountService> logger,
+        IOptions<EmailDeliveryOptions> emailOptions)
     {
         _httpClient = httpClient;
         _options = options.Value;
+        _emailOptions = emailOptions.Value;
         _accountEmailSender = accountEmailSender;
         _accountEmailRepository = accountEmailRepository;
         _logger = logger;
@@ -50,13 +53,20 @@ public sealed class SupabaseAccountService : IAccountService
         var displayName = ValidateRegistration(request);
         EnsureConfigured();
 
+        if (_emailOptions.UsesBrevo)
+        {
+            EnsureRegistrationConfigured();
+        }
+
         var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
         if (emailAvailability.Exists)
         {
             throw new ConflictException("Email này đã được đăng ký tài khoản.");
         }
 
-        var redirectTo = ResolveRedirectUrl(request.RedirectTo, _options.RegistrationRedirectUrl);
+        var redirectTo = _emailOptions.UsesBrevo
+            ? ResolveAccountEmailRedirect(request.RedirectTo, _options.RegistrationRedirectUrl)
+            : ResolveRedirectUrl(request.RedirectTo, _options.RegistrationRedirectUrl);
 
         if (!string.IsNullOrWhiteSpace(_options.ServiceRoleKey))
         {
@@ -75,8 +85,8 @@ public sealed class SupabaseAccountService : IAccountService
                     redirect_to = redirectTo,
                 });
 
-            var json = await SendAsync(httpRequest, cancellationToken);
-            var generatedLink = ParseGeneratedSignupLink(json);
+            using var json = await SendAsync(httpRequest, cancellationToken);
+            var generatedLink = ParseGeneratedAccountLink(json);
             try
             {
                 var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
@@ -89,7 +99,7 @@ public sealed class SupabaseAccountService : IAccountService
                 {
                     await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
                     throw new ExternalServiceUnavailableException(
-                        "SMTP",
+                        "Email",
                         "The confirmation email could not be sent. Please try registering again.");
                 }
             }
@@ -168,7 +178,35 @@ public sealed class SupabaseAccountService : IAccountService
         ValidateEmail(request.Email);
         EnsureConfigured();
 
-        var redirectTo = ResolveRedirectUrl(request.RedirectTo, _options.PasswordResetRedirectUrl);
+        var redirectTo = _emailOptions.UsesBrevo
+            ? ResolveAccountEmailRedirect(request.RedirectTo, _options.PasswordResetRedirectUrl)
+            : ResolveRedirectUrl(request.RedirectTo, _options.PasswordResetRedirectUrl);
+        if (_emailOptions.UsesBrevo)
+        {
+            EnsureRegistrationConfigured();
+            // Match the public recovery response for unknown accounts to avoid enumeration.
+            var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
+            if (!emailAvailability.Exists)
+            {
+                return new AccountMessageDto("Đã gửi email khôi phục mật khẩu.");
+            }
+
+            using var generateRequest = CreateAdminJsonRequest(
+                HttpMethod.Post,
+                new Uri("auth/v1/admin/generate_link", UriKind.Relative),
+                new { type = "recovery", email = emailAvailability.Email, redirect_to = redirectTo });
+            using var generated = await SendAsync(generateRequest, cancellationToken);
+            var link = ParseGeneratedAccountLink(generated);
+            var result = await _accountEmailSender.SendPasswordResetAsync(
+                emailAvailability.Email, link.ActionLink, cancellationToken);
+            if (!result.Sent)
+            {
+                throw new ExternalServiceUnavailableException("Email", "Không gửi được email khôi phục mật khẩu. Vui lòng thử lại sau.");
+            }
+
+            return new AccountMessageDto("Đã gửi email khôi phục mật khẩu.");
+        }
+
         var endpoint = BuildAuthUri("recover", redirectTo);
         using var httpRequest = CreateJsonRequest(HttpMethod.Post, endpoint, new { email = request.Email });
         _ = await SendAsync(httpRequest, cancellationToken);
@@ -321,7 +359,7 @@ public sealed class SupabaseAccountService : IAccountService
         return new Uri(relative, UriKind.Relative);
     }
 
-    private static (string ActionLink, Guid? UserId, string? Email) ParseGeneratedSignupLink(JsonDocument document)
+    private static (string ActionLink, Guid? UserId, string? Email) ParseGeneratedAccountLink(JsonDocument document)
     {
         var root = document.RootElement;
         var properties = root.TryGetProperty("properties", out var propertiesElement)
@@ -332,7 +370,7 @@ public sealed class SupabaseAccountService : IAccountService
         {
             throw new ExternalServiceUnavailableException(
                 "Supabase Auth",
-                "Supabase không trả về liên kết xác nhận email.");
+                "Supabase không trả về liên kết xác thực tài khoản.");
         }
 
         var user = root.TryGetProperty("user", out var userElement) ? userElement : default;
@@ -398,6 +436,24 @@ public sealed class SupabaseAccountService : IAccountService
         }
 
         return configuredRedirectTo;
+    }
+
+    private static string ResolveAccountEmailRedirect(string? requested, string configured)
+    {
+        if (!Uri.TryCreate(configured, UriKind.Absolute, out var callback)
+            || (callback.Scheme != Uri.UriSchemeHttps
+                && !(callback.Scheme == Uri.UriSchemeHttp && callback.IsLoopback)))
+        {
+            throw new InvalidOperationException("An HTTPS account email callback (or localhost for development) must be configured.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(requested) && requested != "string"
+            && !string.Equals(requested, configured, StringComparison.Ordinal))
+        {
+            throw Validation("redirectTo", "Liên kết chuyển hướng phải khớp callback đã cấu hình.");
+        }
+
+        return configured;
     }
 
     private static void ValidateEmailAndPassword(string? email, string? password)

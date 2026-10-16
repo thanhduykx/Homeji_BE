@@ -32,11 +32,19 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         _logger = logger;
     }
 
-    public async Task<EmailSendResultDto> SendRegistrationConfirmationAsync(
+    public Task<EmailSendResultDto> SendPasswordResetAsync(
+        string email, string resetUrl, CancellationToken cancellationToken = default) =>
+        SendAsync(email, null, resetUrl, true, cancellationToken);
+
+    public Task<EmailSendResultDto> SendRegistrationConfirmationAsync(
         string email,
         string? displayName,
         string confirmationUrl,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        SendAsync(email, displayName, confirmationUrl, false, cancellationToken);
+
+    private async Task<EmailSendResultDto> SendAsync(
+        string email, string? displayName, string confirmationUrl, bool passwordReset, CancellationToken cancellationToken)
     {
         if (!_options.Enabled)
         {
@@ -47,7 +55,9 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
         {
             ValidateOptions(confirmationUrl);
             var recipientName = NormalizeDisplayName(displayName);
-            using var mailMessage = CreateRegistrationMessage(email, recipientName, confirmationUrl);
+            using var mailMessage = passwordReset
+                ? CreateMessage(email, recipientName, AccountEmailContent.PasswordReset(confirmationUrl))
+                : CreateRegistrationMessage(email, recipientName, confirmationUrl);
             using var smtpClient = CreateClient();
 
             await smtpClient.SendMailAsync(mailMessage, cancellationToken);
@@ -71,21 +81,27 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
     }
 
     private MailMessage CreateRegistrationMessage(string email, string recipientName, string confirmationUrl)
+        => CreateMessage(email, recipientName, new AccountEmailContent(
+            _options.RegistrationSubject,
+            BuildHtmlBody(recipientName, confirmationUrl),
+            BuildPlainTextBody(recipientName, confirmationUrl)));
+
+    private MailMessage CreateMessage(string email, string recipientName, AccountEmailContent content)
     {
         var from = new MailAddress(_options.FromEmail, _options.FromName);
         var to = new MailAddress(email, recipientName);
 
         return new MailMessage(from, to)
         {
-            Subject = _options.RegistrationSubject,
-            Body = BuildHtmlBody(recipientName, confirmationUrl),
+            Subject = content.Subject,
+            Body = content.Html,
             IsBodyHtml = true,
             BodyEncoding = System.Text.Encoding.UTF8,
             SubjectEncoding = System.Text.Encoding.UTF8,
             AlternateViews =
             {
                 AlternateView.CreateAlternateViewFromString(
-                    BuildPlainTextBody(recipientName, confirmationUrl),
+                    content.Text,
                     System.Text.Encoding.UTF8,
                     "text/plain"),
             },
