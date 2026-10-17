@@ -15,10 +15,27 @@ public sealed class AccountController : ControllerBase
 {
     private readonly IAccountService _accountService;
 
-    public AccountController(IAccountService accountService)
+    private readonly ISignupOtpService _signupOtp;
+
+    public AccountController(IAccountService accountService, ISignupOtpService signupOtp)
     {
         _accountService = accountService;
+        _signupOtp = signupOtp;
     }
+
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [HttpPost("verify-signup-otp")]
+    public async Task<ActionResult<AuthSessionDto>> VerifySignupOtp(
+        [FromBody] SignupOtpDto request, CancellationToken cancellationToken) =>
+        Ok(await _signupOtp.VerifySignupOtpAsync(request, cancellationToken));
+
+    [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [HttpPost("resend-signup-otp")]
+    public async Task<ActionResult<AccountMessageDto>> ResendSignupOtp(
+        [FromBody] ResendSignupOtpDto request, CancellationToken cancellationToken) =>
+        Ok(await _signupOtp.ResendSignupOtpAsync(request, cancellationToken));
 
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]

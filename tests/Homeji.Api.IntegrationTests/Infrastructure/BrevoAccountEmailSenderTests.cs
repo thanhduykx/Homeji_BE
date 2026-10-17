@@ -101,6 +101,43 @@ public sealed class BrevoAccountEmailSenderTests
         Options.Create(new BrevoOptions { ApiKey = "test-brevo-key", FromEmail = "sender@example.com" }),
         NullLogger<BrevoAccountEmailSender>.Instance);
 
+    [Fact]
+    public async Task Receipt_uses_stable_json_idempotency_key_and_duplicate_is_accepted()
+    {
+        using var handler = new DuplicateHandler();
+        using var client = new HttpClient(handler);
+        var key = Guid.NewGuid();
+        var result = await CreateSender(client).SendAsync("user@example.com", "Receipt", "<p>Test</p>", "Test", key, CancellationToken.None);
+        Assert.True(result.Sent);
+        Assert.Equal(key.ToString("D"), handler.Key);
+    }
+
+    private sealed class DuplicateHandler : HttpMessageHandler
+    {
+        public string? Key { get; private set; }
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            using var json = JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken));
+            Key = json.RootElement.GetProperty("headers").GetProperty("idempotencyKey").GetString();
+            return new HttpResponseMessage(HttpStatusCode.BadRequest)
+            { Content = new StringContent("{\"code\":\"duplicate_parameter\",\"message\":\"Duplicate idempotency key\"}") };
+        }
+    }
+
+    [Fact]
+    public async Task Receipt_attachment_preserves_utf8_html()
+    {
+        using var handler = new RecordingHandler(HttpStatusCode.Created);
+        using var client = new HttpClient(handler);
+        const string html = "<html><meta charset=\"utf-8\"><p>Biên nhận nạp tiền</p></html>";
+        var attachment = new Homeji.Application.DTOs.Emails.EmailAttachmentDto("Homeji.html", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html)));
+        await CreateSender(client).SendAsync("user@example.com", "Receipt", html, "Receipt", Guid.NewGuid(), CancellationToken.None, attachment);
+        using var json = JsonDocument.Parse(handler.Body!);
+        var attached = json.RootElement.GetProperty("attachment")[0];
+        Assert.Equal("Homeji.html", attached.GetProperty("name").GetString());
+        Assert.Equal(html, System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(attached.GetProperty("content").GetString()!)));
+    }
+
     private sealed class RecordingHandler(HttpStatusCode status, bool cancel = false) : HttpMessageHandler
     {
         public string? Url { get; private set; }

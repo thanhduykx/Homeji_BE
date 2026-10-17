@@ -54,6 +54,7 @@ builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 {
+    builder.Services.AddHostedService<ReceiptEmailWorker>();
     builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
     builder.Services.AddHostedService<PaymentExpirationWorker>();
     // Legacy seed repairs must be explicitly enabled; startup must preserve edits

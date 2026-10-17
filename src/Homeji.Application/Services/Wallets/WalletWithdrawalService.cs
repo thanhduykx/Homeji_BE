@@ -2,6 +2,7 @@ using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.Wallets;
 using Homeji.Application.IRepositories.Wallets;
 using Homeji.Application.IServices.Wallets;
+using Homeji.Application.IServices.Emails;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
@@ -14,17 +15,20 @@ public sealed class WalletWithdrawalService : IWalletWithdrawalService
     private readonly IWalletRepository _wallets;
     private readonly IWalletWithdrawalRepository _withdrawals;
     private readonly TimeProvider _timeProvider;
+    private readonly ITransactionReceiptService _receipts;
 
     public WalletWithdrawalService(
         UserContext userContext,
         IWalletRepository wallets,
         IWalletWithdrawalRepository withdrawals,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITransactionReceiptService receipts)
     {
         _userContext = userContext;
         _wallets = wallets;
         _withdrawals = withdrawals;
         _timeProvider = timeProvider;
+        _receipts = receipts;
     }
 
     public async Task<WalletWithdrawalDto> CreateAsync(
@@ -54,6 +58,7 @@ public sealed class WalletWithdrawalService : IWalletWithdrawalService
             withdrawal.Id,
             $"Yêu cầu rút tiền về {withdrawal.BankName} ••••{LastFour(withdrawal.AccountNumber)}",
             now), cancellationToken);
+        await _receipts.RecordWithdrawalAsync(withdrawal, cancellationToken);
         await _withdrawals.SaveChangesAsync(cancellationToken);
         return ToDto(withdrawal);
     }
@@ -84,6 +89,7 @@ public sealed class WalletWithdrawalService : IWalletWithdrawalService
         var admin = await EnsureAdminAsync(cancellationToken);
         var withdrawal = await GetRequiredAsync(id, cancellationToken);
         withdrawal.Complete(admin.Id, request.Note, _timeProvider.GetUtcNow());
+        await _receipts.RecordWithdrawalAsync(withdrawal, cancellationToken);
         await _withdrawals.SaveChangesAsync(cancellationToken);
         return ToDto(withdrawal);
     }
@@ -110,6 +116,7 @@ public sealed class WalletWithdrawalService : IWalletWithdrawalService
             withdrawal.Id,
             "Hoàn tiền yêu cầu rút bị từ chối",
             now), cancellationToken);
+        await _receipts.RecordWithdrawalAsync(withdrawal, cancellationToken);
         await _withdrawals.SaveChangesAsync(cancellationToken);
         return ToDto(withdrawal);
     }

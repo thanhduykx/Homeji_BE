@@ -8,4 +8,5 @@ public sealed record AuthSessionDto(
     Guid? UserId,
     string? Email,
     bool EmailConfirmationRequired,
-    string Message);
+    string Message,
+    string? ConfirmationMethod = null);

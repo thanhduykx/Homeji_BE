@@ -8,10 +8,12 @@ using Homeji.Application.IServices.Accounts;
 using Homeji.Application.IServices.Emails;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Homeji.Infrastructure.Context;
+using Microsoft.EntityFrameworkCore;
 
 namespace Homeji.Infrastructure.External;
 
-public sealed class SupabaseAccountService : IAccountService
+public sealed class SupabaseAccountService : IAccountService, ISignupOtpService
 {
     private static readonly Regex FullNameRegex = new(
         "^[\\p{L}\\p{M}' -]+$",
@@ -29,6 +31,9 @@ public sealed class SupabaseAccountService : IAccountService
     private readonly ILogger<SupabaseAccountService> _logger;
     private readonly SupaBaseAuthOptions _options;
     private readonly EmailDeliveryOptions _emailOptions;
+    private readonly ApplicationDbContext? _database;
+    private readonly ITransactionalEmailSender? _transactionalSender;
+    private readonly TimeProvider _timeProvider;
 
     public SupabaseAccountService(
         HttpClient httpClient,
@@ -36,7 +41,10 @@ public sealed class SupabaseAccountService : IAccountService
         IAccountEmailSender accountEmailSender,
         IAccountEmailRepository accountEmailRepository,
         ILogger<SupabaseAccountService> logger,
-        IOptions<EmailDeliveryOptions> emailOptions)
+        IOptions<EmailDeliveryOptions> emailOptions,
+        ApplicationDbContext? database = null,
+        ITransactionalEmailSender? transactionalSender = null,
+        TimeProvider? timeProvider = null)
     {
         _httpClient = httpClient;
         _options = options.Value;
@@ -44,6 +52,9 @@ public sealed class SupabaseAccountService : IAccountService
         _accountEmailSender = accountEmailSender;
         _accountEmailRepository = accountEmailRepository;
         _logger = logger;
+        _database = database;
+        _transactionalSender = transactionalSender;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<AuthSessionDto> RegisterAsync(
@@ -56,6 +67,10 @@ public sealed class SupabaseAccountService : IAccountService
         if (_emailOptions.UsesBrevo)
         {
             EnsureRegistrationConfigured();
+        }
+        if (_emailOptions.RegistrationOtpEnabled)
+        {
+            EnsureSignupOtpConfigured();
         }
 
         var emailAvailability = await CheckEmailAvailabilityAsync(request.Email, cancellationToken);
@@ -89,21 +104,19 @@ public sealed class SupabaseAccountService : IAccountService
             var generatedLink = ParseGeneratedAccountLink(json);
             try
             {
-                var emailResult = await _accountEmailSender.SendRegistrationConfirmationAsync(
-                    emailAvailability.Email,
-                    displayName,
-                    generatedLink.ActionLink,
-                    cancellationToken);
+                var emailResult = _emailOptions.RegistrationOtpEnabled
+                    ? await SendInitialSignupOtpAsync(emailAvailability.Email, generatedLink.UserId, json, cancellationToken)
+                    : await _accountEmailSender.SendRegistrationConfirmationAsync(
+                        emailAvailability.Email, displayName, generatedLink.ActionLink, cancellationToken);
 
                 if (!emailResult.Sent)
                 {
-                    await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
                     throw new ExternalServiceUnavailableException(
                         "Email",
                         "The confirmation email could not be sent. Please try registering again.");
                 }
             }
-            catch (OperationCanceledException)
+            catch
             {
                 await TryRemoveUnconfirmedUserAsync(generatedLink.UserId);
                 throw;
@@ -117,7 +130,10 @@ public sealed class SupabaseAccountService : IAccountService
                 generatedLink.UserId,
                 generatedLink.Email ?? emailAvailability.Email,
                 true,
-                "Registration succeeded. Check your email to confirm your account before signing in.");
+                _emailOptions.RegistrationOtpEnabled
+                    ? "Nhập mã OTP trong email để hoàn tất đăng ký."
+                    : "Registration succeeded. Check your email to confirm your account before signing in.",
+                _emailOptions.RegistrationOtpEnabled ? "otp" : "link");
         }
         else
         {
@@ -138,6 +154,128 @@ public sealed class SupabaseAccountService : IAccountService
             var json = await SendAsync(httpRequest, cancellationToken);
             return ParseAuthSession(json, "Registration succeeded. Check your email to confirm your account before signing in.");
         }
+    }
+
+    private void EnsureSignupOtpConfigured()
+    {
+        EnsureConfigured();
+        EnsureRegistrationConfigured();
+        if (!_emailOptions.UsesBrevo || !_emailOptions.RegistrationOtpEnabled
+            || _database is null || _transactionalSender is null)
+        {
+            throw new ExternalServiceUnavailableException("Email", "Xác thực OTP chưa được cấu hình.");
+        }
+    }
+
+    private async Task<Homeji.Application.DTOs.Emails.EmailSendResultDto> SendInitialSignupOtpAsync(
+        string email, Guid? userId, JsonDocument generated, CancellationToken cancellationToken)
+    {
+        EnsureSignupOtpConfigured();
+        if (userId is null)
+        {
+            throw new ExternalServiceUnavailableException("Supabase Auth", "Thiếu tài khoản chờ xác thực.");
+        }
+        var code = ReadSignupOtp(generated);
+        var now = _timeProvider.GetUtcNow();
+        var challenges = _database!.Set<SignupVerificationChallenge>();
+        await challenges.Where(x => x.Email == email).ExecuteDeleteAsync(cancellationToken);
+        challenges.Add(new SignupVerificationChallenge
+        {
+            Email = email, UserId = userId.Value, ExpiresAt = now.AddDays(1),
+            CodeExpiresAt = now.AddMinutes(10), NextSendAt = now.AddSeconds(60),
+        });
+        await _database.SaveChangesAsync(cancellationToken);
+        return await SendSignupCodeAsync(email, code, cancellationToken);
+    }
+
+    private Task<Homeji.Application.DTOs.Emails.EmailSendResultDto> SendSignupCodeAsync(
+        string email, string code, CancellationToken cancellationToken)
+    {
+        var text = $"Mã xác thực đăng ký Homeji: {code}. Nhập mã trên website trong 10 phút. Không chia sẻ mã này. Nếu bạn không đăng ký, hãy bỏ qua email.";
+        var html = $"<!doctype html><html lang=\"vi\"><body style=\"font-family:Arial,sans-serif;color:#123b39\"><h2>Xác thực đăng ký Homeji</h2><p>Nhập mã sau trên website để hoàn tất đăng ký:</p><p style=\"font-size:32px;letter-spacing:6px;font-weight:bold\">{code}</p><p>Mã có hiệu lực tối đa 10 phút. Không chia sẻ mã này.</p><p>Nếu bạn không đăng ký, hãy bỏ qua email.</p></body></html>";
+        return _transactionalSender!.SendAsync(email, "Mã OTP xác thực đăng ký Homeji", html, text, Guid.NewGuid(), cancellationToken);
+    }
+
+    private static string ReadSignupOtp(JsonDocument generated)
+    {
+        var root = generated.RootElement;
+        var properties = root.TryGetProperty("properties", out var value) ? value : root;
+        var code = GetString(properties, "email_otp");
+        if (code is null || code.Length is < 6 or > 10 || code.Any(c => c is < '0' or > '9'))
+        {
+            throw new ExternalServiceUnavailableException("Supabase Auth", "Không tạo được mã xác thực đăng ký.");
+        }
+        return code;
+    }
+
+    public async Task<AccountMessageDto> ResendSignupOtpAsync(
+        ResendSignupOtpDto request, CancellationToken cancellationToken = default)
+    {
+        EnsureSignupOtpConfigured();
+        ValidateEmail(request.Email);
+        var email = request.Email.Trim().ToLowerInvariant();
+        var now = _timeProvider.GetUtcNow();
+        var claimed = await _database!.Set<SignupVerificationChallenge>()
+            .Where(x => x.Email == email && x.NextSendAt <= now)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.NextSendAt, now.AddSeconds(60))
+                .SetProperty(x => x.ExpiresAt, now.AddDays(1))
+                .SetProperty(x => x.CodeExpiresAt, now.AddMinutes(10))
+                .SetProperty(x => x.Attempts, 0), cancellationToken);
+        if (claimed == 0)
+        {
+            throw Validation("email", "Vui lòng chờ 60 giây giữa các lần gửi. Chỉ tài khoản đang chờ xác thực OTP mới nhận được mã.");
+        }
+        // No password/data: rotate only the confirmation token for an existing unconfirmed signup.
+        using var generateRequest = CreateAdminJsonRequest(HttpMethod.Post,
+            new Uri("auth/v1/admin/generate_link", UriKind.Relative), new { type = "signup", email });
+        using var generated = await SendAsync(generateRequest, cancellationToken);
+        var link = ParseGeneratedAccountLink(generated);
+        var expectedUser = await _database.Set<SignupVerificationChallenge>().AsNoTracking()
+            .Where(x => x.Email == email).Select(x => x.UserId).SingleAsync(cancellationToken);
+        if (link.UserId != expectedUser)
+        {
+            throw new ExternalServiceUnavailableException("Supabase Auth", "Tài khoản xác thực không khớp.");
+        }
+        var sent = await SendSignupCodeAsync(email, ReadSignupOtp(generated), cancellationToken);
+        if (!sent.Sent)
+        {
+            throw new ExternalServiceUnavailableException("Email", "Chưa gửi được mã. Vui lòng thử lại sau 60 giây.");
+        }
+        return new AccountMessageDto("Đã gửi mã mới. Mã trước đó không còn hiệu lực.");
+    }
+
+    public async Task<AuthSessionDto> VerifySignupOtpAsync(
+        SignupOtpDto request, CancellationToken cancellationToken = default)
+    {
+        EnsureSignupOtpConfigured();
+        ValidateEmail(request.Email);
+        if (request.Code is null || request.Code.Length is < 6 or > 10
+            || request.Code.Any(c => c is < '0' or > '9'))
+        {
+            throw Validation("code", "Mã OTP phải gồm 6 đến 10 chữ số.");
+        }
+        var email = request.Email.Trim().ToLowerInvariant();
+        var now = _timeProvider.GetUtcNow();
+        var challenges = _database!.Set<SignupVerificationChallenge>();
+        var claimed = await challenges.Where(x => x.Email == email && x.ExpiresAt > now
+                && x.CodeExpiresAt > now && x.Attempts < 5)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.Attempts, x => x.Attempts + 1), cancellationToken);
+        if (claimed == 0)
+        {
+            throw Validation("code", "Mã đã hết hạn hoặc vượt quá 5 lần thử. Vui lòng yêu cầu mã mới.");
+        }
+        var expectedUser = await challenges.AsNoTracking().Where(x => x.Email == email)
+            .Select(x => x.UserId).SingleAsync(cancellationToken);
+        using var verifyRequest = CreateJsonRequest(HttpMethod.Post,
+            new Uri("auth/v1/verify", UriKind.Relative), new { type = "signup", email, token = request.Code });
+        using var verified = await SendAsync(verifyRequest, cancellationToken);
+        var session = ParseAuthSession(verified, "Xác thực email thành công.");
+        if (session.UserId != expectedUser || string.IsNullOrEmpty(session.AccessToken))
+        {
+            throw new ExternalServiceUnavailableException("Supabase Auth", "Phiên xác thực không hợp lệ.");
+        }
+        await challenges.Where(x => x.Email == email && x.UserId == expectedUser).ExecuteDeleteAsync(cancellationToken);
+        return session;
     }
 
     public async Task<EmailAvailabilityDto> GetEmailAvailabilityAsync(
@@ -373,7 +511,7 @@ public sealed class SupabaseAccountService : IAccountService
                 "Supabase không trả về liên kết xác thực tài khoản.");
         }
 
-        var user = root.TryGetProperty("user", out var userElement) ? userElement : default;
+        var user = root.TryGetProperty("user", out var userElement) ? userElement : root;
         var userIdText = GetString(user, "id");
         return (
             actionLink,

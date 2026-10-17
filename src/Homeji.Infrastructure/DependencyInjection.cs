@@ -110,6 +110,8 @@ public static class DependencyInjection
             .Bind(configuration.GetSection("Email"))
             .Validate(options => options.UsesBrevo || string.Equals(options.Provider, "Smtp", StringComparison.OrdinalIgnoreCase),
                 "Email:Provider must be Brevo or Smtp.")
+            .Validate(options => !options.RegistrationOtpEnabled || options.UsesBrevo,
+                "Registration OTP requires the Brevo HTTPS email provider.")
             .ValidateOnStart();
         var usesBrevo = string.Equals(configuration["Email:Provider"], "Brevo", StringComparison.OrdinalIgnoreCase);
         services.AddOptions<BrevoOptions>()
@@ -125,6 +127,13 @@ public static class DependencyInjection
                 "Supabase:ServiceRoleKey is required when Email:Provider is Brevo.")
             .ValidateOnStart();
         services.Configure<SmtpOptions>(configuration.GetSection("Email:Smtp"));
+        services.AddOptions<ReceiptEmailOptions>().Bind(configuration.GetSection("Email:Receipts"))
+            .Validate(options => !options.Enabled || usesBrevo, "Receipt email delivery requires Brevo.")
+            .ValidateOnStart();
+        services.AddScoped<ITransactionReceiptService, TransactionReceiptService>();
+        services.AddScoped<IReceiptEmailDispatcher, ReceiptEmailDispatcher>();
+        services.AddHttpClient<ITransactionalEmailSender, BrevoAccountEmailSender>()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
@@ -145,6 +154,7 @@ public static class DependencyInjection
             services.AddScoped<IAccountEmailSender, SmtpAccountEmailSender>();
         }
         services.AddHttpClient<IAccountService, SupabaseAccountService>();
+        services.AddHttpClient<ISignupOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
         services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>();

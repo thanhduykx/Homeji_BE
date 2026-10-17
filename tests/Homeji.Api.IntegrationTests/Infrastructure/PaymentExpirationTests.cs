@@ -27,7 +27,7 @@ public sealed class PaymentExpirationTests
         var service = new PaymentService(client,
             new UserContext(new CurrentUser(payment.UserId), null!), repository, null!, null!,
             Options.Create(new MomoOptions()), Options.Create(new PayOsOptions()),
-            Options.Create(new PremiumSubscriptionOptions()), new FixedTime(createdAt.AddMinutes(16)));
+            Options.Create(new PremiumSubscriptionOptions()), new FixedTime(createdAt.AddMinutes(16)), null!);
 
         var result = await service.GetPaymentByIdAsync(payment.Id);
 
@@ -48,7 +48,7 @@ public sealed class PaymentExpirationTests
         var service = new PaymentService(client,
             new UserContext(new CurrentUser(payment.UserId), null!), repository, null!, null!,
             Options.Create(new MomoOptions()), Options.Create(new PayOsOptions()),
-            Options.Create(new PremiumSubscriptionOptions()), new FixedTime(createdAt.AddSeconds(ageSeconds)));
+            Options.Create(new PremiumSubscriptionOptions()), new FixedTime(createdAt.AddSeconds(ageSeconds)), null!);
 
         var history = await service.GetMyPaymentHistoryAsync(expected, 30);
         Assert.Equal(expected, Assert.Single(history).Status);
@@ -107,7 +107,7 @@ public sealed class PaymentExpirationTests
             {
                 ClientId = "test-client", ApiKey = "test-key", ChecksumKey = "test-checksum",
                 ReturnUrl = "https://example.test/return", CancelUrl = "https://example.test/cancel",
-            }), Options.Create(new PremiumSubscriptionOptions()), new FixedTime(now));
+            }), Options.Create(new PremiumSubscriptionOptions()), new FixedTime(now), null!);
 
         var result = await service.CreatePremiumPayOsPaymentAsync("PREMIUM_MONTHLY");
 

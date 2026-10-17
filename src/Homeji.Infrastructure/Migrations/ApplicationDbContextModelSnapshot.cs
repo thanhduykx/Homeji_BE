@@ -771,6 +771,43 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("post_message_attachments", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.ReceiptEmailDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ReceiptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceiptId")
+                        .IsUnique();
+
+                    b.HasIndex("SentAt", "NextAttemptAt");
+
+                    b.ToTable("receipt_email_deliveries", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.RentalPost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1485,6 +1522,47 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("saved_posts", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.TransactionReceipt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Event")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenceCode")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<Guid>("ReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReferenceId", "Event")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IssuedAt", "Id");
+
+                    b.ToTable("transaction_receipts", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.UserActivity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1902,6 +1980,34 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("website_page_views", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Infrastructure.External.SignupVerificationChallenge", b =>
+                {
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CodeExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("NextSendAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Email");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("signup_verification_challenges", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.ChatMessage", b =>
                 {
                     b.HasOne("Homeji.Domain.Entities.ChatConversation", null)
@@ -1968,6 +2074,15 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasOne("Homeji.Domain.Entities.PostMessage", null)
                         .WithMany("Attachments")
                         .HasForeignKey("MessageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReceiptEmailDelivery", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.TransactionReceipt", null)
+                        .WithOne()
+                        .HasForeignKey("Homeji.Domain.Entities.ReceiptEmailDelivery", "ReceiptId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

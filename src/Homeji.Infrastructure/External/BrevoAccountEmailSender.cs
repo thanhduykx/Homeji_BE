@@ -1,5 +1,6 @@
 using System.Net.Mail;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Homeji.Application.DTOs.Emails;
 using Homeji.Application.IServices.Emails;
 using Microsoft.Extensions.Logging;
@@ -10,8 +11,12 @@ namespace Homeji.Infrastructure.External;
 public sealed class BrevoAccountEmailSender(
     HttpClient httpClient,
     IOptions<BrevoOptions> options,
-    ILogger<BrevoAccountEmailSender> logger) : IAccountEmailSender
+    ILogger<BrevoAccountEmailSender> logger) : IAccountEmailSender, ITransactionalEmailSender
 {
+    private static readonly JsonSerializerOptions RequestJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
     private static readonly Action<ILogger, int, Exception?> SendFailed = LoggerMessage.Define<int>(
         LogLevel.Warning, new EventId(1003, nameof(SendFailed)),
         "Brevo account email request failed with HTTP status {StatusCode}.");
@@ -25,7 +30,8 @@ public sealed class BrevoAccountEmailSender(
         SendAsync(email, AccountEmailContent.PasswordReset(resetUrl), cancellationToken);
 
     private async Task<EmailSendResultDto> SendAsync(
-        string email, AccountEmailContent content, CancellationToken cancellationToken)
+        string email, AccountEmailContent content, CancellationToken cancellationToken, Guid? idempotencyKey = null,
+        EmailAttachmentDto? attachment = null)
     {
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.ApiKey)
@@ -45,7 +51,9 @@ public sealed class BrevoAccountEmailSender(
             subject = content.Subject,
             htmlContent = content.Html,
             textContent = content.Text,
-        });
+            attachment = attachment is null ? null : new[] { new { name = attachment.Name, content = attachment.Content } },
+            headers = idempotencyKey is null ? null : new Dictionary<string, string> { ["idempotencyKey"] = idempotencyKey.Value.ToString("D") },
+        }, options: RequestJsonOptions);
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(settings.TimeoutSeconds, 5, 120)));
@@ -57,19 +65,38 @@ public sealed class BrevoAccountEmailSender(
                 return new EmailSendResultDto(true, "Brevo đã tiếp nhận email.");
             }
 
+            if (idempotencyKey is not null && response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                try
+                {
+                    using var error = JsonDocument.Parse(await response.Content.ReadAsStringAsync(timeout.Token));
+                    if (error.RootElement.TryGetProperty("code", out var code)
+                        && code.GetString() == "duplicate_parameter"
+                        && error.RootElement.TryGetProperty("message", out var message)
+                        && message.GetString()?.Contains("idempotency", StringComparison.OrdinalIgnoreCase) == true)
+                        return new EmailSendResultDto(true, "Brevo đã tiếp nhận yêu cầu email này trước đó.");
+                }
+                catch (JsonException) { }
+            }
+
             // Never log provider response bodies: they may contain personal data or links.
             SendFailed(logger, (int)response.StatusCode, null);
+            return new EmailSendResultDto(false, "Brevo chưa xác nhận tiếp nhận email.", (int)response.StatusCode >= 500);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             SendFailed(logger, 0, null);
+            return new EmailSendResultDto(false, "Kết quả gửi email chưa xác định.", true);
         }
         catch (HttpRequestException)
         {
             SendFailed(logger, 0, null);
+            return new EmailSendResultDto(false, "Kết quả gửi email chưa xác định.", true);
         }
 
-        // No automatic retries: a timeout can occur after the provider accepted the email.
-        return new EmailSendResultDto(false, "Không gửi được email qua Brevo. Vui lòng thử lại sau.");
     }
+
+    public Task<EmailSendResultDto> SendAsync(string email, string subject, string html, string text,
+        Guid idempotencyKey, CancellationToken cancellationToken, EmailAttachmentDto? attachment = null) =>
+        SendAsync(email, new AccountEmailContent(subject, html, text), cancellationToken, idempotencyKey, attachment);
 }

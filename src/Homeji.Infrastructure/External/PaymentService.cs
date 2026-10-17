@@ -9,6 +9,7 @@ using Homeji.Application.IRepositories.Payments;
 using Homeji.Application.IRepositories.Subscriptions;
 using Homeji.Application.IRepositories.Wallets;
 using Homeji.Application.IServices.Payments;
+using Homeji.Application.IServices.Emails;
 using Homeji.Application.Mappers.Payments;
 using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Subscriptions;
@@ -33,6 +34,7 @@ public sealed class PaymentService : IPaymentService
     private readonly PayOsOptions _payOsOptions;
     private readonly PremiumSubscriptionOptions _premiumOptions;
     private readonly TimeProvider _timeProvider;
+    private readonly ITransactionReceiptService _receipts;
 
     public PaymentService(
         HttpClient httpClient,
@@ -43,7 +45,8 @@ public sealed class PaymentService : IPaymentService
         IOptions<MomoOptions> momoOptions,
         IOptions<PayOsOptions> payOsOptions,
         IOptions<PremiumSubscriptionOptions> premiumOptions,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        ITransactionReceiptService receipts)
     {
         _httpClient = httpClient;
         _userContext = userContext;
@@ -54,6 +57,7 @@ public sealed class PaymentService : IPaymentService
         _payOsOptions = payOsOptions.Value;
         _premiumOptions = premiumOptions.Value;
         _timeProvider = timeProvider;
+        _receipts = receipts;
     }
 
     public async Task<PaymentDto> GetPaymentByIdAsync(
@@ -277,6 +281,7 @@ public sealed class PaymentService : IPaymentService
             payment.MarkPaid(request.TransId.ToString(CultureInfo.InvariantCulture), request.Message, rawPayload, now);
             await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
             await CreditWalletTopUpIfNeededAsync(payment, now, cancellationToken);
+            await _receipts.RecordPaymentAsync(payment, cancellationToken);
         }
         else
         {
@@ -476,6 +481,7 @@ public sealed class PaymentService : IPaymentService
             payment.MarkPaid(request.Data.Reference, request.Data.Desc ?? request.Desc, rawPayload, now);
             await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
             await CreditWalletTopUpIfNeededAsync(payment, now, cancellationToken);
+            await _receipts.RecordPaymentAsync(payment, cancellationToken);
         }
         else
         {

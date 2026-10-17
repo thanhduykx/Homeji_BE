@@ -43,6 +43,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<WalletAccount> WalletAccounts => Set<WalletAccount>();
     public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
     public DbSet<WalletWithdrawalRequest> WalletWithdrawalRequests => Set<WalletWithdrawalRequest>();
+    public DbSet<TransactionReceipt> TransactionReceipts => Set<TransactionReceipt>();
+    public DbSet<ReceiptEmailDelivery> ReceiptEmailDeliveries => Set<ReceiptEmailDelivery>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
