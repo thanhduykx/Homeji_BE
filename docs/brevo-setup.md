@@ -50,8 +50,8 @@ Supabase__ServiceRoleKey=<Supabase service role/secret key>
 Giữ `Supabase__ProjectUrl` và `Supabase__ApiKey` đúng project. Nếu chưa có biến tương ứng, callback mặc định của repository là:
 
 ```text
-Supabase__RegistrationRedirectUrl=https://exe101-homeji.onrender.com/auth/callback
-Supabase__PasswordResetRedirectUrl=https://exe101-homeji.onrender.com/reset-password
+Supabase__RegistrationRedirectUrl=https://homeji.onrender.com/auth/callback
+Supabase__PasswordResetRedirectUrl=https://homeji.onrender.com/reset-password
 ```
 
 Thêm hai URL này vào Redirect URLs được cho phép trong Supabase Auth. Local phải cấu hình callback localhost phù hợp frontend. Với Brevo, `redirectTo` do client gửi phải khớp chính xác callback đã cấu hình hoặc để trống; không nhận địa chỉ chuyển hướng tùy ý trong luồng dùng quyền admin.
