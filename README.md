@@ -92,7 +92,7 @@ Supabase Dashboard:
 1. Vào **Authentication → URL Configuration**.
 2. Đặt **Site URL** thành URL frontend production, không để `localhost:3000`.
 3. Thêm chính xác callback production, ví dụ
-   `https://exe101-homeji.onrender.com/auth/callback`, vào **Redirect URLs**.
+   `https://homeji.onrender.com/auth/callback`, vào **Redirect URLs**.
 4. Giữ `http://localhost:3000/**` trong Redirect URLs chỉ để phát triển local.
 
 Frontend cũng có thể truyền `redirectTo` trong request đăng ký; URL đó phải nằm

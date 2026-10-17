@@ -32,15 +32,33 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     }
 
     [Theory]
+    [InlineData("https://homeji.onrender.com", true)]
+    [InlineData("https://untrusted.example", false)]
+    public async Task CorsPreflight_OnlyAllowsConfiguredOrigins(string origin, bool allowed)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Options, "/api/profile/me");
+        request.Headers.Add("Origin", origin);
+        request.Headers.Add("Access-Control-Request-Method", "GET");
+        request.Headers.Add("Access-Control-Request-Headers", "authorization");
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        var hasOrigin = response.Headers.TryGetValues("Access-Control-Allow-Origin", out var values);
+        Assert.Equal(allowed, hasOrigin);
+        if (allowed) Assert.Equal(origin, Assert.Single(values!));
+    }
+
+    [Theory]
     [InlineData(
         "/api/payments/momo/return?orderId=MOMO123&resultCode=0&message=Successful",
-        "https://exe101-homeji.onrender.com/payments?resultCode=0&message=Successful&provider=momo&orderCode=MOMO123")]
+        "https://homeji.onrender.com/payments?resultCode=0&message=Successful&provider=momo&orderCode=MOMO123")]
     [InlineData(
         "/api/payments/payos/return?code=00&id=link-123&cancel=false&status=PAID&orderCode=3059852975",
-        "https://exe101-homeji.onrender.com/payments?code=00&paymentLinkId=link-123&cancel=false&providerStatus=PAID&provider=payos&orderCode=3059852975")]
+        "https://homeji.onrender.com/payments?code=00&paymentLinkId=link-123&cancel=false&providerStatus=PAID&provider=payos&orderCode=3059852975")]
     [InlineData(
         "/api/payments/payos/cancel?code=00&id=link-123&cancel=true&status=CANCELLED&orderCode=3059852975",
-        "https://exe101-homeji.onrender.com/payments?code=00&paymentLinkId=link-123&cancel=true&providerStatus=CANCELLED&provider=payos&orderCode=3059852975")]
+        "https://homeji.onrender.com/payments?code=00&paymentLinkId=link-123&cancel=true&providerStatus=CANCELLED&provider=payos&orderCode=3059852975")]
     public async Task PaymentProviderReturn_RedirectsToFrontendPayments(
         string callbackUrl,
         string expectedFrontendUrl)

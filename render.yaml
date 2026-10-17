@@ -24,3 +24,14 @@ services:
         sync: false
       - key: Ai__Gemini__ApiKey
         sync: false
+      # Frontend origin migration: keep runtime overrides aligned with appsettings.
+      - key: Supabase__RegistrationRedirectUrl
+        value: https://homeji.onrender.com/auth/callback
+      - key: Supabase__PasswordResetRedirectUrl
+        value: https://homeji.onrender.com/reset-password
+      - key: Supabase__GoogleRedirectUrl
+        value: https://homeji.onrender.com/auth/callback
+      - key: Payments__Redirects__FrontendPaymentUrl
+        value: https://homeji.onrender.com/payments
+      - key: Cors__AllowedOrigins__3
+        value: https://homeji.onrender.com
