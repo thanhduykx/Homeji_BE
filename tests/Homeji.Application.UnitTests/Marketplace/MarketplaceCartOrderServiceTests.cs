@@ -64,6 +64,7 @@ public sealed class MarketplaceCartOrderServiceTests
         var notifications = new StubNotificationRepository();
         var publisher = new StubNotificationPublisher();
         var timeProvider = new StubTimeProvider();
+        var receiptWriter = new TestOrderReceiptWriter();
         var service = new MarketplaceOrderService(
             new UserContext(new StubCurrentUser(buyerId), profiles: null!),
             orderRepository,
@@ -79,7 +80,7 @@ public sealed class MarketplaceCartOrderServiceTests
                 MinimumFoodOrder = 25_000,
                 SellerReserve = 20_000,
             }),
-            profiles: null!, receipts: new TestOrderReceiptWriter());
+            profiles: null!, receipts: receiptWriter);
 
         var result = await service.CreateCartAsync(new CreateMarketplaceCartOrderDto(
             posts.Select(post => new MarketplaceCartItemDto(post.Id, 1)).ToArray(),
@@ -90,6 +91,10 @@ public sealed class MarketplaceCartOrderServiceTests
                 new MarketplaceDeliveryDto("Sinh viên", "0901234567", "KTX Thủ Đức", 10.85m, 106.77m)) : null));
 
         Assert.Equal(2, result.Count);
+        Assert.Equal(2, receiptWriter.Recorded.Count);
+        Assert.Equal(35_000, receiptWriter.Recorded.Sum(receipt => receipt.Amount));
+        Assert.All(result, order => Assert.Contains(receiptWriter.Recorded, receipt => receipt.OrderId == order.Id));
+        Assert.All(posts, post => Assert.Contains(receiptWriter.Recorded, receipt => receipt.Title == post.Title));
         Assert.Single(result.Select(order => order.CheckoutId).Distinct());
         Assert.All(result, order => Assert.Equal(sellerDelivery
             ? MarketplaceFulfillmentType.SellerDelivery : MarketplaceFulfillmentType.Pickup, order.FulfillmentType));

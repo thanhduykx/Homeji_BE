@@ -11,3 +11,13 @@ Recovery requires the existing Brevo/registration-OTP configuration. Only confir
 Local verification: 462 unit and 169 integration tests passed with no skips. The recovery test covers unknown-account responses, cooldown, wrong codes, five-attempt limit, expiry, resend without password/data, password update only after verification, one-time use and deletion cascade. Database purchase tests assert buyer receipts/outbox and one refund per order alongside actual wallet changes.
 
 No real-money production transactions are used for verification. Transactional email delivery and the financial database path are checked separately.
+
+## Production verification, 18 October 2026
+
+Backend release `c853a1b` applied the migration. Production contains 36 purchase receipts and 23 refund receipts from evidenced historical wallet transactions; zero historical marketplace email jobs were created. Recovery RLS and the auth-user cascade constraint are enabled.
+
+The ignored report `output/production-recovery-otp-check.json` records request 200, identical unknown-account response, wrong-code rejection, successful OTP password reset, successful login with the new password, rejection of the old password and rejection of code replay. The OTP was read from the actual Brevo email preview; Brevo recorded `sent` and `delivered`. The disposable test account was removed.
+
+Frontend release `6b4b441` is live at https://homeji.onrender.com. The generated WebP returns HTTP 200 with `image/webp` and 380358 bytes. Browser inspection confirms the new illustration loaded, with zero old WebGL canvases/scene controls. Both the deployment worktree and the original working folders build successfully; unrelated local edits were preserved. An additional targeted cart test run passed all five cases, including receipt amounts/titles/order references for both pickup and seller delivery.
+
+Supabase security advisors report the recovery table as RLS enabled with no public policy (intentional backend-only access). The pre-existing leaked-password-protection warning remains outside this change; see https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection.
