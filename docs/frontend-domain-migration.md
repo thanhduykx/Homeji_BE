@@ -21,6 +21,10 @@ Production frontend: https://homeji.onrender.com. Backend remains https://homeji
 
 Local read-only probe results and screenshots: `C:/EXE101_Homeji/output/verification/domain-migration/`.
 
+## Final authentication confirmation
+
+On 17/10/2026, the project owner tested the Google button at `https://homeji.onrender.com/login` and explicitly confirmed: “Đăng nhập thành công”. This is human verification of the primary popup flow, separate from the automated backend/Supabase redirect and authenticated API evidence above. The final pending domain-migration check is satisfied.
+
 ## Verification limit
 
-No real payment/order, signup, or password reset was executed. The existing backend/Supabase Google redirect flow and authenticated API calls are verified end to end. The separate Google Identity Services popup button remains unverified: account selection is visible with the new legal URLs, but automated interaction with the popup does not finish. An earlier attempt still showed origin_mismatch after account selection; current saved origin is correct and the frontend SDK has been reloaded. No successful production `/api/account/google/id-token` exchange has been captured. Keep the overall migration goal active until the primary popup login is confirmed.
+No real payment/order, signup, or password reset was executed. Payment redirects and account-email callback configuration were checked without creating a financial transaction or changing credentials. The automated browser did not capture the successful Google ID-token exchange; successful primary-button login is evidenced by the owner's direct confirmation.
