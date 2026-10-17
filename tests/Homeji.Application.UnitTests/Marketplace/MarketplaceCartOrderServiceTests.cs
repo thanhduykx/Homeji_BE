@@ -34,7 +34,7 @@ public sealed class MarketplaceCartOrderServiceTests
             new UserContext(new StubCurrentUser(Guid.NewGuid()), profiles: null!), orders,
             new StubPostRepository([post]), new StubNotificationRepository(), new StubNotificationPublisher(),
             new StubTimeProvider(), new StubWalletRepository(wallet), validator: null!, cartValidator: null!,
-            Options.Create(new MarketplaceFinanceOptions()), profiles: null!);
+            Options.Create(new MarketplaceFinanceOptions()), profiles: null!, receipts: new TestOrderReceiptWriter());
 
         await Assert.ThrowsAsync<Homeji.Application.Common.Exceptions.ForbiddenAccessException>(() => service.CancelAsync(order.Id));
         await Assert.ThrowsAsync<Homeji.Application.Common.Exceptions.ForbiddenAccessException>(() => service.GetDetailAsync(order.Id));
@@ -79,7 +79,7 @@ public sealed class MarketplaceCartOrderServiceTests
                 MinimumFoodOrder = 25_000,
                 SellerReserve = 20_000,
             }),
-            profiles: null!);
+            profiles: null!, receipts: new TestOrderReceiptWriter());
 
         var result = await service.CreateCartAsync(new CreateMarketplaceCartOrderDto(
             posts.Select(post => new MarketplaceCartItemDto(post.Id, 1)).ToArray(),
@@ -141,7 +141,7 @@ public sealed class MarketplaceCartOrderServiceTests
                 MinimumFoodOrder = 25_000,
                 SellerReserve = 20_000,
             }),
-            profiles: null!);
+            profiles: null!, receipts: new TestOrderReceiptWriter());
 
         var created = await service.CreateCartAsync(new CreateMarketplaceCartOrderDto(
             posts.Select(post => new MarketplaceCartItemDto(post.Id, 1)).ToArray(),
@@ -199,7 +199,7 @@ public sealed class MarketplaceCartOrderServiceTests
                 MinimumFoodOrder = 25_000,
                 SellerReserve = 20_000,
             }),
-            profiles: null!);
+            profiles: null!, receipts: new TestOrderReceiptWriter());
 
         var buyerService = CreateService(buyerId);
         var created = await buyerService.CreateCartAsync(new CreateMarketplaceCartOrderDto(

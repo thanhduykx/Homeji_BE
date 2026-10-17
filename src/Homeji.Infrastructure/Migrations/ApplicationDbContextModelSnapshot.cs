@@ -1980,6 +1980,31 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("website_page_views", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Infrastructure.External.PasswordRecoveryChallenge", b =>
+                {
+                    b.Property<string>("Email")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("NextSendAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Email");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("password_recovery_challenges", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Infrastructure.External.SignupVerificationChallenge", b =>
                 {
                     b.Property<string>("Email")

@@ -7,4 +7,6 @@ public enum ReceiptEvent
     WithdrawalRequested = 3,
     WithdrawalCompleted = 4,
     WithdrawalRejected = 5,
+    PurchasePaid = 6,
+    PurchaseRefunded = 7,
 }

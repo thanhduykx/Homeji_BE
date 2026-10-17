@@ -13,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homeji.Infrastructure.External;
 
-public sealed class SupabaseAccountService : IAccountService, ISignupOtpService
+public sealed partial class SupabaseAccountService : IAccountService, ISignupOtpService, IPasswordRecoveryOtpService
 {
     private static readonly Regex FullNameRegex = new(
         "^[\\p{L}\\p{M}' -]+$",

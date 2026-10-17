@@ -131,6 +131,7 @@ public static class DependencyInjection
             .Validate(options => !options.Enabled || usesBrevo, "Receipt email delivery requires Brevo.")
             .ValidateOnStart();
         services.AddScoped<ITransactionReceiptService, TransactionReceiptService>();
+        services.AddScoped<IOrderReceiptWriter, TransactionReceiptService>();
         services.AddScoped<IReceiptEmailDispatcher, ReceiptEmailDispatcher>();
         services.AddHttpClient<ITransactionalEmailSender, BrevoAccountEmailSender>()
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
@@ -155,6 +156,7 @@ public static class DependencyInjection
         }
         services.AddHttpClient<IAccountService, SupabaseAccountService>();
         services.AddHttpClient<ISignupOtpService, SupabaseAccountService>();
+        services.AddHttpClient<IPasswordRecoveryOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
         services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>();

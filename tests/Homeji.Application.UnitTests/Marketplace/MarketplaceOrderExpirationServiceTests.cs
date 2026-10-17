@@ -51,7 +51,7 @@ public sealed class MarketplaceOrderExpirationServiceTests
             validator: null!,
             cartValidator: null!,
             Options.Create(new MarketplaceFinanceOptions { OrderRequestTimeoutMinutes = 30 }),
-            profiles: null!);
+            profiles: null!, receipts: new TestOrderReceiptWriter());
 
         var expiredCount = await service.ExpireOverdueAsync();
 
@@ -105,7 +105,7 @@ public sealed class MarketplaceOrderExpirationServiceTests
             validator: null!,
             cartValidator: null!,
             Options.Create(new MarketplaceFinanceOptions { EscrowHoldHours = 24 }),
-            profiles: null!);
+            profiles: null!, receipts: new TestOrderReceiptWriter());
 
         var releasedCount = await service.ReleaseOverdueFundsAsync();
 

@@ -10,8 +10,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Homeji.Infrastructure.Repositories;
 
-public sealed class TransactionReceiptService(ApplicationDbContext db, UserContext userContext) : ITransactionReceiptService
+public sealed class TransactionReceiptService(ApplicationDbContext db, UserContext userContext) : ITransactionReceiptService, IOrderReceiptWriter
 {
+    public Task RecordOrderAsync(MarketplaceOrder order, string itemTitle, CancellationToken cancellationToken)
+    {
+        var refunded = order.RefundedAt.HasValue;
+        var title = itemTitle.Length > 220 ? itemTitle[..220] : itemTitle;
+        var description = refunded
+            ? $"Hoàn tiền vào số dư Homeji · {title} · Số lượng {order.Quantity}"
+            : $"{title} · Số lượng {order.Quantity} · Đơn giá {order.UnitPrice:0.##} VND · Thanh toán bằng số dư Homeji; tiền đang được giữ đảm bảo đơn hàng.";
+        return RecordAsync(new TransactionReceipt(order.BuyerId, order.Id,
+            refunded ? ReceiptEvent.PurchaseRefunded : ReceiptEvent.PurchasePaid,
+            order.AgreedPrice, order.Id.ToString("N"), description,
+            order.RefundedAt ?? order.CreatedAt), cancellationToken);
+    }
+
     public Task RecordPaymentAsync(PaymentTransaction payment, CancellationToken cancellationToken)
     {
         if (payment.Status != PaymentStatus.Paid) throw new InvalidOperationException("Only paid payments have success receipts.");

@@ -33,6 +33,11 @@ public sealed class MarketplaceDatabaseTests
         var order = await buyerService.CreateAsync(post.Id, new CreateMarketplaceOrderDto(clock.Now.AddHours(1), "Linh Trung", null));
         db.ChangeTracker.Clear();
         Assert.Equal(170_000, (await db.WalletAccounts.SingleAsync(wallet => wallet.UserId == buyer)).Balance);
+        var purchaseReceipt = await db.TransactionReceipts.SingleAsync(x => x.ReferenceId == order.Id);
+        Assert.Equal(ReceiptEvent.PurchasePaid, purchaseReceipt.Event);
+        Assert.Equal(30_000, purchaseReceipt.Amount);
+        Assert.Equal(buyer, purchaseReceipt.UserId);
+        Assert.True(await db.ReceiptEmailDeliveries.AnyAsync(x => x.ReceiptId == purchaseReceipt.Id));
         Assert.Equal(1, (await db.MarketplacePosts.SingleAsync(item => item.Id == post.Id)).ReservedQuantity);
         await sellerService.AcceptAsync(order.Id);
         db.ChangeTracker.Clear();
@@ -85,6 +90,10 @@ public sealed class MarketplaceDatabaseTests
         var saved = await db.MarketplaceOrders.SingleAsync(item => item.Id == order.Id);
         Assert.Equal(MarketplaceOrderStatus.Rejected, saved.Status);
         Assert.NotNull(saved.RefundedAt);
+        var refundReceipt = await db.TransactionReceipts.SingleAsync(x => x.ReferenceId == order.Id && x.Event == ReceiptEvent.PurchaseRefunded);
+        Assert.Equal(saved.AgreedPrice, refundReceipt.Amount);
+        Assert.Equal(2, await db.TransactionReceipts.CountAsync(x => x.ReferenceId == order.Id));
+        Assert.True(await db.ReceiptEmailDeliveries.AnyAsync(x => x.ReceiptId == refundReceipt.Id));
         Assert.Equal(200_000, (await db.WalletAccounts.SingleAsync(wallet => wallet.UserId == buyer)).Balance);
         var inventory = await db.MarketplacePosts.SingleAsync(item => item.Id == post.Id);
         Assert.Equal(1, inventory.AvailableQuantity);
@@ -118,7 +127,8 @@ public sealed class MarketplaceDatabaseTests
             new MarketplaceOrderRepository(db), new MarketplacePostRepository(db), new NotificationRepository(db),
             new LocalNotificationPublisher(), clock, new WalletRepository(db),
             new CreateMarketplaceOrderDtoValidator(clock), new CreateMarketplaceCartOrderDtoValidator(clock),
-            Options.Create(new MarketplaceFinanceOptions()), profiles);
+            Options.Create(new MarketplaceFinanceOptions()), profiles,
+            new TransactionReceiptService(db, new UserContext(new CheckoutUser(user), profiles)));
     }
 
     private static PostConversationService ConversationService(ApplicationDbContext db, Guid user)

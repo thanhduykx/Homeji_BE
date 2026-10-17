@@ -11,6 +11,8 @@ internal static class TransactionReceiptHtml
     {
         ReceiptEvent.DepositSucceeded => "Nạp tiền thành công",
         ReceiptEvent.PaymentSucceeded => "Thanh toán thành công",
+        ReceiptEvent.PurchasePaid => "Biên nhận thanh toán mua hàng",
+        ReceiptEvent.PurchaseRefunded => "Đã hoàn tiền mua hàng vào số dư Homeji",
         ReceiptEvent.WithdrawalRequested => "Đã nhận yêu cầu rút tiền",
         ReceiptEvent.WithdrawalCompleted => "Rút tiền hoàn tất",
         ReceiptEvent.WithdrawalRejected => "Yêu cầu rút tiền bị từ chối — đã hoàn tiền vào ví",

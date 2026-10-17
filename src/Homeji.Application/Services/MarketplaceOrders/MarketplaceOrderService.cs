@@ -14,6 +14,7 @@ using FluentValidation;
 using Microsoft.Extensions.Options;
 using Homeji.Application.Services.Marketplace;
 using Homeji.Application.IRepositories.Profiles;
+using Homeji.Application.IServices.Emails;
 
 namespace Homeji.Application.Services.MarketplaceOrders;
 
@@ -31,6 +32,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
     private readonly IValidator<CreateMarketplaceCartOrderDto> _cartValidator;
     private readonly MarketplaceFinanceOptions _financeOptions;
     private readonly IUserProfileRepository _profiles;
+    private readonly IOrderReceiptWriter _receipts;
 
     public MarketplaceOrderService(
         UserContext userContext,
@@ -43,7 +45,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         IValidator<CreateMarketplaceOrderDto> validator,
         IValidator<CreateMarketplaceCartOrderDto> cartValidator,
         IOptions<MarketplaceFinanceOptions> financeOptions,
-        IUserProfileRepository profiles)
+        IUserProfileRepository profiles,
+        IOrderReceiptWriter receipts)
     {
         _userContext = userContext;
         _orders = orders;
@@ -56,6 +59,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         _cartValidator = cartValidator;
         _financeOptions = financeOptions.Value;
         _profiles = profiles;
+        _receipts = receipts;
     }
 
     public async Task<MarketplaceOrderDto> CreateAsync(
@@ -142,6 +146,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             now), cancellationToken);
         var notification = BuildNotification(order, post.SellerId, now);
         await _orders.AddAsync(order, cancellationToken);
+        await _receipts.RecordOrderAsync(order, post.Title, cancellationToken);
         await _notifications.AddAsync(notification, cancellationToken);
         await _orders.SaveChangesAsync(cancellationToken);
         await _realtimePublisher.PublishAsync(notification, cancellationToken);
@@ -265,6 +270,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             var notification = BuildNotification(order, sellerId, now);
             notifications.Add(notification);
             createdOrders.Add((order, post));
+            await _receipts.RecordOrderAsync(order, post.Title, cancellationToken);
         }
 
         await _notifications.AddRangeAsync(notifications, cancellationToken);
@@ -685,6 +691,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 ?? throw new NotFoundException(nameof(MarketplacePost), order.MarketplacePostId);
             post.ReleaseReservation(order.Quantity, now);
             order.MarkRefunded(now);
+            await _receipts.RecordOrderAsync(order, post.Title, cancellationToken);
         }
 
         var referenceId = orders.MinBy(order => order.Id)!.Id;
