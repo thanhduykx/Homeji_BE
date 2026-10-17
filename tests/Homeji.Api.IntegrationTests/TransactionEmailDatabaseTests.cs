@@ -154,6 +154,7 @@ public sealed class TransactionEmailDatabaseTests
         await using var db = Open();
         var clock = new Clock();
         using var handler = new AuthHandler();
+        await db.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO auth.users(id) VALUES ({handler.UserId})");
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://project.supabase.co/") };
         var sender = new Sender();
         var service = new SupabaseAccountService(client, Options.Create(new SupaBaseAuthOptions
@@ -179,6 +180,10 @@ public sealed class TransactionEmailDatabaseTests
         Assert.Equal("test-access-token", session.AccessToken);
         Assert.False(session.EmailConfirmationRequired);
         await Assert.ThrowsAsync<RequestValidationException>(() => service.VerifySignupOtpAsync(new SignupOtpDto(email, "123456")));
+        Assert.False(await db.Set<SignupVerificationChallenge>().AnyAsync(x => x.Email == email));
+        db.ChangeTracker.Clear();
+        await service.RegisterAsync(new RegisterAccountDto(email, "original-password", "Test User", null));
+        await db.Database.ExecuteSqlInterpolatedAsync($"DELETE FROM auth.users WHERE id = {handler.UserId}");
         Assert.False(await db.Set<SignupVerificationChallenge>().AnyAsync(x => x.Email == email));
     }
 
@@ -224,6 +229,7 @@ public sealed class TransactionEmailDatabaseTests
     private sealed class AuthHandler : HttpMessageHandler
     {
         private readonly Guid _userId = Guid.NewGuid();
+        public Guid UserId => _userId;
         private string? _email;
         public int Verifications { get; private set; }
         public string? LastGeneratedBody { get; private set; }
