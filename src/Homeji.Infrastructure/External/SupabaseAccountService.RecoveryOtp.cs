@@ -52,8 +52,8 @@ public sealed partial class SupabaseAccountService
         ValidateEmailAndPassword(request.Email, request.NewPassword);
         if (request.NewPassword.Length > 128)
             throw Validation("newPassword", "Mật khẩu không được quá 128 ký tự.");
-        if (request.Code is null || request.Code.Length is < 6 or > 10 || request.Code.Any(c => c is < '0' or > '9'))
-            throw Validation("code", "Mã OTP phải gồm 6 đến 10 chữ số.");
+        if (request.Code is null || request.Code.Length != 6 || request.Code.Any(c => c is < '0' or > '9'))
+            throw Validation("code", "Mã OTP phải gồm đúng 6 chữ số.");
         var email = request.Email.Trim().ToLowerInvariant();
         var now = _timeProvider.GetUtcNow();
         var challenges = _database!.Set<PasswordRecoveryChallenge>();

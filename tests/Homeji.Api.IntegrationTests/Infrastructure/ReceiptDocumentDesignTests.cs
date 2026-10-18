@@ -66,13 +66,23 @@ public sealed class ReceiptDocumentDesignTests
     [InlineData(true)]
     public void Otp_email_has_brand_code_expiration_and_security_note(bool recovery)
     {
-        var html = HomejiEmailLayout.Otp("12345678", recovery);
+        var html = HomejiEmailLayout.Otp("123456", recovery);
         Assert.Contains(HomejiEmailLayout.LogoUrl, html, StringComparison.Ordinal);
-        Assert.Contains("12345678", html, StringComparison.Ordinal);
+        Assert.Contains("123456", html, StringComparison.Ordinal);
         Assert.Contains("10 phút", html, StringComparison.Ordinal);
         Assert.Contains("Không chuyển tiếp mã", html, StringComparison.Ordinal);
         Assert.Contains(recovery ? "Đặt lại mật khẩu" : "Xác thực đăng ký", html, StringComparison.Ordinal);
         Assert.Throws<ArgumentException>(() => HomejiEmailLayout.Otp("<script>", recovery));
+    }
+
+    [Theory]
+    [InlineData("12345")]
+    [InlineData("1234567")]
+    [InlineData("12345678")]
+    [InlineData("１２３４５６")]
+    public void Otp_email_rejects_codes_outside_six_ascii_digits(string code)
+    {
+        Assert.Throws<ArgumentException>(() => HomejiEmailLayout.Otp(code, false));
     }
 
     private static TransactionReceiptDto Example(ReceiptEvent value) => new(

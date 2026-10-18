@@ -30,8 +30,8 @@ internal static class HomejiEmailLayout
 
     public static string Otp(string code, bool recovery)
     {
-        if (code.Length is < 6 or > 10 || code.Any(c => c is < '0' or > '9'))
-            throw new ArgumentException("OTP must contain 6 to 10 digits.", nameof(code));
+        if (code.Length != 6 || code.Any(c => c is < '0' or > '9'))
+            throw new ArgumentException("OTP must contain exactly 6 digits.", nameof(code));
         var title = recovery ? "Đặt lại mật khẩu" : "Xác thực đăng ký";
         var purpose = recovery ? "đặt lại mật khẩu Homeji" : "hoàn tất đăng ký tài khoản Homeji";
         var body = $$"""

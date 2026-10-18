@@ -1,6 +1,6 @@
 # Branded account email and receipt attachments
 
-OTP signup and recovery emails share a responsive HTML layout with the website's Homeji logo, a prominent numeric code, ten-minute validity text, and a security notice. Existing confirmation/reset links use the same branded layout. No codes appear in subjects or logs.
+OTP signup and recovery emails share a responsive HTML layout with the website's Homeji logo, a prominent six-digit numeric code, ten-minute validity text, and a security notice. Existing confirmation/reset links use the same branded layout. No codes appear in subjects or logs.
 
 Receipt email displays the complete HTML receipt in the message body. It also attaches **two files**, with the same receipt reference: `Homeji-HJ-<id>.pdf` and `Homeji-HJ-<id>.html`. Amount, time, status and explanatory notes use the same presentation helpers. The HTML attachment exactly matches the email body. The website HTML preview also uses that renderer.
 
@@ -27,3 +27,9 @@ Fonts are the unmodified Noto Sans static TTF files from the Noto Fonts project:
 - https://github.com/notofonts/noto-fonts/blob/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf
 
 The SIL Open Font License and copyright notice are retained in `External/EmailAssets/NotoSans-LICENSE.txt` and embedded in the assembly. The logo is copied from the existing frontend brand asset.
+
+## Six-digit OTP contract
+
+Supabase Email OTP length is configured to 6. Signup and recovery API validation and web inputs require exactly six ASCII digits, including leading zeroes. Expiration, cooldown and attempt limits remain unchanged. Previously issued eight-digit codes require requesting a new code.
+
+Production verification on 2026-10-18: recovery email delivered, actual six-digit code accepted by reset API (HTTP 200). A separate explicitly labelled sample receipt was delivered with two attachments (PDF 701977 bytes and HTML 5125 bytes). Brevo rewrites the image URL to its image proxy, so checking for the original logo filename in retrieved body is not a valid delivery assertion. No real financial transaction was made. Six-digit change quality run: 462 unit + 183 integration tests, zero failures/skips, in `output/quality/local-eff1c43a1f72452b862d150efaa86ee5`.
