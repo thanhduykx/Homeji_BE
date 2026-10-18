@@ -67,11 +67,14 @@ internal static class TransactionReceiptPdf
             _page++;
             _canvas = _document.BeginPage(Width, Height);
             _canvas.Clear(SKColors.White);
-            Rect(new SKRect(0, 0, Width, 5), Teal);
-            _canvas.DrawImage(_logo, new SKRect(Margin, 28, Margin + 48, 76), new SKSamplingOptions(SKFilterMode.Linear));
-            Text("Homeji", Margin + 60, 55, _brand, Teal);
-            Text("Một nơi để thuộc về", Margin + 60, 74, _small, Muted);
-            Rect(new SKRect(Margin, 98, Width - Margin, 99), SKColor.Parse("#dbe8e5"));
+            Rect(new SKRect(0, 0, Width, 90), Teal);
+            Rect(new SKRect(Margin, 24, Margin + 44, 68), SKColors.White, 6);
+            _canvas.DrawImage(_logo, new SKRect(Margin + 4, 28, Margin + 40, 64), new SKSamplingOptions(SKFilterMode.Linear));
+            Text("Homeji", Margin + 56, 47, _brand, SKColors.White);
+            Text("Một nơi để thuộc về", Margin + 56, 66, _small, SKColor.Parse("#d9f3ec"));
+            Text("BIÊN NHẬN ĐIỆN TỬ", Width - Margin - 105, 48, _small, SKColors.White);
+            Rect(new SKRect(0, 90, Width, 94), SKColor.Parse("#84d9c5"));
+            Rect(new SKRect(0, 98, Width, 101), Teal);
             Text("Biên nhận giao dịch Homeji - không phải hóa đơn thuế/VAT.", Margin, Height - 48, _small, Muted);
             Text("homeji.onrender.com", Margin, Height - 29, _small, Teal);
             Text("Trang " + _page.ToString(CultureInfo.InvariantCulture), Width - Margin - 38, Height - 29, _small, Muted);
@@ -110,37 +113,79 @@ internal static class TransactionReceiptPdf
             foreach (var line in Lines(value, font, ContentWidth))
             { Ensure(lineHeight); Text(line, Margin, _y, font, color); _y += lineHeight; }
         }
-        private void Row(string label, string value)
+        private float Metadata(string label, string value, float x, float y, float width)
         {
-            var first = true;
-            foreach (var line in Lines(value, _body, ContentWidth - 132))
-            {
-                Ensure(20);
-                if (first) Text(label, Margin, _y, _small, Muted);
-                Text(line, Margin + 132, _y, _body, Ink); _y += 18; first = false;
-            }
-            _y += 11;
-            Rect(new SKRect(Margin, _y - 5, Width - Margin, _y - 4), SKColor.Parse("#e2ece9"));
-            _y += 10;
+            Text(label, x, y, _small, Muted); y += 19;
+            foreach (var line in Lines(value, _body, width))
+            { Text(line, x, y, _body, Ink); y += 17; }
+            return y + 15;
+        }
+        private void DashedRule(float x, float y, float width)
+        {
+            for (var offset = 0f; offset < width; offset += 7)
+                Rect(new SKRect(x + offset, y, x + Math.Min(offset + 4, width), y + .7f), SKColor.Parse("#b8ccc5"));
+        }
+        private void Total(string value, float x, float y, float width)
+        {
+            DashedRule(x, y, width);
+            Text("TỔNG TIỀN", x, y + 26, _small, Ink);
+            var size = _bodyBold.Size;
+            _bodyBold.Size = 14;
+            Text(value, x + width - _bodyBold.MeasureText(value), y + 27, _bodyBold, Teal);
+            _bodyBold.Size = size;
         }
         public void Write(TransactionReceiptDto receipt)
         {
-            Text("BIÊN NHẬN GIAO DỊCH", Margin, _y, _bodyBold, Teal); _y += 31;
-            Paragraph(TransactionReceiptHtml.Title(receipt.Event), _heading, Ink, 26); _y += 14;
-            Ensure(123);
-            Rect(new SKRect(Margin, _y - 4, Width - Margin, _y + 105), SKColor.Parse("#eef8f5"), 10);
-            Text("SỐ TIỀN GIAO DỊCH", Margin + 20, _y + 19, _small, Muted);
+            Text("GIAO DỊCH CỦA BẠN TẠI HOMEJI", Margin, _y, _small, Muted); _y += 29;
+            Paragraph(TransactionReceiptHtml.Title(receipt.Event), _heading, Teal, 26); _y += 13;
+            Ensure(80);
             var amount = ReceiptPresentation.Amount(receipt);
-            while (_amount.MeasureText(amount) > ContentWidth - 40 && _amount.Size > 18) _amount.Size--;
-            Text(amount, Margin + 20, _y + 60, _amount, Teal);
-            Text(ReceiptPresentation.Status(receipt.Event), Margin + 20, _y + 87, _bodyBold, SKColor.Parse("#245b48"));
-            _y += 139;
-            Row("Mã biên nhận", ReceiptPresentation.Id(receipt));
-            Row("Mã giao dịch", receipt.ReferenceCode);
-            Row("Thời gian", ReceiptPresentation.Time(receipt));
-            Ensure(48); _y += 4;
-            Text("NỘI DUNG GIAO DỊCH", Margin, _y, _bodyBold, Muted); _y += 25;
-            Paragraph(receipt.Description, _body, Ink); _y += 22;
+            Text("Tổng tiền giao dịch", Margin, _y, _small, Muted);
+            Text("Ngày · Giờ (UTC+7)", Margin + 266, _y, _small, Muted);
+            while (_amount.MeasureText(amount) > 246 && _amount.Size > 18) _amount.Size--;
+            Text(amount, Margin, _y + 35, _amount, Teal);
+            Text(ReceiptPresentation.Time(receipt), Margin + 266, _y + 30, _small, Ink);
+            _y += 70;
+
+            const float leftWidth = 166, gap = 24, paperPadding = 18;
+            var paperX = Margin + leftWidth + gap;
+            var paperWidth = ContentWidth - leftWidth - gap;
+            var textWidth = paperWidth - paperPadding * 2;
+            var detailLines = Lines(receipt.Description, _body, textWidth).ToArray();
+            var metadataHeight = 136 + 17 * (Lines(receipt.ReferenceCode, _body, leftWidth).Count()
+                + Lines(ReceiptPresentation.Id(receipt), _body, leftWidth).Count());
+            var panelHeight = Math.Max(metadataHeight, 145 + detailLines.Length * 18);
+            if (panelHeight <= Height - 110 - _y)
+            {
+                var top = _y;
+                Rect(new SKRect(Margin - 16, top - 16, Width - Margin + 16, top + panelHeight + 16), SKColor.Parse("#f3f6f5"));
+                Text("CHI TIẾT GIAO DỊCH", Margin, top + 8, _bodyBold, Teal);
+                var metaY = Metadata("Trạng thái", ReceiptPresentation.Status(receipt.Event), Margin, top + 38, leftWidth);
+                metaY = Metadata("Mã giao dịch", receipt.ReferenceCode, Margin, metaY, leftWidth);
+                Metadata("Mã biên nhận", ReceiptPresentation.Id(receipt), Margin, metaY, leftWidth);
+                Rect(new SKRect(paperX - 1, top - 1, paperX + paperWidth + 1, top + panelHeight + 1), SKColor.Parse("#dbe5e2"));
+                Rect(new SKRect(paperX, top, paperX + paperWidth, top + panelHeight), SKColors.White);
+                var x = paperX + paperPadding;
+                Text("BIÊN NHẬN CỦA BẠN", x, top + 26, _bodyBold, Teal);
+                Text("Được ghi nhận bởi Homeji", x, top + 44, _small, Muted);
+                DashedRule(x, top + 60, textWidth);
+                Text("Nội dung giao dịch", x, top + 79, _small, Muted);
+                var lineY = top + 103;
+                foreach (var line in detailLines) { Text(line, x, lineY, _body, Ink); lineY += 18; }
+                Total(amount, x, top + panelHeight - 47, textWidth);
+                _y = top + panelHeight + 49;
+            }
+            else
+            {
+                // Long receipts switch to full-width flowing content; no detail is dropped.
+                Paragraph("CHI TIẾT GIAO DỊCH", _bodyBold, Teal); _y += 10;
+                Paragraph("Trạng thái: " + ReceiptPresentation.Status(receipt.Event), _body, Ink);
+                Paragraph("Mã giao dịch: " + receipt.ReferenceCode, _body, Ink);
+                Paragraph("Mã biên nhận: " + ReceiptPresentation.Id(receipt), _body, Ink); _y += 20;
+                Ensure(55); Paragraph("BIÊN NHẬN CỦA BẠN", _bodyBold, Teal); _y += 10;
+                Paragraph(receipt.Description, _body, Ink); _y += 15;
+                Ensure(55); Total(amount, Margin, _y, ContentWidth); _y += 62;
+            }
             Paragraph(ReceiptPresentation.Note(receipt.Event), _small, Muted, 15);
             _document.EndPage();
         }

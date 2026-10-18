@@ -33,3 +33,9 @@ The SIL Open Font License and copyright notice are retained in `External/EmailAs
 Supabase Email OTP length is configured to 6. Signup and recovery API validation and web inputs require exactly six ASCII digits, including leading zeroes. Expiration, cooldown and attempt limits remain unchanged. Previously issued eight-digit codes require requesting a new code.
 
 Production verification on 2026-10-18: recovery email delivered, actual six-digit code accepted by reset API (HTTP 200). A separate explicitly labelled sample receipt was delivered with two attachments (PDF 701977 bytes and HTML 5125 bytes). Brevo rewrites the image URL to its image proxy, so checking for the original logo filename in retrieved body is not a valid delivery assertion. No real financial transaction was made. Six-digit change quality run: 462 unit + 183 integration tests, zero failures/skips, in `output/quality/local-eff1c43a1f72452b862d150efaa86ee5`.
+
+## Receipt design based on the supplied email reference
+
+The receipt uses a full-width teal brand banner, parallel accent rules, a total/date summary and two columns: transaction metadata and a white paper receipt with dashed separators. On narrow email layouts the columns stack. HTML body and attachment use the same renderer; PDF follows the same hierarchy and branding. Unknown fees, discounts and quantities are not fabricated from free-form descriptions. Long PDFs retain flowing pagination.
+
+Reference redesign checks: 14 document design cases plus sender/dispatcher tests; PDF text extraction confirms Vietnamese, amounts, all 45 long description lines and complete long reference. Normal PDF remains one page; long sample remains two.
