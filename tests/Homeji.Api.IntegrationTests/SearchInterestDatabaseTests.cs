@@ -25,6 +25,7 @@ public sealed class SearchInterestDatabaseTests
     public async Task Requires_consent_three_distinct_sessions_and_respects_dismissal_retention_and_owner()
     {
         await using var db = Open(); var user = await Seed(db); var other = await Seed(db); var clock = new Clock();
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => Service(db, Guid.NewGuid(), clock).GetAsync(default));
         var service = Service(db, user, clock); var criteria = new InterestCriteria("Thủ Đức", MaxPrice: 4000000);
         var initial = await service.ObserveAsync(new(Guid.NewGuid(), criteria), default);
         Assert.False(initial.Settings.Enabled); Assert.Empty(initial.Suggestions);

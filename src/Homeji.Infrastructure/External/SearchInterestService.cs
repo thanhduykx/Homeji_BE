@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Homeji.Application.Common.Exceptions;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.RentalPosts;
@@ -47,7 +48,13 @@ public sealed class SearchInterestService(ApplicationDbContext db, UserContext u
             var key = "interest:" + user.ToString("N");
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key},0))", ct);
             var row = await db.Set<SearchPersonalization>().SingleOrDefaultAsync(x => x.UserId == user, ct);
-            if (row is null) { row = new SearchPersonalization { UserId = user, CheckedAt = Now }; db.Add(row); }
+            if (row is null)
+            {
+                if (!await db.UserProfiles.AnyAsync(p => p.Id == user, ct))
+                    throw new ForbiddenAccessException("Vui lòng hoàn thiện hồ sơ trước khi bật cá nhân hóa.");
+                row = new SearchPersonalization { UserId = user, CheckedAt = Now };
+                db.Add(row);
+            }
             var state = JsonSerializer.Deserialize<State>(row.Data, Json) ?? new State();
             Prune(state);
             var result = await action(row, state);

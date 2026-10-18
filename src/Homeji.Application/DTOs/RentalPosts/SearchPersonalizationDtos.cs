@@ -2,17 +2,17 @@ using System.ComponentModel.DataAnnotations;
 namespace Homeji.Application.DTOs.RentalPosts;
 
 public sealed record InterestCriteria(
-    [property: Required, StringLength(160, MinimumLength = 2)] string Area,
-    [property: Range(0, 1000000000)] decimal? MinPrice = null,
-    [property: Range(0, 1000000000)] decimal? MaxPrice = null,
-    [property: Range(0, 10000)] decimal? MinArea = null,
-    [property: Range(0, 10000)] decimal? MaxArea = null,
+    [Required, StringLength(160, MinimumLength = 2)] string Area,
+    [Range(0, 1000000000)] decimal? MinPrice = null,
+    [Range(0, 1000000000)] decimal? MaxPrice = null,
+    [Range(0, 10000)] decimal? MinArea = null,
+    [Range(0, 10000)] decimal? MaxArea = null,
     string[]? Amenities = null, string[]? ExcludedAmenities = null,
-    [property: Range(-90, 90)] double? Latitude = null,
-    [property: Range(-180, 180)] double? Longitude = null,
-    [property: Range(.5, 30)] double? RadiusKm = null,
-    [property: Range(1, 20)] int? Occupants = null,
-    [property: Range(0, 1000000000)] decimal? MaxDeposit = null,
+    [Range(-90, 90)] double? Latitude = null,
+    [Range(-180, 180)] double? Longitude = null,
+    [Range(.5, 30)] double? RadiusKm = null,
+    [Range(1, 20)] int? Occupants = null,
+    [Range(0, 1000000000)] decimal? MaxDeposit = null,
     bool ExcludeRoommateShare = false);
 public sealed record InterestSettings(bool Enabled, bool AiEnabled = false, bool EmailEnabled = false);
 public sealed record ObserveInterest(Guid SessionId, InterestCriteria Criteria);
