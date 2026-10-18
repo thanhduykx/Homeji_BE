@@ -31,7 +31,7 @@ public sealed class BrevoAccountEmailSender(
 
     private async Task<EmailSendResultDto> SendAsync(
         string email, AccountEmailContent content, CancellationToken cancellationToken, Guid? idempotencyKey = null,
-        EmailAttachmentDto? attachment = null)
+        IReadOnlyList<EmailAttachmentDto>? attachments = null)
     {
         var settings = options.Value;
         if (string.IsNullOrWhiteSpace(settings.ApiKey)
@@ -51,7 +51,7 @@ public sealed class BrevoAccountEmailSender(
             subject = content.Subject,
             htmlContent = content.Html,
             textContent = content.Text,
-            attachment = attachment is null ? null : new[] { new { name = attachment.Name, content = attachment.Content } },
+            attachment = attachments?.Select(item => new { name = item.Name, content = item.Content }).ToArray(),
             headers = idempotencyKey is null ? null : new Dictionary<string, string> { ["idempotencyKey"] = idempotencyKey.Value.ToString("D") },
         }, options: RequestJsonOptions);
 
@@ -97,6 +97,6 @@ public sealed class BrevoAccountEmailSender(
     }
 
     public Task<EmailSendResultDto> SendAsync(string email, string subject, string html, string text,
-        Guid idempotencyKey, CancellationToken cancellationToken, EmailAttachmentDto? attachment = null) =>
-        SendAsync(email, new AccountEmailContent(subject, html, text), cancellationToken, idempotencyKey, attachment);
+        Guid idempotencyKey, CancellationToken cancellationToken, IReadOnlyList<EmailAttachmentDto>? attachments = null) =>
+        SendAsync(email, new AccountEmailContent(subject, html, text), cancellationToken, idempotencyKey, attachments);
 }

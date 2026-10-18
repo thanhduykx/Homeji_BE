@@ -22,7 +22,7 @@ public sealed class ReceiptsController(ITransactionReceiptService receipts) : Co
     [HttpGet("{id:guid}/html")]
     public async Task<IActionResult> GetHtml(Guid id, CancellationToken cancellationToken)
     {
-        Response.Headers.ContentSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
+        Response.Headers.ContentSecurityPolicy = "default-src 'none'; img-src https://homeji.onrender.com; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
         Response.Headers.CacheControl = "private, no-store";
         Response.Headers.XContentTypeOptions = "nosniff";
         return Content(await receipts.GetMyHtmlAsync(id, cancellationToken), "text/html; charset=utf-8");

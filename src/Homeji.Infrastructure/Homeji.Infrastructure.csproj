@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <InternalsVisibleTo Include="Homeji.Api.IntegrationTests" />
+    <EmbeddedResource Include="External/EmailAssets/*" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Homeji.Application\Homeji.Application.csproj" />

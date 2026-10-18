@@ -17,7 +17,7 @@ COPY . .
 RUN dotnet test tests/Homeji.Api.IntegrationTests/Homeji.Api.IntegrationTests.csproj \
     --configuration Release \
     --no-restore \
-    --filter FullyQualifiedName~ConversationImageProcessorTests
+    --filter "FullyQualifiedName~ConversationImageProcessorTests|FullyQualifiedName~ReceiptDocumentDesignTests"
 RUN dotnet publish src/Homeji.Api/Homeji.Api.csproj \
     --configuration Release \
     --no-restore \

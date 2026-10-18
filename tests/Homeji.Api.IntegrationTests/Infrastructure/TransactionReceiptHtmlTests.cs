@@ -14,7 +14,8 @@ public sealed class TransactionReceiptHtmlTests
             DateTimeOffset.UnixEpoch, null, 0, false);
         var html = TransactionReceiptHtml.Render(dto);
         Assert.DoesNotContain("<script>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("<img", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("<img src=x", html, StringComparison.Ordinal);
+        Assert.Contains(HomejiEmailLayout.LogoUrl, html, StringComparison.Ordinal);
         Assert.Contains("&lt;script&gt;", html, StringComparison.Ordinal);
         Assert.Contains("không xác nhận tiền đã tới ngân hàng", html, StringComparison.Ordinal);
         Assert.Contains("không phải hóa đơn thuế/VAT", html, StringComparison.Ordinal);

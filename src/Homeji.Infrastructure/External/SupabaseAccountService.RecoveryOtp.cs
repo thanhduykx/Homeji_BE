@@ -35,7 +35,7 @@ public sealed partial class SupabaseAccountService
                 throw new ExternalServiceUnavailableException("Supabase Auth", "Tài khoản khôi phục không khớp.");
             var code = ReadSignupOtp(generated);
             var result = await _transactionalSender!.SendAsync(email, "Mã OTP đặt lại mật khẩu Homeji",
-                $"<!doctype html><html lang=\"vi\"><body style=\"font-family:Arial,sans-serif;color:#123b39\"><h2>Đặt lại mật khẩu Homeji</h2><p>Nhập mã sau trên website:</p><p style=\"font-size:32px;letter-spacing:6px;font-weight:bold\">{code}</p><p>Mã có hiệu lực tối đa 10 phút. Không chia sẻ mã này.</p><p>Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email.</p></body></html>",
+                HomejiEmailLayout.Otp(code, recovery: true),
                 $"Mã OTP đặt lại mật khẩu Homeji: {code}. Có hiệu lực tối đa 10 phút. Không chia sẻ mã này. Nếu bạn không yêu cầu, hãy bỏ qua email.",
                 Guid.NewGuid(), cancellationToken);
             if (!result.Sent)

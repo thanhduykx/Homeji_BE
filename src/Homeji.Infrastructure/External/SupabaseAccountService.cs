@@ -192,7 +192,7 @@ public sealed partial class SupabaseAccountService : IAccountService, ISignupOtp
         string email, string code, CancellationToken cancellationToken)
     {
         var text = $"Mã xác thực đăng ký Homeji: {code}. Nhập mã trên website trong 10 phút. Không chia sẻ mã này. Nếu bạn không đăng ký, hãy bỏ qua email.";
-        var html = $"<!doctype html><html lang=\"vi\"><body style=\"font-family:Arial,sans-serif;color:#123b39\"><h2>Xác thực đăng ký Homeji</h2><p>Nhập mã sau trên website để hoàn tất đăng ký:</p><p style=\"font-size:32px;letter-spacing:6px;font-weight:bold\">{code}</p><p>Mã có hiệu lực tối đa 10 phút. Không chia sẻ mã này.</p><p>Nếu bạn không đăng ký, hãy bỏ qua email.</p></body></html>";
+        var html = HomejiEmailLayout.Otp(code, recovery: false);
         return _transactionalSender!.SendAsync(email, "Mã OTP xác thực đăng ký Homeji", html, text, Guid.NewGuid(), cancellationToken);
     }
 

@@ -61,13 +61,24 @@ public sealed class ReceiptEmailDispatcher(ApplicationDbContext db, ITransaction
             var dto = new TransactionReceiptDto(receipt.Id, receipt.ReferenceId, receipt.Event, receipt.Amount, "VND",
                 receipt.ReferenceCode, receipt.Description, receipt.IssuedAt, null, job.Attempts, false);
             var result = new EmailSendResultDto(false, "recipient_unavailable");
+            var failureCode = "recipient_unavailable";
             if (recipients.TryGetValue(receipt.UserId, out var email))
             {
                 var html = TransactionReceiptHtml.Render(dto);
-                result = await sender.SendAsync(email, "[Homeji] " + TransactionReceiptHtml.Title(receipt.Event),
-                    html, $"Biên nhận Homeji HJ-{receipt.Id:N}. {TransactionReceiptHtml.Title(receipt.Event)}. Số tiền: {receipt.Amount:0} VND. Mã giao dịch: {receipt.ReferenceCode}.",
-                    job.Id, cancellationToken, new EmailAttachmentDto($"Homeji-HJ-{receipt.Id:N}.html",
-                        Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html))));
+                IReadOnlyList<EmailAttachmentDto>? attachments = null;
+                try { attachments = TransactionReceiptFiles.Create(dto, html); }
+                catch (Exception error) when (error is InvalidOperationException or IOException or DllNotFoundException or EntryPointNotFoundException or TypeInitializationException)
+                {
+                    // No provider call occurred: this is a known document failure, safe to retry.
+                    failureCode = "receipt_files_failed";
+                }
+                if (attachments is not null)
+                {
+                    failureCode = "send_failed";
+                    result = await sender.SendAsync(email, "[Homeji] " + TransactionReceiptHtml.Title(receipt.Event),
+                        html, $"Biên nhận Homeji {ReceiptPresentation.Id(dto)}. {TransactionReceiptHtml.Title(receipt.Event)}. Số tiền: {ReceiptPresentation.Amount(dto)}. Mã giao dịch: {receipt.ReferenceCode}. {ReceiptPresentation.Note(receipt.Event)}",
+                        job.Id, cancellationToken, attachments);
+                }
             }
 
             var completedAt = timeProvider.GetUtcNow();
@@ -76,7 +87,7 @@ public sealed class ReceiptEmailDispatcher(ApplicationDbContext db, ITransaction
             await db.ReceiptEmailDeliveries.Where(x => x.Id == job.Id && x.LeaseId == lease)
                 .ExecuteUpdateAsync(set => set
                     .SetProperty(x => x.SentAt, result.Sent ? completedAt : (DateTimeOffset?)null)
-                    .SetProperty(x => x.LastErrorCode, result.Sent ? null : result.OutcomeUncertain ? "outcome_uncertain" : "send_failed")
+                    .SetProperty(x => x.LastErrorCode, result.Sent ? null : result.OutcomeUncertain ? "outcome_uncertain" : failureCode)
                     .SetProperty(x => x.Attempts, result.OutcomeUncertain ? 8 : job.Attempts)
                     .SetProperty(x => x.NextAttemptAt, nextAttempt)
                     .SetProperty(x => x.LeaseUntil, (DateTimeOffset?)null)

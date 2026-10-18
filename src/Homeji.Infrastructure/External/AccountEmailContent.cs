@@ -23,21 +23,15 @@ internal sealed record AccountEmailContent(string Subject, string Html, string T
         var name = string.IsNullOrWhiteSpace(displayName) ? "bạn" : displayName.Trim();
         var safeName = WebUtility.HtmlEncode(name);
         var safeUrl = WebUtility.HtmlEncode(url);
-        var html = $$"""
-            <!doctype html>
-            <html lang="vi">
-            <body style="font-family:Arial,sans-serif;line-height:1.6;color:#111827">
-              <h2>{{subject}}</h2>
-              <p>Chào {{safeName}},</p>
-              <p>{{message}}</p>
-              <p><a href="{{safeUrl}}" style="display:inline-block;padding:12px 18px;background:#0f766e;color:#fff;text-decoration:none;border-radius:6px">{{action}}</a></p>
-              <p>Nếu nút không hoạt động, hãy mở liên kết sau:</p>
-              <p>{{safeUrl}}</p>
-              <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
-              <p>Homeji</p>
-            </body>
-            </html>
+        var body = $$"""
+            <p style="margin:0 0 8px;color:#087681;font-size:11px;font-weight:700;letter-spacing:1.5px">BẢO MẬT TÀI KHOẢN</p>
+            <h1 class="email-title" style="margin:0 0 18px;font-size:26px;line-height:1.4;color:#193737">{{subject}}</h1>
+            <p style="font-size:15px;line-height:1.8;color:#506b66">Chào {{safeName}},<br>{{message}}</p>
+            <p style="margin:24px 0"><a href="{{safeUrl}}" style="display:inline-block;padding:13px 20px;background:#087f88;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700">{{action}}</a></p>
+            <p style="font-size:12px;line-height:1.8;color:#627976">Nếu nút không hoạt động, hãy mở liên kết sau:<br><span style="word-break:break-all">{{safeUrl}}</span></p>
+            <p style="font-size:13px;line-height:1.8;color:#627976">Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.</p>
             """;
+        var html = HomejiEmailLayout.Wrap(subject, message, body);
         var text = $"Chào {name},\n\n{message}\n{url}\n\nNếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.\n\nHomeji";
         return new AccountEmailContent(subject, html, text);
     }

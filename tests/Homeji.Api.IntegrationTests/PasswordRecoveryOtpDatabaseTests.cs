@@ -70,7 +70,7 @@ public sealed class PasswordRecoveryOtpDatabaseTests
     private sealed class Sender : ITransactionalEmailSender
     {
         public int Sent { get; private set; }
-        public Task<EmailSendResultDto> SendAsync(string email, string subject, string html, string text, Guid idempotencyKey, CancellationToken cancellationToken, EmailAttachmentDto? attachment = null)
+        public Task<EmailSendResultDto> SendAsync(string email, string subject, string html, string text, Guid idempotencyKey, CancellationToken cancellationToken, IReadOnlyList<EmailAttachmentDto>? attachments = null)
         {
             Sent++;
             Assert.Contains("123456", html, StringComparison.Ordinal);
