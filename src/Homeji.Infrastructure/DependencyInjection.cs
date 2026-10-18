@@ -131,6 +131,7 @@ public static class DependencyInjection
             .Validate(options => !options.Enabled || usesBrevo, "Receipt email delivery requires Brevo.")
             .ValidateOnStart();
         services.AddScoped<ITransactionReceiptService, TransactionReceiptService>();
+        services.AddScoped<IPremiumWalletPaymentService, PremiumWalletPaymentService>();
         services.AddScoped<IOrderReceiptWriter, TransactionReceiptService>();
         services.AddScoped<IReceiptEmailDispatcher, ReceiptEmailDispatcher>();
         services.AddHttpClient<ITransactionalEmailSender, BrevoAccountEmailSender>()

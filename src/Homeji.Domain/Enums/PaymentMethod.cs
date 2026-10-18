@@ -4,4 +4,5 @@ public enum PaymentMethod
 {
     Momo = 1,
     PayOs = 2,
+    Wallet = 3,
 }

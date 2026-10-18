@@ -1,6 +1,7 @@
 using Homeji.Application.DTOs.Payments;
 using Homeji.Application.DTOs.Subscriptions;
 using Homeji.Application.IServices.Subscriptions;
+using Homeji.Application.IServices.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -34,6 +35,13 @@ public sealed class SubscriptionsController : ControllerBase
     {
         return Ok(await _subscriptions.GetMySubscriptionAsync(cancellationToken));
     }
+
+    [HttpPost("premium/{packageCode}/wallet")]
+    [ProducesResponseType<PaymentDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PaymentDto>> PurchaseWithWallet(
+        string packageCode, [FromBody] WalletPremiumPaymentDto request,
+        [FromServices] IPremiumWalletPaymentService walletPayments, CancellationToken cancellationToken)
+        => Ok(await walletPayments.PurchaseAsync(packageCode, request, cancellationToken));
 
     [HttpPost("premium/{packageCode}/momo/create")]
     [ProducesResponseType<MomoPaymentResponseDto>(StatusCodes.Status200OK)]

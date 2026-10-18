@@ -10,4 +10,5 @@ public enum WalletTransactionKind
     LegacyServicePurchase = 6,
     Withdrawal = 7,
     WithdrawalRefund = 8,
+    SubscriptionPurchase = 9,
 }
