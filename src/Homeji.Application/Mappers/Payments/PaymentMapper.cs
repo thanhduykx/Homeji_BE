@@ -1,5 +1,6 @@
 using Homeji.Application.DTOs.Payments;
 using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
 
 namespace Homeji.Application.Mappers.Payments;
 
@@ -28,6 +29,6 @@ public static class PaymentMapper
             payment.CreatedAt,
             payment.UpdatedAt,
             payment.PaidAt,
-            payment.CreatedAt.Add(PaymentTransaction.PaymentLifetime));
+            payment.Method == PaymentMethod.Wallet ? null : payment.CreatedAt.Add(PaymentTransaction.PaymentLifetime));
     }
 }
