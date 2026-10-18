@@ -1,3 +1,4 @@
+using Homeji.Application.IServices.RentalPosts;
 using Homeji.Application.IRepositories.Moderation;
 using Homeji.Application.IRepositories.Marketplace;
 using Homeji.Application.IRepositories.Wallets;
@@ -132,6 +133,8 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddScoped<ITransactionReceiptService, TransactionReceiptService>();
         services.AddScoped<IPremiumWalletPaymentService, PremiumWalletPaymentService>();
+        services.AddScoped<ISearchInterestService, SearchInterestService>();
+        services.AddHttpClient<GeminiInterestRanker>();
         services.AddScoped<IOrderReceiptWriter, TransactionReceiptService>();
         services.AddScoped<IReceiptEmailDispatcher, ReceiptEmailDispatcher>();
         services.AddHttpClient<ITransactionalEmailSender, BrevoAccountEmailSender>()

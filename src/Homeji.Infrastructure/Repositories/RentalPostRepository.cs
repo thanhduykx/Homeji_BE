@@ -40,7 +40,7 @@ public sealed class RentalPostRepository : IRentalPostRepository
         return await BuildActiveSearchQuery(search).ToListAsync(cancellationToken);
     }
 
-    internal IQueryable<RentalPost> BuildActiveSearchQuery(RentalPostSearchDto search)
+    internal IQueryable<RentalPost> BuildActiveSearchQuery(RentalPostSearchDto search, bool paginate = true)
     {
         var today = RentalPublicAvailability.Today(_timeProvider);
         var query = _dbContext.RentalPosts
@@ -131,6 +131,7 @@ public sealed class RentalPostRepository : IRentalPostRepository
             query = query.Where(post => post.Amenities.Any(item => item.Code == amenity));
         }
 
+        if (!paginate) return query.AsSplitQuery();
         var page = Math.Max(1, search.Page);
         var pageSize = Math.Clamp(search.PageSize, 1, MaxPageSize);
 

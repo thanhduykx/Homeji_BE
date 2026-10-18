@@ -97,6 +97,9 @@ public sealed class UserProfileRepository : IUserProfileRepository
     {
         var candidates = await _dbContext.UserProfiles
             .AsNoTracking()
+            // Users with explicit personalization settings are handled by confirmed follows,
+            // including permanent opt-out; do not bypass those filters through legacy hints.
+            .Where(profile => !_dbContext.Set<SearchPersonalization>().Any(s => s.UserId == profile.Id))
             .Where(profile => profile.Id != excludedUserId
                 && profile.Role == UserRole.Renter
                 && (profile.MaxBudget == null || profile.MaxBudget >= price))

@@ -1522,6 +1522,38 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("saved_posts", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.SearchPersonalization", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AiEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset>("CheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Data")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("EmailEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("Enabled", "CheckedAt");
+
+                    b.ToTable("search_personalization", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.TransactionReceipt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2209,6 +2241,15 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasOne("Homeji.Domain.Entities.UserProfile", null)
                         .WithOne()
                         .HasForeignKey("Homeji.Domain.Entities.RoommateProfile", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.SearchPersonalization", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithOne()
+                        .HasForeignKey("Homeji.Domain.Entities.SearchPersonalization", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
