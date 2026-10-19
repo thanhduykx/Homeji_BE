@@ -62,12 +62,12 @@ public sealed class TransactionEmailDatabaseTests
 
         var withdrawals = new WalletWithdrawalRepository(db);
         var requester = new WalletWithdrawalService(new UserContext(new CurrentUser(user), new UserProfileRepository(db)), wallets, withdrawals, TimeProvider.System, receipts);
-        var requested = await requester.CreateAsync(new CreateWalletWithdrawalDto(20000, "Test Bank", "1234567890", "TEST USER"));
+        var requested = await requester.CreateAsync(new CreateWalletWithdrawalDto(20000, "Test Bank", "1234567890", "TEST USER", Guid.NewGuid()));
         Assert.Equal(80000, (await wallets.GetAsync(user, CancellationToken.None))!.Balance);
         var reviewer = new WalletWithdrawalService(new UserContext(new CurrentUser(admin), new UserProfileRepository(db)), wallets, withdrawals, TimeProvider.System, receipts);
         await reviewer.RejectAsync(requested.Id, new ReviewWalletWithdrawalDto("Test refund"));
         Assert.Equal(100000, (await wallets.GetAsync(user, CancellationToken.None))!.Balance);
-        var second = await requester.CreateAsync(new CreateWalletWithdrawalDto(20000, "Test Bank", "1234567890", "TEST USER"));
+        var second = await requester.CreateAsync(new CreateWalletWithdrawalDto(20000, "Test Bank", "1234567890", "TEST USER", Guid.NewGuid()));
         await reviewer.CompleteAsync(second.Id, new ReviewWalletWithdrawalDto("Test transfer reference"));
         var history = (await receipts.GetMineAsync(1, 20, CancellationToken.None)).Items;
         Assert.Equal(5, history.Count);
@@ -139,6 +139,8 @@ public sealed class TransactionEmailDatabaseTests
         var uncertainPayment = Paid(user);
         await service.RecordPaymentAsync(uncertainPayment, CancellationToken.None);
         await setup.SaveChangesAsync();
+        await setup.ReceiptEmailDeliveries.Where(x => setup.TransactionReceipts.Any(r => r.Id == x.ReceiptId && r.ReferenceId == uncertainPayment.Id))
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.NextAttemptAt, DateTimeOffset.UnixEpoch));
         var uncertainSender = new Sender { Uncertain = true };
         await Dispatcher(first, uncertainSender).DispatchBatchAsync(CancellationToken.None);
         await Dispatcher(second, uncertainSender).DispatchBatchAsync(CancellationToken.None);

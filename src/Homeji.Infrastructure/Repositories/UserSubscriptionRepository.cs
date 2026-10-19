@@ -15,6 +15,12 @@ public sealed class UserSubscriptionRepository : IUserSubscriptionRepository
         _dbContext = dbContext;
     }
 
+    public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        _dbContext.UserSubscriptions.AsNoTracking()
+            .Where(s => s.UserId == userId && s.Tier == SubscriptionTier.Premium
+                && s.Status == SubscriptionStatus.Active && s.ExpiresAt > now)
+            .OrderByDescending(s => s.ExpiresAt).FirstOrDefaultAsync(cancellationToken);
+
     public Task<UserSubscription?> GetActivePremiumAsync(
         Guid userId,
         DateTimeOffset now,

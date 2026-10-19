@@ -74,6 +74,7 @@ public sealed class SubscriptionServiceTests
         public bool Fail { get; init; }
         public Guid? RequestedUserId { get; private set; }
         public DateTimeOffset? RequestedTime { get; private set; }
+        public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => GetActivePremiumAsync(userId, now, cancellationToken);
         public Task<UserSubscription?> GetActivePremiumAsync(Guid userId, DateTimeOffset now,
             CancellationToken cancellationToken = default)
         {

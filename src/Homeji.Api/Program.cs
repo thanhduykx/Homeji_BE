@@ -161,6 +161,11 @@ app.MapGet(
     .AllowAnonymous();
 
 app.MapControllers();
+app.MapGet("/health/version", () => Results.Ok(new
+{
+    release = "payment-integrity-2026-10-19",
+    commit = Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT"),
+})).AllowAnonymous();
 app.MapHub<NotificationHub>("/hubs/notifications");
 
 await app.RunAsync();

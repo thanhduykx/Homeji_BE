@@ -23,7 +23,8 @@ public sealed class WalletWithdrawalRequest
         string bankName,
         string accountNumber,
         string accountHolder,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        Guid? id = null)
     {
         if (userId == Guid.Empty)
         {
@@ -31,7 +32,7 @@ public sealed class WalletWithdrawalRequest
         }
 
         EnsurePositiveAmount(amount);
-        Id = Guid.NewGuid();
+        Id = id ?? Guid.NewGuid();
         UserId = userId;
         Amount = amount;
         BankName = NormalizeRequired(bankName, MaxBankNameLength, "Bank name");

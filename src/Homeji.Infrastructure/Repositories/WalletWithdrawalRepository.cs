@@ -15,6 +15,9 @@ public sealed class WalletWithdrawalRepository : IWalletWithdrawalRepository
         _dbContext = dbContext;
     }
 
+    public Task<T> ExecuteForUserAsync<T>(Guid userId, Func<Task<T>> action, CancellationToken cancellationToken) =>
+        FinancialTransaction.ExecuteAsync(_dbContext, userId, action, cancellationToken);
+
     public Task<WalletWithdrawalRequest?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         _dbContext.WalletWithdrawalRequests.SingleOrDefaultAsync(request => request.Id == id, cancellationToken);
 

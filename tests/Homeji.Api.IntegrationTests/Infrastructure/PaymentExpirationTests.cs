@@ -163,6 +163,7 @@ public sealed class PaymentExpirationTests
 
     private sealed class MemoryPayments(PaymentTransaction payment) : IPaymentTransactionRepository
     {
+        public Task<T> ExecuteForOrderAsync<T>(string orderCode, Func<Task<T>> action, CancellationToken cancellationToken) => action();
         public Task<int> CancelOverdueAsync(DateTimeOffset now, Guid? userId = null, CancellationToken cancellationToken = default) =>
             Task.FromResult((!userId.HasValue || userId == payment.UserId) && payment.CancelIfOverdue(now) ? 1 : 0);
         public Task<PaymentTransaction?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult<PaymentTransaction?>(payment.Id == id ? payment : null);

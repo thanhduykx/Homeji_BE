@@ -423,6 +423,7 @@ public sealed class AiSearchGroundingTests
             Task.FromResult<IReadOnlyDictionary<Guid, UserSubscription>>(PremiumOwner.HasValue
                 ? new Dictionary<Guid, UserSubscription> { [PremiumOwner.Value] = UserSubscription.CreatePremium(PremiumOwner.Value, "test", "Premium", null, now, 30, now) }
                 : new Dictionary<Guid, UserSubscription>());
+        public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => GetActivePremiumAsync(userId, now, cancellationToken);
         public Task<UserSubscription?> GetActivePremiumAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<UserSubscription?> GetByPaymentTransactionIdAsync(Guid paymentTransactionId, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default) => throw new NotSupportedException();

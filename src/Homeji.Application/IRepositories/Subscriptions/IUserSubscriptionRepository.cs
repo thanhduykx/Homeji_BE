@@ -4,6 +4,7 @@ namespace Homeji.Application.IRepositories.Subscriptions;
 
 public interface IUserSubscriptionRepository
 {
+    Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default);
     Task<UserSubscription?> GetActivePremiumAsync(
         Guid userId,
         DateTimeOffset now,

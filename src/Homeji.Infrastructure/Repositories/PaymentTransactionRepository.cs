@@ -15,6 +15,15 @@ public sealed class PaymentTransactionRepository : IPaymentTransactionRepository
         _dbContext = dbContext;
     }
 
+    public async Task<T> ExecuteForOrderAsync<T>(string orderCode, Func<Task<T>> action, CancellationToken cancellationToken)
+    {
+        var userId = await _dbContext.PaymentTransactions.AsNoTracking()
+            .Where(p => p.OrderCode == orderCode).Select(p => (Guid?)p.UserId).SingleOrDefaultAsync(cancellationToken);
+        return userId.HasValue
+            ? await FinancialTransaction.ExecuteAsync(_dbContext, userId.Value, action, cancellationToken)
+            : await action();
+    }
+
     public Task<int> CancelOverdueAsync(DateTimeOffset now, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         var cutoff = now.Subtract(PaymentTransaction.PaymentLifetime);

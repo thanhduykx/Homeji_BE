@@ -141,7 +141,7 @@ public sealed class PaymentService : IPaymentService
         ValidateWalletTopUpAmount(purpose, amount);
         var description = NormalizeDescription(requestedDescription);
         var now = _timeProvider.GetUtcNow();
-        var orderCode = $"MOMO{now.ToUnixTimeMilliseconds()}";
+        var orderCode = $"MOMO{Guid.NewGuid():N}";
         var requestId = $"{orderCode}{RandomNumberGenerator.GetInt32(1000, 9999)}";
         const string extraData = "";
 
@@ -174,6 +174,12 @@ public sealed class PaymentService : IPaymentService
             lang = _momoOptions.Lang,
         };
 
+        var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
+        payment.AttachMomoPayment(requestId, null, null, null, null, null, now);
+        await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
+        await _payments.AddAsync(payment, cancellationToken);
+        await _payments.SaveChangesAsync(cancellationToken);
+
         using var response = await SendAsync(
             () => _httpClient.PostAsJsonAsync(_momoOptions.Endpoint, payload, JsonOptions, cancellationToken),
             "MoMo",
@@ -197,19 +203,21 @@ public sealed class PaymentService : IPaymentService
             throw ProviderFailure("MoMo", "Phản hồi thành công nhưng không có đường dẫn thanh toán hợp lệ.");
         }
 
-        var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
-        payment.AttachMomoPayment(
-            requestId,
-            payUrl,
-            GetString(root, "deeplink"),
-            GetString(root, "qrCodeUrl"),
-            GetString(root, "message"),
-            responseText,
-            now);
+        payment = await _payments.ExecuteForOrderAsync(orderCode, async () =>
+        {
+            var current = await _payments.GetByOrderCodeAsync(orderCode, cancellationToken) ?? payment;
+            current.AttachMomoPayment(
+                requestId,
+                payUrl,
+                GetString(root, "deeplink"),
+                GetString(root, "qrCodeUrl"),
+                current.Status == PaymentStatus.Paid ? current.ProviderMessage : GetString(root, "message"),
+                current.Status == PaymentStatus.Paid ? current.RawProviderPayload : responseText,
+                current.Status == PaymentStatus.Paid ? current.UpdatedAt : now);
 
-        await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
-        await _payments.AddAsync(payment, cancellationToken);
-        await _payments.SaveChangesAsync(cancellationToken);
+            await _payments.SaveChangesAsync(cancellationToken);
+            return current;
+        }, cancellationToken);
 
         return new MomoPaymentResponseDto(
             payment.Id,
@@ -223,7 +231,10 @@ public sealed class PaymentService : IPaymentService
             payment.ProviderMessage);
     }
 
-    public async Task<PaymentDto> HandleMomoIpnAsync(
+    public Task<PaymentDto> HandleMomoIpnAsync(MomoIpnDto request, CancellationToken cancellationToken = default) =>
+        _payments.ExecuteForOrderAsync(request.OrderId ?? string.Empty, () => HandleMomoIpnCoreAsync(request, cancellationToken), cancellationToken);
+
+    private async Task<PaymentDto> HandleMomoIpnCoreAsync(
         MomoIpnDto request,
         CancellationToken cancellationToken = default)
     {
@@ -360,6 +371,11 @@ public sealed class PaymentService : IPaymentService
         httpRequest.Headers.Add("x-client-id", _payOsOptions.ClientId);
         httpRequest.Headers.Add("x-api-key", _payOsOptions.ApiKey);
 
+        var payment = new PaymentTransaction(userId, PaymentMethod.PayOs, amount,
+            orderCode.ToString(CultureInfo.InvariantCulture), description, now, purpose, packageCode);
+        await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
+        await _payments.AddAsync(payment, cancellationToken);
+        await _payments.SaveChangesAsync(cancellationToken);
         using var response = await SendAsync(
             () => _httpClient.SendAsync(httpRequest, cancellationToken),
             "PayOS",
@@ -397,32 +413,26 @@ public sealed class PaymentService : IPaymentService
             throw ProviderFailure("PayOS", "Phản hồi thành công nhưng dữ liệu link thanh toán không hợp lệ.");
         }
 
-        var payment = new PaymentTransaction(
-            userId,
-            PaymentMethod.PayOs,
-            amount,
-            orderCode.ToString(CultureInfo.InvariantCulture),
-            description,
-            now,
-            purpose,
-            packageCode);
-        payment.AttachPayOsQrPayment(
-            qrCode,
-            null,
-            responseText,
-            now);
-        payment.AttachMomoPayment(
-            orderCode.ToString(CultureInfo.InvariantCulture),
-            checkoutUrl,
-            null,
-            null,
-            providerMessage,
-            responseText,
-            now);
+        payment = await _payments.ExecuteForOrderAsync(payment.OrderCode, async () =>
+        {
+            var current = await _payments.GetByOrderCodeAsync(payment.OrderCode, cancellationToken) ?? payment;
+            current.AttachPayOsQrPayment(
+                qrCode,
+                null,
+                current.Status == PaymentStatus.Paid ? current.RawProviderPayload : responseText,
+                current.Status == PaymentStatus.Paid ? current.UpdatedAt : now);
+            current.AttachMomoPayment(
+                orderCode.ToString(CultureInfo.InvariantCulture),
+                checkoutUrl,
+                null,
+                null,
+                current.Status == PaymentStatus.Paid ? current.ProviderMessage : providerMessage,
+                current.Status == PaymentStatus.Paid ? current.RawProviderPayload : responseText,
+                current.Status == PaymentStatus.Paid ? current.UpdatedAt : now);
 
-        await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
-        await _payments.AddAsync(payment, cancellationToken);
-        await _payments.SaveChangesAsync(cancellationToken);
+            await _payments.SaveChangesAsync(cancellationToken);
+            return current;
+        }, cancellationToken);
 
         return new PayOsPaymentResponseDto(
             payment.Id,
@@ -434,7 +444,11 @@ public sealed class PaymentService : IPaymentService
             payment.ProviderMessage);
     }
 
-    public async Task<PaymentDto?> HandlePayOsWebhookAsync(
+    public Task<PaymentDto?> HandlePayOsWebhookAsync(PayOsWebhookDto request, CancellationToken cancellationToken = default) =>
+        _payments.ExecuteForOrderAsync(request.Data?.OrderCode.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            () => HandlePayOsWebhookCoreAsync(request, cancellationToken), cancellationToken);
+
+    private async Task<PaymentDto?> HandlePayOsWebhookCoreAsync(
         PayOsWebhookDto request,
         CancellationToken cancellationToken = default)
     {
@@ -510,7 +524,7 @@ public sealed class PaymentService : IPaymentService
             return;
         }
 
-        var currentPremium = await _subscriptions.GetActivePremiumAsync(payment.UserId, paidAt, cancellationToken);
+        var currentPremium = await _subscriptions.GetPremiumTailAsync(payment.UserId, paidAt, cancellationToken);
         var startsAt = currentPremium is not null && currentPremium.ExpiresAt > paidAt
             ? currentPremium.ExpiresAt
             : paidAt;
@@ -606,8 +620,10 @@ public sealed class PaymentService : IPaymentService
 
     private static long GeneratePayOsOrderCode()
     {
-        var unixMilliseconds = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        return (unixMilliseconds % 9_000_000_000) + 1_000_000_000;
+        // 15 decimal digits remain exactly representable by JavaScript clients.
+        // Reserve the unique-indexed intent before any provider request.
+        return RandomNumberGenerator.GetInt32(100_000_000, 1_000_000_000) * 1_000_000L
+            + RandomNumberGenerator.GetInt32(0, 1_000_000);
     }
 
     private static long ToWholeVnd(decimal amount)

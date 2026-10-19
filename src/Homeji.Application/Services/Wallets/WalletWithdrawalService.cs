@@ -6,6 +6,8 @@ using Homeji.Application.IServices.Emails;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Homeji.Application.Services.Wallets;
 
@@ -37,6 +39,26 @@ public sealed class WalletWithdrawalService : IWalletWithdrawalService
     {
         ValidateCreate(request);
         var userId = _userContext.GetRequiredUserId();
+        if (request.RequestId is null || request.RequestId == Guid.Empty)
+            throw Validation("requestId", "Vui lòng tải lại trang để tạo mã yêu cầu rút tiền.");
+        return await _withdrawals.ExecuteForUserAsync(userId,
+            () => CreateCoreAsync(userId, request, cancellationToken), cancellationToken);
+    }
+
+    private async Task<WalletWithdrawalDto> CreateCoreAsync(Guid userId, CreateWalletWithdrawalDto request, CancellationToken cancellationToken)
+    {
+        // Namespaced durable key: another user's identical client key cannot resolve this withdrawal.
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"homeji-withdrawal:{userId:N}:{request.RequestId:N}"));
+        var id = new Guid(hash.AsSpan(0, 16));
+        var existing = await _withdrawals.GetByIdAsync(id, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.UserId != userId || existing.Amount != request.Amount
+                || existing.BankName != request.BankName.Trim() || existing.AccountNumber != request.AccountNumber.Trim()
+                || !string.Equals(existing.AccountHolder, request.AccountHolder.Trim(), StringComparison.OrdinalIgnoreCase))
+                throw new ConflictException("Mã yêu cầu đã được dùng với thông tin rút tiền khác.");
+            return ToDto(existing);
+        }
         var wallet = await _wallets.GetAsync(userId, cancellationToken)
             ?? throw Validation("amount", "Ví chưa được kích hoạt.");
         var now = _timeProvider.GetUtcNow();
@@ -46,7 +68,8 @@ public sealed class WalletWithdrawalService : IWalletWithdrawalService
             request.BankName,
             request.AccountNumber,
             request.AccountHolder,
-            now);
+            now,
+            id);
 
         wallet.DebitWithdrawal(request.Amount, now);
         await _withdrawals.AddAsync(withdrawal, cancellationToken);

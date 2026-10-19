@@ -27,7 +27,8 @@ public sealed record CreateWalletWithdrawalDto(
     decimal Amount,
     string BankName,
     string AccountNumber,
-    string AccountHolder);
+    string AccountHolder,
+    Guid? RequestId = null);
 
 public sealed record ReviewWalletWithdrawalDto(string? Note);
 

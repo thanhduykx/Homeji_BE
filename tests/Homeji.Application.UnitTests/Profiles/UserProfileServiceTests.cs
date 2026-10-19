@@ -184,6 +184,7 @@ public sealed class UserProfileServiceTests
 
     private sealed class EmptyUserSubscriptionRepository : IUserSubscriptionRepository
     {
+        public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => GetActivePremiumAsync(userId, now, cancellationToken);
         public Task<UserSubscription?> GetActivePremiumAsync(
             Guid userId,
             DateTimeOffset now,

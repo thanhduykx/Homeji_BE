@@ -264,6 +264,7 @@ public sealed class RentalPostSearchTests
             Task.FromResult<IReadOnlyDictionary<Guid, UserSubscription>>(
                 new Dictionary<Guid, UserSubscription>());
 
+        public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => GetActivePremiumAsync(userId, now, cancellationToken);
         public Task<UserSubscription?> GetActivePremiumAsync(
             Guid userId,
             DateTimeOffset now,
