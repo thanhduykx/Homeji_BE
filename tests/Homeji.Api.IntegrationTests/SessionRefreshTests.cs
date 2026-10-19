@@ -8,6 +8,8 @@ using Homeji.Application.IServices.Accounts;
 using Homeji.Infrastructure.External;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
@@ -24,6 +26,19 @@ public sealed class SessionRefreshTests : IDisposable
     private readonly string _session = Guid.NewGuid().ToString();
     private readonly Revocations _revocations = new();
     private readonly Handler _handler = new();
+
+    [Fact]
+    public void MvcCanValidateRefreshRecordWithoutPropertyMetadataErrors()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddControllers();
+        using var provider = services.BuildServiceProvider();
+        var context = new ActionContext { HttpContext = new DefaultHttpContext { RequestServices = provider } };
+        provider.GetRequiredService<IObjectModelValidator>().Validate(context, null, "", new RefreshSessionRequest("bad", "short"));
+        Assert.False(context.ModelState.IsValid);
+        Assert.Contains("SessionToken", context.ModelState.Keys);
+    }
 
     [Fact]
     public async Task ExpiredSignedAnchorCanRotateWithinSameSession()

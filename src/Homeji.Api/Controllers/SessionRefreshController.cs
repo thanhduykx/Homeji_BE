@@ -81,5 +81,5 @@ public sealed class SessionRefreshController(
 }
 
 public sealed record RefreshSessionRequest(
-    [property: Required, StringLength(16384, MinimumLength = 20)] string SessionToken,
-    [property: Required, StringLength(4096, MinimumLength = 8)] string RefreshToken);
+    [Required, StringLength(16384, MinimumLength = 20)] string SessionToken,
+    [Required, StringLength(4096, MinimumLength = 8)] string RefreshToken);
