@@ -18,6 +18,9 @@ verification. No storage file is uploaded and no real browser is driven by this 
   a production/application role. The role needs schema creation for `EnsureCreated`.
 - Each test rolls back its inserted rows. No `DROP DATABASE`, cleanup SQL or production
   migrations are run. `EnsureCreated` verifies the current EF model, not migration history.
+- The fixture installs the immutable search normalization function and pg_trgm prerequisite
+  from AddNormalizedRentalSearch before EnsureCreated; generated search columns require them.
+  The guarded QA database role needs permission to install trusted pg_trgm in this disposable DB.
 - Missing configuration fails explicitly; passing tests are never silently skipped.
 
 ## Optional persistence verification without Docker

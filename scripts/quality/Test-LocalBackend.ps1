@@ -4,7 +4,8 @@ param(
     [int]$DatabasePort = 55439,
     [int]$ApiPort = 5189,
     [string]$SourceImportSql,
-    [switch]$SkipLoadTest
+    [switch]$SkipLoadTest,
+    [switch]$IncludePostingPersistence
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -14,7 +15,7 @@ New-Item -ItemType Directory -Path $runPath | Out-Null
 $password = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 $passwordFile = Join-Path $runPath 'pg-password.txt'
 Set-Content -LiteralPath $passwordFile -Value $password
-$trackedEnvironment = @('PGPASSWORD', 'HOMEJI_TEST_DATABASE', 'ASPNETCORE_ENVIRONMENT', 'ASPNETCORE_URLS',
+$trackedEnvironment = @('PGPASSWORD', 'HOMEJI_TEST_DATABASE', 'HOMEJI_TEST_DB', 'ASPNETCORE_ENVIRONMENT', 'ASPNETCORE_URLS',
     'ConnectionStrings__DefaultConnection', 'Database__ApplyMigrationsOnStartup', 'BackgroundJobs__Enabled',
     'Api__EnableOpenApi', 'RateLimiting__PublicSearch__PermitLimit')
 $previousEnvironment = @{}
@@ -51,6 +52,13 @@ try {
         }
         dotnet test Homeji.sln --no-restore --logger 'trx;LogFilePrefix=local' --results-directory (Join-Path $runPath 'tests') --collect 'XPlat Code Coverage' -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
         if ($LASTEXITCODE -ne 0) { throw 'Local regression/database tests failed.' }
+        if ($IncludePostingPersistence) {
+            & (Join-Path $PostgresBin 'psql.exe') -h 127.0.0.1 -p $DatabasePort -U homeji_quality -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE homeji_ui_qa;'
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the isolated posting-test database.' }
+            $env:HOMEJI_TEST_DB = "Host=127.0.0.1;Port=$DatabasePort;Database=homeji_ui_qa;Username=homeji_quality;Password=$password"
+            dotnet test tests/Homeji.Infrastructure.IntegrationTests --logger 'trx;LogFilePrefix=posting' --results-directory (Join-Path $runPath 'tests')
+            if ($LASTEXITCODE -ne 0) { throw 'Posting persistence tests failed.' }
+        }
         if ($SkipLoadTest) {
             Write-Output "Test evidence: $runPath"
             return

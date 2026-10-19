@@ -932,6 +932,24 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("save_count");
 
+                    b.Property<string>("SearchAddress")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("search_address")
+                        .HasComputedColumnSql("homeji.normalize_rental_search(address)", true);
+
+                    b.Property<string>("SearchDescription")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("search_description")
+                        .HasComputedColumnSql("homeji.normalize_rental_search(description)", true);
+
+                    b.Property<string>("SearchTitle")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("text")
+                        .HasColumnName("search_title")
+                        .HasComputedColumnSql("homeji.normalize_rental_search(title)", true);
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");
@@ -976,6 +994,24 @@ namespace Homeji.Infrastructure.Migrations
 
                     b.HasIndex("Price")
                         .HasDatabaseName("ix_rental_posts_price");
+
+                    b.HasIndex("SearchAddress")
+                        .HasDatabaseName("ix_rental_posts_search_address_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchAddress"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchAddress"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("SearchDescription")
+                        .HasDatabaseName("ix_rental_posts_search_description_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchDescription"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchDescription"), new[] { "gin_trgm_ops" });
+
+                    b.HasIndex("SearchTitle")
+                        .HasDatabaseName("ix_rental_posts_search_title_trgm");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("SearchTitle"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("SearchTitle"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_rental_posts_status");

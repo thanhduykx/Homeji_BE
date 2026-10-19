@@ -11,6 +11,8 @@ using Homeji.Domain.Exceptions;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using Homeji.Infrastructure.Migrations;
 using Npgsql;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
@@ -122,6 +124,15 @@ public sealed class PostingPersistenceTests
         {
             await db.DisposeAsync();
             throw new InvalidOperationException("The isolated local QA database is unavailable.");
+        }
+        await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS homeji;");
+        var normalizationInstalled = await db.Database.SqlQuery<bool>(
+            $"SELECT to_regprocedure('homeji.normalize_rental_search(text)') IS NOT NULL AS \"Value\"").SingleAsync();
+        if (!normalizationInstalled)
+        {
+            // EnsureCreated creates stored columns but does not execute migration SQL prerequisites.
+            var prerequisite = new AddNormalizedRentalSearch().UpOperations.OfType<SqlOperation>().Single();
+            await db.Database.ExecuteSqlRawAsync(prerequisite.Sql);
         }
         await db.Database.EnsureCreatedAsync();
         return db;

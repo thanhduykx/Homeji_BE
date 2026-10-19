@@ -1,5 +1,6 @@
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.Common;
+using Homeji.Application.Services.AI;
 using Homeji.Application.IRepositories.RentalPosts;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
@@ -59,6 +60,22 @@ public sealed class RentalPostRepository : IRentalPostRepository
             query = query.Where(post => post.Type == search.Type.Value);
         foreach (var code in (search.ExcludedAmenities ?? []).Select(value => value.Trim().ToUpperInvariant()).Distinct(StringComparer.Ordinal))
             query = query.Where(post => !post.Amenities.Any(amenity => amenity.Code == code));
+
+        if (!string.IsNullOrWhiteSpace(search.NormalizedLocation))
+        {
+            var location = LiteralContainsPattern(search.NormalizedLocation);
+            query = query.Where(post =>
+                EF.Functions.Like(EF.Property<string>(post, "SearchAddress"), location, "\\")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), location, "\\"));
+        }
+        if (!string.IsNullOrWhiteSpace(search.NormalizedKeyword))
+        {
+            var term = LiteralContainsPattern(search.NormalizedKeyword);
+            query = query.Where(post =>
+                EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), term, "\\")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchDescription"), term, "\\")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchAddress"), term, "\\"));
+        }
 
         if (!string.IsNullOrWhiteSpace(search.Keyword))
         {
@@ -153,6 +170,11 @@ public sealed class RentalPostRepository : IRentalPostRepository
             .OrderBy(post => post.UpdatedAt)
             .ToListAsync(cancellationToken);
     }
+
+    private static string LiteralContainsPattern(string value) => "%" + RentalSearchIntent.Normalize(value)
+        .Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("%", "\\%", StringComparison.Ordinal)
+        .Replace("_", "\\_", StringComparison.Ordinal) + "%";
 
     public async Task<IReadOnlyList<RentalPost>> GetByOwnerAsync(
         Guid ownerId,

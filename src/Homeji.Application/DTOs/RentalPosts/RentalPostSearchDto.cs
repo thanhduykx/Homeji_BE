@@ -23,4 +23,6 @@ public sealed record RentalPostSearchDto(
     IReadOnlyCollection<Guid>? Ids = null,
     bool ExcludeSynthetic = false,
     RentalPostType? Type = null,
-    UserRole? OwnerRole = null);
+    UserRole? OwnerRole = null,
+    string? NormalizedKeyword = null,
+    string? NormalizedLocation = null);

@@ -129,14 +129,16 @@ public sealed class AiSearchService : IAiSearchService
             MinAvailableSlots: parsed.Occupants,
             ExcludedAmenities: parsed.ExcludedAmenities,
             ExcludeRoommateShare: parsed.ExcludeRoommateShare,
-            ExcludeSynthetic: true);
+            ExcludeSynthetic: true,
+            NormalizedKeyword: parsed.Keyword,
+            NormalizedLocation: parsed.Location);
 
         var retrievalStarted = System.Diagnostics.Stopwatch.GetTimestamp();
         var now = _timeProvider.GetUtcNow();
         var today = RentalPublicAvailability.VietnamDate(now);
         IReadOnlyList<RentalPost> posts = [];
-        // Text matching cannot be pushed into accent-sensitive ILike. Scan structured-filtered
-        // pages, retaining only the global best results rather than truncating before matching.
+        // PostgreSQL filters normalized text before pagination; rank all matching pages
+        // so a better match after page one is never silently discarded.
         for (var page = 1; ; page++)
         {
             cancellationToken.ThrowIfCancellationRequested();

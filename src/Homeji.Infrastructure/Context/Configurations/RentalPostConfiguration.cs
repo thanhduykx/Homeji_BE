@@ -46,6 +46,20 @@ public sealed class RentalPostConfiguration : IEntityTypeConfiguration<RentalPos
         builder.Property(post => post.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(post => post.UpdatedAt).HasColumnName("updated_at").IsRequired();
 
+        // Stored generated values also stay correct for imports and direct SQL updates.
+        foreach (var (property, column, source) in new[]
+        {
+            ("SearchTitle", "search_title", "title"),
+            ("SearchAddress", "search_address", "address"),
+            ("SearchDescription", "search_description", "description"),
+        })
+        {
+            builder.Property<string>(property).HasColumnName(column)
+                .HasComputedColumnSql($"homeji.normalize_rental_search({source})", stored: true);
+            builder.HasIndex(property).HasDatabaseName($"ix_rental_posts_{column}_trgm")
+                .HasMethod("gin").HasOperators("gin_trgm_ops");
+        }
+
         builder.HasMany(post => post.Media)
             .WithOne()
             .HasForeignKey(media => media.RentalPostId)
