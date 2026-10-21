@@ -43,3 +43,7 @@ Reference redesign checks: 14 document design cases plus sender/dispatcher tests
 ## Attachment change, 2026-10-21
 
 Receipt emails now attach the existing PDF plus Homeji-logo.png, replacing the HTML attachment. The HTML email body, Vietnamese PDF, amounts, statuses, recipients, outbox retries and idempotency behavior are preserved. Historical delivery evidence above describes the older attachment policy, not the new one. Automated checks validate all seven receipt events, PNG signatures, PDF signatures, and absence of HTML filenames; no customer email or financial transaction is sent by these checks.
+
+## History action, 2026-10-21
+
+Receipt mail now links directly to the protected wallet-history entry (`/marketplace?market=wallet&wallet=history`) rather than labelling the receipt list as transaction history. It opens a browser tab and includes the visible fallback URL. The footer accurately describes the PDF and PNG attachments. Existing delivered emails are immutable. Renderer tests lock the escaped query, new-tab target and updated copy; browser checks follow the generated email link with APIs intercepted and verify history both with an existing session and after mocked login.

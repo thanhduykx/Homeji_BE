@@ -21,4 +21,14 @@ public sealed class TransactionReceiptHtmlTests
         Assert.Contains("không phải hóa đơn thuế/VAT", html, StringComparison.Ordinal);
         Assert.Contains("07:00:00 (UTC+7)", html, StringComparison.Ordinal);
     }
+    [Fact]
+    public void History_link_opens_protected_wallet_history_in_new_browser_tab()
+    {
+        var dto = new TransactionReceiptDto(Guid.NewGuid(), Guid.NewGuid(), ReceiptEvent.DepositSucceeded,
+            100000, "VND", "TEST-REFERENCE", "Kiểm thử liên kết", DateTimeOffset.UnixEpoch, null, 0, false);
+        var html = TransactionReceiptHtml.Render(dto);
+        Assert.Contains("href=\"https://homeji.onrender.com/marketplace?market=wallet&amp;wallet=history\" target=\"_blank\"", html, StringComparison.Ordinal);
+        Assert.Contains("rel=\"noopener noreferrer\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("PDF và HTML", html, StringComparison.Ordinal);
+    }
 }

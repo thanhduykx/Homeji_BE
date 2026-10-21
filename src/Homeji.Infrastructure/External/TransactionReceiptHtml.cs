@@ -64,8 +64,9 @@ internal static class TransactionReceiptHtml
             </td></tr>
             <tr><td class="receipt-pad" style="padding:26px 36px 30px">
               <p style="margin:0 0 22px;font-size:12px;line-height:1.9;color:#506b66">{{ReceiptPresentation.Note(receipt.Event)}}</p>
-              <p style="margin:0 0 22px"><a href="{{HomejiEmailLayout.Website}}/receipts" style="display:inline-block;padding:13px 21px;background:#087f88;border-radius:6px;text-decoration:none;color:#ffffff;font-size:13px;font-weight:700">Xem lịch sử giao dịch &nbsp; →</a></p>
-              <p style="margin:0;padding-top:20px;border-top:1px solid #e2ece9;font-size:11px;line-height:1.9;color:#627976">Bản PDF và HTML được đính kèm để bạn lưu trữ, in hoặc đối chiếu.<br>Đây là biên nhận giao dịch Homeji, <strong>không phải hóa đơn thuế/VAT</strong>.</p>
+              <p style="margin:0 0 22px"><a href="{{WebUtility.HtmlEncode(HomejiEmailLayout.WalletHistoryUrl)}}" target="_blank" rel="noopener noreferrer" style="display:inline-block;padding:13px 21px;background:#087f88;border-radius:6px;text-decoration:none;color:#ffffff;font-size:13px;font-weight:700">Xem lịch sử giao dịch &nbsp; →</a></p>
+              <p style="margin:0 0 22px;font-size:12px;line-height:1.8;color:#506b66">Nếu nút không mở được, dùng liên kết này trong trình duyệt và đăng nhập cùng tài khoản Homeji:<br><a href="{{WebUtility.HtmlEncode(HomejiEmailLayout.WalletHistoryUrl)}}" target="_blank" rel="noopener noreferrer" style="color:#087681;word-break:break-all">{{WebUtility.HtmlEncode(HomejiEmailLayout.WalletHistoryUrl)}}</a></p>
+              <p style="margin:0;padding-top:20px;border-top:1px solid #e2ece9;font-size:11px;line-height:1.9;color:#627976">Biên nhận PDF và ảnh logo Homeji được đính kèm. Bạn có thể lưu PDF để in hoặc đối chiếu.<br>Đây là biên nhận giao dịch Homeji, <strong>không phải hóa đơn thuế/VAT</strong>.</p>
             </td></tr></table>
             <p style="margin:18px 0 0;font-size:11px;line-height:1.9;color:#627976">Homeji · Tìm phòng, kết nối và chia sẻ cuộc sống.<br><a href="{{HomejiEmailLayout.Website}}" style="color:#087681;text-decoration:none">homeji.onrender.com</a></p>
             </td></tr></table></body></html>

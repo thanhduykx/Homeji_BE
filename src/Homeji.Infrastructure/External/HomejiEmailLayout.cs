@@ -5,6 +5,7 @@ namespace Homeji.Infrastructure.External;
 internal static class HomejiEmailLayout
 {
     public const string Website = "https://homeji.onrender.com";
+    public const string WalletHistoryUrl = Website + "/marketplace?market=wallet&wallet=history";
     public const string LogoUrl = Website + "/brand/homeji-logo2.png";
 
     // Only trusted template markup enters content. Callers encode every user-controlled value.
