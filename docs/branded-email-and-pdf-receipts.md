@@ -2,7 +2,7 @@
 
 OTP signup and recovery emails share a responsive HTML layout with the website's Homeji logo, a prominent six-digit numeric code, ten-minute validity text, and a security notice. Existing confirmation/reset links use the same branded layout. No codes appear in subjects or logs.
 
-Receipt email displays the complete HTML receipt in the message body. It also attaches **two files**, with the same receipt reference: `Homeji-HJ-<id>.pdf` and `Homeji-HJ-<id>.html`. Amount, time, status and explanatory notes use the same presentation helpers. The HTML attachment exactly matches the email body. The website HTML preview also uses that renderer.
+Receipt email displays the complete receipt in the message body. It attaches the transaction PDF and the embedded Homeji-logo.png image. It no longer attaches an HTML file. Logo bytes come from the bundled asset, with no remote download at send time. The website renders receipt fields natively in the selected theme and offers no HTML download control.
 
 PDFs use the existing SkiaSharp dependency. The website logo and Noto Sans Regular/Bold fonts are embedded resources; PDF rendering needs no browser, network call or system-installed font. PDF text remains selectable, Vietnamese renders correctly, long references wrap, and long descriptions continue on another page. A typical PDF is about 700 KB because fonts are embedded. Its note distinguishes Homeji receipts from VAT invoices and does not claim delivery or bank settlement before the matching business state.
 
@@ -36,6 +36,10 @@ Production verification on 2026-10-18: recovery email delivered, actual six-digi
 
 ## Receipt design based on the supplied email reference
 
-The receipt uses a full-width teal brand banner, parallel accent rules, a total/date summary and two columns: transaction metadata and a white paper receipt with dashed separators. On narrow email layouts the columns stack. HTML body and attachment use the same renderer; PDF follows the same hierarchy and branding. Unknown fees, discounts and quantities are not fabricated from free-form descriptions. Long PDFs retain flowing pagination.
+The receipt uses a full-width teal brand banner, parallel accent rules, a total/date summary and two columns: transaction metadata and a white paper receipt with dashed separators. On narrow email layouts the columns stack. The email body uses the HTML renderer; PDF follows the same hierarchy and branding. Unknown fees, discounts and quantities are not fabricated from free-form descriptions. Long PDFs retain flowing pagination.
 
 Reference redesign checks: 14 document design cases plus sender/dispatcher tests; PDF text extraction confirms Vietnamese, amounts, all 45 long description lines and complete long reference. Normal PDF remains one page; long sample remains two.
+
+## Attachment change, 2026-10-21
+
+Receipt emails now attach the existing PDF plus Homeji-logo.png, replacing the HTML attachment. The HTML email body, Vietnamese PDF, amounts, statuses, recipients, outbox retries and idempotency behavior are preserved. Historical delivery evidence above describes the older attachment policy, not the new one. Automated checks validate all seven receipt events, PNG signatures, PDF signatures, and absence of HTML filenames; no customer email or financial transaction is sent by these checks.

@@ -227,8 +227,8 @@ public sealed class TransactionEmailDatabaseTests
             {
                 Assert.Equal(2, attachments.Count);
                 Assert.Contains(attachments, file => file.Name.EndsWith(".pdf", StringComparison.Ordinal));
-                var htmlFile = Assert.Single(attachments, file => file.Name.EndsWith(".html", StringComparison.Ordinal));
-                Assert.Equal(html, Encoding.UTF8.GetString(Convert.FromBase64String(htmlFile.Content)));
+                var logoFile = Assert.Single(attachments, file => file.Name == "Homeji-logo.png");
+                Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, Convert.FromBase64String(logoFile.Content)[..8]);
                 var pdfFile = Assert.Single(attachments, file => file.Name.EndsWith(".pdf", StringComparison.Ordinal));
                 Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(Convert.FromBase64String(pdfFile.Content)), StringComparison.Ordinal);
             }

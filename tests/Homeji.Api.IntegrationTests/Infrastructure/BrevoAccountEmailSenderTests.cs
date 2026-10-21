@@ -125,19 +125,20 @@ public sealed class BrevoAccountEmailSenderTests
     }
 
     [Fact]
-    public async Task Receipt_attachment_preserves_utf8_html()
+    public async Task Receipt_attachment_preserves_png_logo_and_pdf_bytes()
     {
         using var handler = new RecordingHandler(HttpStatusCode.Created);
         using var client = new HttpClient(handler);
         const string html = "<html><meta charset=\"utf-8\"><p>Biên nhận nạp tiền</p></html>";
-        var attachment = new Homeji.Application.DTOs.Emails.EmailAttachmentDto("Homeji.html", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(html)));
+        byte[] logo = [137, 80, 78, 71, 13, 10, 26, 10];
+        var attachment = new Homeji.Application.DTOs.Emails.EmailAttachmentDto("Homeji-logo.png", Convert.ToBase64String(logo));
         var pdf = System.Text.Encoding.ASCII.GetBytes("%PDF-1.7\nserializer-fixture\n%%EOF");
         var pdfAttachment = new Homeji.Application.DTOs.Emails.EmailAttachmentDto("Homeji.pdf", Convert.ToBase64String(pdf));
         await CreateSender(client).SendAsync("user@example.com", "Receipt", html, "Receipt", Guid.NewGuid(), CancellationToken.None, [attachment, pdfAttachment]);
         using var json = JsonDocument.Parse(handler.Body!);
         var attached = json.RootElement.GetProperty("attachment")[0];
-        Assert.Equal("Homeji.html", attached.GetProperty("name").GetString());
-        Assert.Equal(html, System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(attached.GetProperty("content").GetString()!)));
+        Assert.Equal("Homeji-logo.png", attached.GetProperty("name").GetString());
+        Assert.Equal(logo, Convert.FromBase64String(attached.GetProperty("content").GetString()!));
         Assert.Equal(2, json.RootElement.GetProperty("attachment").GetArrayLength());
         Assert.Equal(pdf, Convert.FromBase64String(json.RootElement.GetProperty("attachment")[1].GetProperty("content").GetString()!));
     }

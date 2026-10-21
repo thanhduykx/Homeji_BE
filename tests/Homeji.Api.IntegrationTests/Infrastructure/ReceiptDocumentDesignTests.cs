@@ -15,18 +15,19 @@ public sealed class ReceiptDocumentDesignTests
     [InlineData(ReceiptEvent.WithdrawalRejected)]
     [InlineData(ReceiptEvent.PurchasePaid)]
     [InlineData(ReceiptEvent.PurchaseRefunded)]
-    public void Receipt_contains_branded_html_body_and_both_portable_files(ReceiptEvent value)
+    public void Receipt_contains_branded_body_pdf_and_png_logo_without_html_attachment(ReceiptEvent value)
     {
         var receipt = Example(value);
         var html = TransactionReceiptHtml.Render(receipt);
-        var files = TransactionReceiptFiles.Create(receipt, html);
+        var files = TransactionReceiptFiles.Create(receipt);
         var pdf = Convert.FromBase64String(files[0].Content);
         Assert.EndsWith(".pdf", files[0].Name, StringComparison.Ordinal);
         Assert.StartsWith("%PDF-", Encoding.ASCII.GetString(pdf), StringComparison.Ordinal);
         // Embedded Vietnamese fonts keep files portable; budget remains well below email limits.
         Assert.InRange(pdf.Length, 5_000, 1_500_000);
-        Assert.EndsWith(".html", files[1].Name, StringComparison.Ordinal);
-        Assert.Equal(html, Encoding.UTF8.GetString(Convert.FromBase64String(files[1].Content)));
+        Assert.Equal("Homeji-logo.png", files[1].Name);
+        Assert.Equal(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 }, Convert.FromBase64String(files[1].Content)[..8]);
+        Assert.DoesNotContain(files, file => file.Name.EndsWith(".html", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(HomejiEmailLayout.LogoUrl, html, StringComparison.Ordinal);
         Assert.Contains(ReceiptPresentation.Amount(receipt), html, StringComparison.Ordinal);
         Assert.Contains(ReceiptPresentation.Status(value), html, StringComparison.Ordinal);

@@ -66,7 +66,7 @@ public sealed class ReceiptEmailDispatcher(ApplicationDbContext db, ITransaction
             {
                 var html = TransactionReceiptHtml.Render(dto);
                 IReadOnlyList<EmailAttachmentDto>? attachments = null;
-                try { attachments = TransactionReceiptFiles.Create(dto, html); }
+                try { attachments = TransactionReceiptFiles.Create(dto); }
                 catch (Exception error) when (error is InvalidOperationException or IOException or DllNotFoundException or EntryPointNotFoundException or TypeInitializationException)
                 {
                     // No provider call occurred: this is a known document failure, safe to retry.
