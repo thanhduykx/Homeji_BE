@@ -22,11 +22,42 @@ namespace Homeji.Api.IntegrationTests;
 public sealed class SearchInterestDatabaseTests
 {
     [LocalMarketplaceDatabaseFact]
-    public async Task Requires_consent_three_distinct_sessions_and_respects_dismissal_retention_and_owner()
+    public async Task Automatic_defaults_enable_tracking_and_ai_once_without_enabling_email_or_overriding_later_choices()
+    {
+        await using var db = Open();
+        var user = await Seed(db);
+        var legacyUser = await Seed(db);
+        var clock = new Clock();
+        db.Set<SearchPersonalization>().Add(new SearchPersonalization
+        {
+            UserId = legacyUser, CheckedAt = clock.At, Enabled = false, AiEnabled = false, EmailEnabled = false,
+        });
+        await db.SaveChangesAsync();
+        foreach (var owner in new[] { user, legacyUser })
+        {
+            var service = Service(db, owner, clock);
+            var initial = await service.GetAsync(default);
+            Assert.True(initial.Settings.Enabled);
+            Assert.True(initial.Settings.AiEnabled);
+            Assert.False(initial.Settings.EmailEnabled);
+            await service.SettingsAsync(new(false, false, false), default);
+            var disabled = await Service(db, owner, clock).GetAsync(default);
+            Assert.False(disabled.Settings.Enabled);
+            Assert.False(disabled.Settings.AiEnabled);
+            await service.SettingsAsync(new(true, false, false), default);
+            var aiDisabled = await Service(db, owner, clock).GetAsync(default);
+            Assert.True(aiDisabled.Settings.Enabled);
+            Assert.False(aiDisabled.Settings.AiEnabled);
+        }
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Honors_disabled_settings_three_distinct_sessions_dismissal_retention_and_owner()
     {
         await using var db = Open(); var user = await Seed(db); var other = await Seed(db); var clock = new Clock();
         await Assert.ThrowsAsync<ForbiddenAccessException>(() => Service(db, Guid.NewGuid(), clock).GetAsync(default));
         var service = Service(db, user, clock); var criteria = new InterestCriteria("Thủ Đức", MaxPrice: 4000000);
+        await service.SettingsAsync(new(false), default);
         var initial = await service.ObserveAsync(new(Guid.NewGuid(), criteria), default);
         Assert.False(initial.Settings.Enabled); Assert.Empty(initial.Suggestions);
         await service.SettingsAsync(new(true), default);

@@ -26,6 +26,7 @@ public sealed class SearchInterestService(ApplicationDbContext db, UserContext u
     internal sealed record Dismissal(string Key, DateTimeOffset At);
     internal sealed class State
     {
+        public int AutomaticDefaultsVersion { get; set; }
         public List<Observation> History { get; set; } = [];
         public List<FollowedInterest> Following { get; set; } = [];
         public List<Marker> Viewed { get; set; } = [];
@@ -56,6 +57,14 @@ public sealed class SearchInterestService(ApplicationDbContext db, UserContext u
                 db.Add(row);
             }
             var state = JsonSerializer.Deserialize<State>(row.Data, Json) ?? new State();
+            // Apply the product default once, including existing accounts. Future user
+            // choices stay authoritative; email keeps its separate opt-in setting.
+            if (state.AutomaticDefaultsVersion < 1)
+            {
+                row.Enabled = true;
+                row.AiEnabled = true;
+                state.AutomaticDefaultsVersion = 1;
+            }
             Prune(state);
             var result = await action(row, state);
             Prune(state);
