@@ -12,6 +12,17 @@ public sealed class SubscriptionServiceTests
     private static readonly DateTimeOffset Now = new(2026, 10, 4, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Renewal_reports_paid_through_date_without_changing_current_package()
+    {
+        var userId = Guid.NewGuid();
+        var active = UserSubscription.CreatePremium(userId, "CURRENT", "Current", Guid.NewGuid(), Now.AddDays(-20), 30, Now);
+        var renewal = UserSubscription.CreatePremium(userId, "RENEWAL", "Renewal", Guid.NewGuid(), active.ExpiresAt, 365, Now);
+        var repository = new SubscriptionRepository(active) { Tail = renewal };
+        var result = await CreateService(userId, repository).GetMySubscriptionAsync();
+        Assert.Equal(renewal.ExpiresAt, result.PremiumExpiresAt);
+        Assert.Equal(active.PackageCode, result.PackageCode);
+    }
+    [Fact]
     public async Task Current_subscription_preserves_database_package_identity()
     {
         var userId = Guid.NewGuid();
@@ -72,9 +83,10 @@ public sealed class SubscriptionServiceTests
     private sealed class SubscriptionRepository(UserSubscription? subscription) : IUserSubscriptionRepository
     {
         public bool Fail { get; init; }
+        public UserSubscription? Tail { get; init; }
         public Guid? RequestedUserId { get; private set; }
         public DateTimeOffset? RequestedTime { get; private set; }
-        public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => GetActivePremiumAsync(userId, now, cancellationToken);
+        public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => Task.FromResult(Tail ?? subscription);
         public Task<UserSubscription?> GetActivePremiumAsync(Guid userId, DateTimeOffset now,
             CancellationToken cancellationToken = default)
         {

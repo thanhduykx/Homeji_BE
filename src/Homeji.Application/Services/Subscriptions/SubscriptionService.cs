@@ -77,6 +77,8 @@ public sealed class SubscriptionService : ISubscriptionService
         var now = _timeProvider.GetUtcNow();
         var premium = await _subscriptions.GetActivePremiumAsync(userId, now, cancellationToken);
 
+        var paidThrough = premium is null ? null : await _subscriptions.GetPremiumTailAsync(userId, now, cancellationToken);
+
         return premium is null
             ? new MySubscriptionDto(
                 SubscriptionTier.Basic,
@@ -93,7 +95,7 @@ public sealed class SubscriptionService : ISubscriptionService
                 premium.PackageCode,
                 premium.PackageName,
                 premium.StartedAt,
-                premium.ExpiresAt);
+                paidThrough?.ExpiresAt ?? premium.ExpiresAt);
     }
 
     public Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
