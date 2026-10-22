@@ -220,6 +220,95 @@ public sealed class ChatbotServiceTests
         Assert.Contains("Chưa đủ thông tin", reply.AssistantMessage.Content, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("compare", "So sánh các lựa chọn này", "Diện tích theo tin")]
+    [InlineData("cost", "Tính tiền tháng", "Chưa đủ thông tin")]
+    [InlineData("questions", "Chuẩn bị câu hỏi", "Mình chưa gửi tin nhắn")]
+    [InlineData(null, "Hai lựa chọn này cần hỏi chủ tin những gì?", "Mình chưa gửi tin nhắn")]
+    [InlineData(null, "Chi phí của ba phòng này?", "Chưa đủ thông tin")]
+    public async Task SelectedChoices_UseOneAuthorizedScenarioWithoutProviderOrPersistence(string? task, string message, string expected)
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new SuccessfulClient();
+        var decision = new StubRentalDecisionService();
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        var scenario = new RentalCostScenarioDto(Occupants: 2, ElectricityKwh: 120, WaterM3: 6,
+            ElectricityUnit: "kwh", WaterUnit: "m3", InternetUnit: "month");
+
+        var reply = await CreateService(repository, ai, decision: decision).SendMessageAsync(
+            new(null, message, RentalSelection: new(ids, task, scenario)));
+
+        Assert.Equal(ids, decision.LastRequest!.PostIds);
+        Assert.Same(scenario, decision.LastRequest.Scenario);
+        Assert.Null(decision.LastRequest.Destination);
+        Assert.Same(decision.Response, reply.RentalDecision);
+        Assert.Contains(expected, reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("Địa chỉ riêng tư", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Null(reply.SearchUpdate);
+        Assert.Empty(reply.Actions);
+        Assert.Equal(0, ai.Calls);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task ExplicitNewSearch_DoesNotUseSelectedChoicesOrTheirScenario()
+    {
+        var decision = new StubRentalDecisionService();
+        var reply = await CreateService(new(), new SuccessfulClient(), new GroundedSearchStub(), decision: decision)
+            .SendMessageAsync(new(null, "Tìm phòng dưới 2 triệu", RentalSelection:
+                new([Guid.NewGuid(), Guid.NewGuid()], "compare", new(Occupants: 2))));
+        Assert.NotNull(reply.SearchUpdate);
+        Assert.Null(reply.RentalDecision);
+        Assert.Equal(0, decision.Calls);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    [InlineData(7)]
+    public async Task InvalidSelection_IsRejectedBeforeReadingFactsCallingProviderOrSaving(int invalidCase)
+    {
+        var id = Guid.NewGuid();
+        IReadOnlyCollection<Guid>? ids = invalidCase switch
+        {
+            0 => null, 1 => [], 2 => [id], 3 => [id, id], 4 => [id, Guid.Empty],
+            5 => [id, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()], _ => [id, Guid.NewGuid()],
+        };
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new SuccessfulClient();
+        var decision = new StubRentalDecisionService();
+        await Assert.ThrowsAsync<RequestValidationException>(() => CreateService(repository, ai, decision: decision)
+            .SendMessageAsync(new(null, "Hai lựa chọn này", RentalContext: invalidCase == 7 ? new(id) : null,
+                RentalSelection: new(ids, invalidCase == 6 ? "send-message" : "compare"))));
+        Assert.Equal(0, decision.Calls);
+        Assert.Equal(0, ai.Calls);
+        Assert.Null(repository.Conversation);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UnavailableChoices_DiscloseIncompleteCoverageWithoutGuessing(bool allUnavailable)
+    {
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid() };
+        var decision = new StubRentalDecisionService();
+        decision.Response = decision.Response with
+        {
+            Posts = allUnavailable ? [] : decision.Response.Posts,
+            UnavailablePostIds = allUnavailable ? ids : [ids[1]],
+        };
+        var ai = new SuccessfulClient();
+        var reply = await CreateService(new(), ai, decision: decision).SendMessageAsync(
+            new(null, "Hai lựa chọn này", RentalSelection: new(ids)));
+        Assert.Contains(allUnavailable ? "không còn khả dụng" : "chưa thể coi đây là so sánh đủ", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Equal(0, ai.Calls);
+    }
+
     private sealed class StubRentalDecisionService : IRentalDecisionService
     {
         public int Calls { get; private set; }

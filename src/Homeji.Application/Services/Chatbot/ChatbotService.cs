@@ -100,6 +100,7 @@ public sealed class ChatbotService : IChatbotService
         }
 
         var message = ValidateMessage(request.Message);
+        var selectionTask = ChatbotRentalSelection.ResolveTask(request.RentalSelection, request.RentalContext, message);
         var rentalTask = ChatbotRentalContext.ResolveTask(request.RentalContext, message);
         if (request.SaveHistory && !_options.HistoryStorageEnabled)
             throw new ForbiddenAccessException("Lưu lịch sử đang tắt. Bạn vẫn có thể dùng chatbot trong phiên hiện tại.");
@@ -129,7 +130,13 @@ public sealed class ChatbotService : IChatbotService
         AiHighlightResponseDto? searchUpdate = null;
         RentalDecisionResponseDto? rentalDecision = null;
         string assistantReply;
-        if (rentalTask is not null)
+        if (selectionTask is not null)
+        {
+            rentalDecision = await _rentalDecision.CompareAsync(new RentalDecisionRequestDto(
+                request.RentalSelection!.PostIds!, request.RentalSelection.Scenario), cancellationToken);
+            assistantReply = ChatbotRentalSelection.BuildReply(selectionTask, rentalDecision);
+        }
+        else if (rentalTask is not null)
         {
             rentalDecision = await _rentalDecision.CompareAsync(
                 new RentalDecisionRequestDto([request.RentalContext!.PostId]), cancellationToken);

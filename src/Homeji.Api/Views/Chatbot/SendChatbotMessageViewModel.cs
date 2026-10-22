@@ -8,4 +8,5 @@ public sealed record SendChatbotMessageViewModel(
     string? Message,
     bool SaveHistory = false,
     AiParsedSearchCriteriaDto? PreviousCriteria = null,
-    ChatbotRentalContextDto? RentalContext = null);
+    ChatbotRentalContextDto? RentalContext = null,
+    ChatbotRentalSelectionDto? RentalSelection = null);

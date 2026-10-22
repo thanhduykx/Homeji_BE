@@ -22,10 +22,9 @@ internal static partial class ChatbotRentalContext
 
         var normalized = RentalSearchIntent.Normalize(message);
         // A selected listing never changes an explicit request to start another search.
-        if (NewSearch().IsMatch(normalized)) return null;
+        if (StartsNewSearch(message)) return null;
         if (context.Task is not null) return context.Task;
-        if (OwnerQuestions().IsMatch(normalized)) return "questions";
-        if (CostQuestion().IsMatch(normalized)) return "cost";
+        if (InferDetailTask(message) is { } task) return task;
         return SelectedListing().IsMatch(normalized) ? "details" : null;
     }
 
@@ -72,6 +71,15 @@ internal static partial class ChatbotRentalContext
     }
 
     private static string Money(decimal amount) => amount.ToString("#,##0.##", Vietnamese);
+
+    internal static bool StartsNewSearch(string message) => NewSearch().IsMatch(RentalSearchIntent.Normalize(message));
+
+    internal static string? InferDetailTask(string message)
+    {
+        var normalized = RentalSearchIntent.Normalize(message);
+        if (OwnerQuestions().IsMatch(normalized)) return "questions";
+        return CostQuestion().IsMatch(normalized) ? "cost" : null;
+    }
 
     [GeneratedRegex(@"\b(?:(?:tim|loc|goi y)(?: giup (?:toi|minh))?\s+(?:phong|tro)|(?:phong|tro) khac|tim lai|bat dau lai)\b", RegexOptions.CultureInvariant)]
     private static partial Regex NewSearch();

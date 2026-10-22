@@ -52,6 +52,37 @@ public sealed class ChatbotContextApiTests
         Assert.Null(service.LastRequest);
     }
 
+    [Fact]
+    public async Task SelectionAndScenarioSurviveHttpBindingWithoutChangingSingleRoomContract()
+    {
+        var service = new CapturingChatbot();
+        using var factory = CreateFactory(service);
+        using var client = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        using var response = await client.PostAsJsonAsync(new Uri("/api/chatbot/messages", UriKind.Relative),
+            new { message = "Ba lựa chọn này", rentalSelection = new { postIds = ids, task = "compare",
+                scenario = new { occupants = 2, electricityKwh = 120, electricityUnit = "kwh" } } });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Null(service.LastRequest!.RentalContext);
+        Assert.Equal(ids, service.LastRequest.RentalSelection!.PostIds);
+        Assert.Equal("compare", service.LastRequest.RentalSelection.Task);
+        Assert.Equal(2, service.LastRequest.RentalSelection.Scenario!.Occupants);
+        Assert.Equal(120, service.LastRequest.RentalSelection.Scenario.ElectricityKwh);
+        Assert.Equal("kwh", service.LastRequest.RentalSelection.Scenario.ElectricityUnit);
+    }
+
+    [Fact]
+    public async Task MalformedSelectionIdReturns400BeforeServiceRuns()
+    {
+        var service = new CapturingChatbot();
+        using var factory = CreateFactory(service);
+        using var client = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        using var response = await client.PostAsJsonAsync(new Uri("/api/chatbot/messages", UriKind.Relative),
+            new { message = "Hai lựa chọn này", rentalSelection = new { postIds = new[] { Guid.NewGuid().ToString(), "not-a-guid" } } });
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Null(service.LastRequest);
+    }
+
     private static Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory<Program> CreateFactory(CapturingChatbot service) =>
         new HomejiApiFactory().WithWebHostBuilder(builder =>
         {
