@@ -7,4 +7,7 @@ public sealed record ChatbotReplyDto(
     ChatbotMessageDto UserMessage,
     ChatbotMessageDto AssistantMessage,
     AiHighlightResponseDto? SearchUpdate,
-    IReadOnlyCollection<ChatbotNavigationActionDto> Actions);
+    IReadOnlyCollection<ChatbotNavigationActionDto> Actions)
+{
+    public RentalDecisionResponseDto? RentalDecision { get; init; }
+}

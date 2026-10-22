@@ -22,6 +22,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly IChatConversationRepository _conversations;
     private readonly IChatbotAiClient _aiClient;
     private readonly IAiSearchService _aiSearch;
+    private readonly IRentalDecisionService _rentalDecision;
     private readonly ChatbotOptions _options;
     private readonly TimeProvider _timeProvider;
 
@@ -30,6 +31,7 @@ public sealed class ChatbotService : IChatbotService
         IChatConversationRepository conversations,
         IChatbotAiClient aiClient,
         IAiSearchService aiSearch,
+        IRentalDecisionService rentalDecision,
         IOptions<ChatbotOptions> options,
         TimeProvider timeProvider)
     {
@@ -37,6 +39,7 @@ public sealed class ChatbotService : IChatbotService
         _conversations = conversations;
         _aiClient = aiClient;
         _aiSearch = aiSearch;
+        _rentalDecision = rentalDecision;
         _options = options.Value;
         _timeProvider = timeProvider;
     }
@@ -97,6 +100,7 @@ public sealed class ChatbotService : IChatbotService
         }
 
         var message = ValidateMessage(request.Message);
+        var rentalTask = ChatbotRentalContext.ResolveTask(request.RentalContext, message);
         if (request.SaveHistory && !_options.HistoryStorageEnabled)
             throw new ForbiddenAccessException("Lưu lịch sử đang tắt. Bạn vẫn có thể dùng chatbot trong phiên hiện tại.");
         if (!request.SaveHistory && request.ConversationId.HasValue)
@@ -121,14 +125,27 @@ public sealed class ChatbotService : IChatbotService
             .Select(ChatbotMapper.ToMessageDto)
             .ToArray();
 
-        var actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
-        var searchUpdate = await BuildSearchUpdateAsync(conversation, message, request.PreviousCriteria, cancellationToken);
-        var rentalQuery = RentalSearchIntent.IsRentalQuery(message);
-        var assistantReply = searchUpdate is not null
-            ? BuildGroundedReply(searchUpdate)
-            : rentalQuery
-                ? "Mình chưa truy vấn được tin phòng lúc này. Bạn có thể dùng bộ lọc thông thường hoặc thử lại. Mình không có dữ liệu để giới thiệu một phòng cụ thể."
-                : await GenerateReplyAsync(history, message, actions, cancellationToken);
+        IReadOnlyCollection<ChatbotNavigationActionDto> actions = [];
+        AiHighlightResponseDto? searchUpdate = null;
+        RentalDecisionResponseDto? rentalDecision = null;
+        string assistantReply;
+        if (rentalTask is not null)
+        {
+            rentalDecision = await _rentalDecision.CompareAsync(
+                new RentalDecisionRequestDto([request.RentalContext!.PostId]), cancellationToken);
+            assistantReply = ChatbotRentalContext.BuildReply(rentalTask, rentalDecision);
+        }
+        else
+        {
+            actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
+            searchUpdate = await BuildSearchUpdateAsync(conversation, message, request.PreviousCriteria, cancellationToken);
+            var rentalQuery = RentalSearchIntent.IsRentalQuery(message);
+            assistantReply = searchUpdate is not null
+                ? BuildGroundedReply(searchUpdate)
+                : rentalQuery
+                    ? "Mình chưa truy vấn được tin phòng lúc này. Bạn có thể dùng bộ lọc thông thường hoặc thử lại. Mình không có dữ liệu để giới thiệu một phòng cụ thể."
+                    : await GenerateReplyAsync(history, message, actions, cancellationToken);
+        }
         var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
 
         if (request.SaveHistory) await _conversations.SaveChangesAsync(cancellationToken);
@@ -138,7 +155,7 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions);
+            actions) { RentalDecision = rentalDecision };
     }
 
     private async Task<string> GenerateReplyAsync(

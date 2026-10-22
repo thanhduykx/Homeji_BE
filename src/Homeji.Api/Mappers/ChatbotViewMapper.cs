@@ -8,6 +8,7 @@ public static class ChatbotViewMapper
     public static SendChatbotMessageDto ToDto(SendChatbotMessageViewModel viewModel)
     {
         ArgumentNullException.ThrowIfNull(viewModel);
-        return new SendChatbotMessageDto(viewModel.ConversationId, viewModel.Message, viewModel.SaveHistory, viewModel.PreviousCriteria);
+        return new SendChatbotMessageDto(viewModel.ConversationId, viewModel.Message, viewModel.SaveHistory,
+            viewModel.PreviousCriteria, viewModel.RentalContext);
     }
 }

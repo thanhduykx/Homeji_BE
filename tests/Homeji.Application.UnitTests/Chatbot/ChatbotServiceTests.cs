@@ -8,7 +8,9 @@ using Homeji.Application.IServices.AI;
 using Homeji.Application.IServices.Chatbot;
 using Homeji.Application.Services.Chatbot;
 using Homeji.Application.Services.Common;
+using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Domain.Entities;
+using Homeji.Domain.Enums;
 using Microsoft.Extensions.Options;
 
 namespace Homeji.Application.UnitTests.Chatbot;
@@ -95,15 +97,154 @@ public sealed class ChatbotServiceTests
         InMemoryChatConversationRepository conversations,
         IChatbotAiClient aiClient,
         IAiSearchService? search = null,
-        bool historyStorageEnabled = true)
+        bool historyStorageEnabled = true,
+        IRentalDecisionService? decision = null)
     {
         return new ChatbotService(
             new UserContext(new StubCurrentUser(UserId), new StubUserProfileRepository()),
             conversations,
             aiClient,
             search ?? new StubAiSearchService(),
+            decision ?? new StubRentalDecisionService(),
             Options.Create(new ChatbotOptions { HistoryStorageEnabled = historyStorageEnabled }),
             new StubTimeProvider());
+    }
+
+    [Theory]
+    [InlineData("cost", "Tính tiền tháng", "Chưa đủ thông tin")]
+    [InlineData("details", "Xem thông tin", "Diện tích theo tin")]
+    [InlineData("questions", "Chuẩn bị câu hỏi", "Mình chưa gửi tin nhắn")]
+    [InlineData(null, "Phòng này tổng tiền tháng bao nhiêu?", "Chưa đủ thông tin")]
+    [InlineData(null, "Tien dien nuoc cua phong nay?", "Chưa đủ thông tin")]
+    [InlineData(null, "Soạn câu hỏi cho chủ phòng", "Mình chưa gửi tin nhắn")]
+    [InlineData(null, "Phong nay con trong khong?", "Cần hỏi chủ tin")]
+    public async Task SelectedRoom_UsesAuthorizedDecisionFactsWithoutSearchOrProvider(string? task, string message, string expected)
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new SuccessfulClient();
+        var decision = new StubRentalDecisionService();
+        var postId = Guid.NewGuid();
+        var reply = await CreateService(repository, ai, decision: decision)
+            .SendMessageAsync(new(null, message, RentalContext: new(postId, task)));
+
+        Assert.Equal(new[] { postId }, decision.LastRequest!.PostIds);
+        Assert.Null(decision.LastRequest.Scenario);
+        Assert.Null(decision.LastRequest.Destination);
+        Assert.Same(decision.Response, reply.RentalDecision);
+        Assert.Null(reply.SearchUpdate);
+        Assert.Empty(reply.Actions);
+        Assert.Contains(expected, reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("đã xác minh", reply.AssistantMessage.Content, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, ai.Calls);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Theory]
+    [InlineData("Tìm phòng dưới 2 triệu")]
+    [InlineData("Lọc phòng có bếp")]
+    [InlineData("Gợi ý phòng khác")]
+    public async Task ExplicitNewSearch_DoesNotUseSelectedRoomEvenWithAContextTask(string message)
+    {
+        var decision = new StubRentalDecisionService();
+        var reply = await CreateService(new(), new SuccessfulClient(), new GroundedSearchStub(), decision: decision)
+            .SendMessageAsync(new(null, message, RentalContext: new(Guid.NewGuid(), "cost")));
+
+        Assert.NotNull(reply.SearchUpdate);
+        Assert.Null(reply.RentalDecision);
+        Assert.Equal(0, decision.Calls);
+    }
+
+    [Theory]
+    [InlineData("Cách thanh toán bằng PayOS?")]
+    [InlineData("Đổi số điện thoại tài khoản như thế nào?")]
+    public async Task UnrelatedSupportQuestion_KeepsItsExistingBehaviorWhenARoomIsSelected(string message)
+    {
+        var ai = new SuccessfulClient();
+        var decision = new StubRentalDecisionService();
+        var reply = await CreateService(new(), ai, decision: decision)
+            .SendMessageAsync(new(null, message, RentalContext: new(Guid.NewGuid())));
+
+        Assert.Equal("Câu trả lời thực từ Gemini.", reply.AssistantMessage.Content);
+        Assert.Null(reply.RentalDecision);
+        Assert.Equal(1, ai.Calls);
+        Assert.Equal(0, decision.Calls);
+    }
+
+    [Fact]
+    public async Task UnavailableSelectedRoom_ReturnsSafeAnswerWithoutFallingThroughToProvider()
+    {
+        var postId = Guid.NewGuid();
+        var ai = new SuccessfulClient();
+        var decision = new StubRentalDecisionService { Response = new([], [postId], "Unavailable") };
+        var reply = await CreateService(new(), ai, decision: decision)
+            .SendMessageAsync(new(null, "Phòng này tổng bao nhiêu?", RentalContext: new(postId, "cost")));
+
+        Assert.Same(decision.Response, reply.RentalDecision);
+        Assert.Empty(reply.RentalDecision!.Posts);
+        Assert.Contains("không còn khả dụng", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Equal(0, ai.Calls);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("send-message", false)]
+    [InlineData("COST", false)]
+    public async Task InvalidRentalContext_IsRejectedBeforeAnyProviderOrPersistence(string? task, bool emptyId)
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new SuccessfulClient();
+        var decision = new StubRentalDecisionService();
+        var service = CreateService(repository, ai, decision: decision);
+
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.SendMessageAsync(
+            new(null, "Phòng này", RentalContext: new(emptyId ? Guid.Empty : Guid.NewGuid(), task))));
+        Assert.Equal(0, ai.Calls);
+        Assert.Equal(0, decision.Calls);
+        Assert.Null(repository.Conversation);
+    }
+
+    [Fact]
+    public async Task PricePerPerson_IsNotPresentedAsARoomTotal()
+    {
+        var decision = new StubRentalDecisionService();
+        var item = decision.Response.Posts.Single();
+        decision.Response = decision.Response with
+        {
+            Posts = [item with { Cost = item.Cost with { PriceBasis = "person", KnownMonthlySubtotal = null } }],
+        };
+        var reply = await CreateService(new(), new SuccessfulClient(), decision: decision)
+            .SendMessageAsync(new(null, "Tính tiền tháng", RentalContext: new(Guid.NewGuid(), "cost")));
+
+        Assert.Contains("đồng/người/tháng", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.DoesNotContain("đồng/phòng/tháng", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Contains("Chưa đủ thông tin", reply.AssistantMessage.Content, StringComparison.Ordinal);
+    }
+
+    private sealed class StubRentalDecisionService : IRentalDecisionService
+    {
+        public int Calls { get; private set; }
+        public RentalDecisionRequestDto? LastRequest { get; private set; }
+        public RentalDecisionResponseDto Response { get; set; } = CreateResponse();
+
+        public Task<RentalDecisionResponseDto> CompareAsync(RentalDecisionRequestDto request, CancellationToken cancellationToken)
+        {
+            Calls++;
+            LastRequest = request;
+            return Task.FromResult(Response);
+        }
+
+        public Task<RentalDraftPreviewDto> PreviewDraftAsync(RentalDraftPreviewRequestDto request, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<AdminAssistantSummaryDto> GetAdminSummaryAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
+
+        private static RentalDecisionResponseDto CreateResponse()
+        {
+            var post = RentalPost.CreateDraft(Guid.NewGuid(), RentalPostType.VacantRoom, UtcNow);
+            post.UpdateDetails(RentalPostType.VacantRoom, "Phòng thật", "Thông tin chủ tin", 3_000_000,
+                3_000_000, 25, "Địa chỉ riêng tư không đưa vào câu trả lời", 10.84m, 106.80m, [], UtcNow);
+            return new([new(RentalPostMapper.ToDto(post),
+                new(post.Id, 3_000_000, null, null, ["Điện: chưa xác nhận đơn giá/đơn vị"],
+                    ["Điện tính theo kWh, tháng hay đầu người?"], "ownerListing + userScenario", UtcNow, "room"), null)], [], "Theo tin đăng");
+        }
     }
 
     [Fact]
