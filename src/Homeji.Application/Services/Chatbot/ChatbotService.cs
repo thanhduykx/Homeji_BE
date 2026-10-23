@@ -23,6 +23,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly IChatbotAiClient _aiClient;
     private readonly IAiSearchService _aiSearch;
     private readonly IRentalDecisionService _rentalDecision;
+    private readonly IChatbotFoodService _food;
     private readonly ChatbotOptions _options;
     private readonly TimeProvider _timeProvider;
 
@@ -32,6 +33,7 @@ public sealed class ChatbotService : IChatbotService
         IChatbotAiClient aiClient,
         IAiSearchService aiSearch,
         IRentalDecisionService rentalDecision,
+        IChatbotFoodService food,
         IOptions<ChatbotOptions> options,
         TimeProvider timeProvider)
     {
@@ -40,6 +42,7 @@ public sealed class ChatbotService : IChatbotService
         _aiClient = aiClient;
         _aiSearch = aiSearch;
         _rentalDecision = rentalDecision;
+        _food = food;
         _options = options.Value;
         _timeProvider = timeProvider;
     }
@@ -100,8 +103,10 @@ public sealed class ChatbotService : IChatbotService
         }
 
         var message = ValidateMessage(request.Message);
-        var selectionTask = ChatbotRentalSelection.ResolveTask(request.RentalSelection, request.RentalContext, message);
-        var rentalTask = ChatbotRentalContext.ResolveTask(request.RentalContext, message);
+        var foodTopic = FoodSearchIntent.IsFoodTopic(message);
+        var foodQuery = foodTopic && FoodSearchIntent.IsDiscovery(message);
+        var selectionTask = foodTopic ? null : ChatbotRentalSelection.ResolveTask(request.RentalSelection, request.RentalContext, message);
+        var rentalTask = foodTopic ? null : ChatbotRentalContext.ResolveTask(request.RentalContext, message);
         if (request.SaveHistory && !_options.HistoryStorageEnabled)
             throw new ForbiddenAccessException("Lưu lịch sử đang tắt. Bạn vẫn có thể dùng chatbot trong phiên hiện tại.");
         if (!request.SaveHistory && request.ConversationId.HasValue)
@@ -129,8 +134,15 @@ public sealed class ChatbotService : IChatbotService
         IReadOnlyCollection<ChatbotNavigationActionDto> actions = [];
         AiHighlightResponseDto? searchUpdate = null;
         RentalDecisionResponseDto? rentalDecision = null;
+        ChatbotFoodResponseDto? foodDiscovery = null;
         string assistantReply;
-        if (selectionTask is not null)
+        if (foodQuery)
+        {
+            foodDiscovery = await _food.SearchAsync(message, request.FoodContext, cancellationToken);
+            assistantReply = foodDiscovery.Summary;
+            actions = [new ChatbotNavigationActionDto("food-menu", "Mở Chợ đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
+        }
+        else if (selectionTask is not null)
         {
             rentalDecision = await _rentalDecision.CompareAsync(new RentalDecisionRequestDto(
                 request.RentalSelection!.PostIds!, request.RentalSelection.Scenario), cancellationToken);
@@ -162,7 +174,7 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions) { RentalDecision = rentalDecision };
+            actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery };
     }
 
     private async Task<string> GenerateReplyAsync(

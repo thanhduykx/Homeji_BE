@@ -10,4 +10,5 @@ public sealed record ChatbotReplyDto(
     IReadOnlyCollection<ChatbotNavigationActionDto> Actions)
 {
     public RentalDecisionResponseDto? RentalDecision { get; init; }
+    public ChatbotFoodResponseDto? FoodDiscovery { get; init; }
 }

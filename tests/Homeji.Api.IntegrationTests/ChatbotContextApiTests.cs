@@ -18,6 +18,21 @@ namespace Homeji.Api.IntegrationTests;
 
 public sealed class ChatbotContextApiTests
 {
+    [Fact]
+    public async Task FoodOriginSurvivesHttpBindingAndFoodResponseIsAdditive()
+    {
+        var service = new CapturingChatbot();
+        using var factory = CreateFactory(service);
+        using var client = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        using var response = await client.PostAsJsonAsync(new Uri("/api/chatbot/messages", UriKind.Relative),
+            new { message = "Gợi ý đồ ăn gần tui", foodContext = new { latitude = 10.84m, longitude = 106.8m, radiusKm = 3 } });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(new ChatbotFoodContextDto(10.84m, 106.8m), service.LastRequest!.FoodContext);
+        Assert.Null(service.LastRequest.RentalContext); Assert.Null(service.LastRequest.RentalSelection);
+        var reply = await response.Content.ReadFromJsonAsync<ChatbotReplyDto>();
+        Assert.Equal("empty", reply!.FoodDiscovery!.Status); Assert.Null(reply.SearchUpdate); Assert.Null(reply.RentalDecision);
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -121,6 +136,7 @@ public sealed class ChatbotContextApiTests
                 new(Guid.NewGuid(), id, ChatMessageSender.Assistant, "Reply", DateTimeOffset.UtcNow), null, [])
             {
                 RentalDecision = request.RentalContext is { } context ? new RentalDecisionResponseDto([], [context.PostId], "Unavailable") : null,
+                FoodDiscovery = request.FoodContext is not null ? new("empty", "Chưa có món", [], Origin: request.FoodContext) : null,
             };
             return Task.FromResult(reply);
         }

@@ -30,7 +30,8 @@ public static partial class RentalSearchIntent
         return builder.ToString().Normalize(NormalizationForm.FormC);
     }
 
-    public static bool IsRentalQuery(string message) => RentalTerms().IsMatch(Normalize(message));
+    public static bool IsRentalQuery(string message) => !Services.Common.FoodSearchIntent.IsFoodTopic(message)
+        && RentalTerms().IsMatch(Normalize(message));
 
     public static bool IsKeywordClearCommand(string message) => Normalize(message).Trim() == "bo tu khoa";
 

@@ -56,6 +56,21 @@ public sealed class ChatbotServiceTests
         }
     }
 
+    [Theory]
+    [InlineData("CÓ GÌ ĂN GIỚI THIỆU ĐI")]
+    [InlineData("GIỚI THIỆU ĐỒ ĂN NGON GẦN TUI")]
+    public async Task FoodDiscovery_NeverReturnsRentalResultsOrAnUngroundedProviderGuide(string message)
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new SuccessfulClient();
+        var reply = await CreateService(repository, ai, new GroundedSearchStub()).SendMessageAsync(new(null, message));
+        Assert.Null(reply.SearchUpdate);
+        Assert.Null(reply.RentalDecision);
+        Assert.NotNull(reply.FoodDiscovery);
+        Assert.Equal(0, ai.Calls);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
     private sealed class CountingUnavailableClient : IChatbotAiClient
     {
         public int Calls { get; private set; }
@@ -106,6 +121,7 @@ public sealed class ChatbotServiceTests
             aiClient,
             search ?? new StubAiSearchService(),
             decision ?? new StubRentalDecisionService(),
+            new StubFoodService(),
             Options.Create(new ChatbotOptions { HistoryStorageEnabled = historyStorageEnabled }),
             new StubTimeProvider());
     }
@@ -407,6 +423,12 @@ public sealed class ChatbotServiceTests
     }
 
     private sealed record StubCurrentUser(Guid? UserId) : ICurrentUser;
+
+    private sealed class StubFoodService : IChatbotFoodService
+    {
+        public Task<ChatbotFoodResponseDto> SearchAsync(string message, ChatbotFoodContextDto? origin, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChatbotFoodResponseDto("empty", "Chưa có món đang bán.", []));
+    }
 
     private sealed class StubTimeProvider : TimeProvider
     {
