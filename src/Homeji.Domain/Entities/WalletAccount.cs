@@ -16,7 +16,7 @@ public sealed class WalletAccount
     {
         if (userId == Guid.Empty)
         {
-            throw new DomainException("Wallet user id must not be empty.");
+            throw new DomainException("Chưa xác định được tài khoản dùng ví. Vui lòng đăng nhập lại.");
         }
 
         UserId = userId;
@@ -50,7 +50,7 @@ public sealed class WalletAccount
         EnsurePositive(amount);
         if (Balance < amount)
         {
-            throw new DomainException("Wallet balance is insufficient for this purchase.");
+            throw new DomainException("Số dư ví chưa đủ để thanh toán. Vui lòng nạp thêm tiền.");
         }
 
         Balance -= amount;
@@ -79,7 +79,7 @@ public sealed class WalletAccount
         EnsurePositive(amount);
         if (Balance - amount < MinimumWithdrawalReserve)
         {
-            throw new DomainException($"Wallet must retain at least {MinimumWithdrawalReserve:0} VND after withdrawal.");
+            throw new DomainException($"Sau khi rút, ví cần còn ít nhất {MinimumWithdrawalReserve:0} đồng.");
         }
 
         Balance -= amount;
@@ -103,7 +103,7 @@ public sealed class WalletAccount
     {
         if (amount <= 0 || decimal.Truncate(amount) != amount)
         {
-            throw new DomainException("Wallet amount must be a positive whole VND value.");
+            throw new DomainException("Nhập số tiền lớn hơn 0 đồng, không có phần thập phân.");
         }
     }
 }

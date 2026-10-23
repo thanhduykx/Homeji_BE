@@ -51,7 +51,7 @@ public sealed class MarketplaceOrder
         SellerId = sellerId;
         if (agreedPrice <= 0 || quantity <= 0 || platformFeeRate is <= 0 or >= 1)
         {
-            throw new DomainException("Order price, quantity, or platform fee rate is invalid.");
+            throw new DomainException("Giá, số lượng hoặc phí của đơn chưa hợp lệ. Vui lòng kiểm tra lại đơn.");
         }
 
         UnitPrice = agreedPrice;
@@ -102,7 +102,7 @@ public sealed class MarketplaceOrder
     {
         if (Status != MarketplaceOrderStatus.Requested)
         {
-            throw new DomainException("Marketplace orders can only be cancelled before the seller accepts them.");
+            throw new DomainException("Chỉ có thể hủy khi đơn còn chờ người bán xác nhận. Vui lòng tải lại đơn để xem trạng thái mới nhất.");
         }
 
         Status = MarketplaceOrderStatus.Cancelled;
@@ -129,7 +129,7 @@ public sealed class MarketplaceOrder
         }
         else if (Status != MarketplaceOrderStatus.Completed)
         {
-            throw new DomainException("Marketplace order cannot be auto-completed in the current state.");
+            throw new DomainException("Chưa thể hoàn tất đơn này. Vui lòng tải lại để xem trạng thái mới nhất.");
         }
     }
 
@@ -146,7 +146,7 @@ public sealed class MarketplaceOrder
             || FundsReleasedAt.HasValue
             || RefundedAt.HasValue)
         {
-            throw new DomainException("Marketplace order funds cannot be released in the current state.");
+            throw new DomainException("Chưa thể chuyển tiền của đơn này về ví người bán. Vui lòng tải lại trạng thái đơn.");
         }
 
         FundsReleasedAt = updatedAt;
@@ -159,7 +159,7 @@ public sealed class MarketplaceOrder
             || FundsReleasedAt.HasValue
             || RefundedAt.HasValue)
         {
-            throw new DomainException("Marketplace order cannot be refunded in the current state.");
+            throw new DomainException("Chưa thể hoàn tiền cho đơn này. Vui lòng tải lại trạng thái đơn.");
         }
 
         RefundedAt = updatedAt;
@@ -170,7 +170,7 @@ public sealed class MarketplaceOrder
     {
         if (Status != expected)
         {
-            throw new DomainException($"Chỉ đơn chợ đồ ở trạng thái {expected} mới chuyển sang {target}.");
+            throw new DomainException("Trạng thái đơn không còn phù hợp với thao tác này. Vui lòng tải lại đơn rồi thử lại.");
         }
 
         Status = target;

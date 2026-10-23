@@ -100,7 +100,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["quantity"] = [$"Food order total must be at least {_financeOptions.MinimumFoodOrder:0} VND."],
+                ["quantity"] = [$"Tổng tiền đặt món cần từ {_financeOptions.MinimumFoodOrder:0} đồng."],
             });
         }
 

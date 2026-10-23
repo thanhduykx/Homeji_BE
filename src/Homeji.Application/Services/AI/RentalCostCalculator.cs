@@ -16,7 +16,7 @@ public static class RentalCostCalculator
             || scenario.InternetUnit is not ("unknown" or "month" or "person")
             || scenario.ElectricityUnit == "m3" || scenario.WaterUnit == "kwh"
             || scenario.OtherMonthlyFees is < 0 or > 100_000_000 || scenario.OtherInitialFees is < 0 or > 100_000_000)
-            throw new RequestValidationException(new Dictionary<string, string[]> { ["scenario"] = ["Kịch bản sử dụng hoặc đơn vị phí không hợp lệ."] });
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["scenario"] = ["Kiểm tra lại số người, mức sử dụng và đơn vị tính phí."] });
         var unknown = new List<string>();
         decimal Fee(string label, decimal rate, string unit, decimal usage, bool confirmedFree)
         {

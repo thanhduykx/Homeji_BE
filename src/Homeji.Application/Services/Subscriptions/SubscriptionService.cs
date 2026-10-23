@@ -13,15 +13,15 @@ public sealed class SubscriptionService : ISubscriptionService
 {
     private static readonly string[] BasicBenefits =
     [
-        "Sử dụng đầy đủ chức năng web và app",
+        "Tìm phòng và liên hệ người đăng trên Homeji",
         "Tìm kiếm và xem bài đăng",
-        "Lưu bài, báo cáo, gửi lời mời roommate",
+        "Lưu tin, báo cáo vi phạm và gửi lời mời ở ghép",
     ];
 
     private static readonly string[] PremiumBenefits =
     [
-        "Có badge Cao cấp trên bài đăng",
-        "Bài đăng được ưu tiên hiển thị theo điểm boost",
+        "Hiển thị nhãn Premium trên tin đăng",
+        "Tin đăng được ưu tiên hiển thị",
         "Tăng khả năng xuất hiện trong đề xuất AI",
     ];
 
