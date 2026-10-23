@@ -37,6 +37,54 @@ public sealed class ChatbotFoodServiceTests
     }
 
     [Fact]
+    public async Task FollowupsKeepDishBudgetAndNearbyRequirementUntilExplicitlyChanged()
+    {
+        var marketplace = new MarketplaceStub { Posts = [Food()] };
+        var service = new ChatbotFoodService(marketplace);
+        var result = await service.SearchAsync("Gợi ý cơm gà dưới 40k", null);
+        static ChatbotFoodCriteriaDto Criteria(ChatbotFoodResponseDto value) => new(value.Keyword, value.MaxPrice, value.Origin, value.Nearby);
+        result = await service.SearchAsync("gần tui", null, Criteria(result));
+        Assert.Equal("locationRequired", result.Status); Assert.True(result.Nearby);
+        Assert.Equal("cơm gà", result.Keyword); Assert.Equal(40_000, result.MaxPrice);
+        result = await service.SearchAsync("30k", null, Criteria(result));
+        Assert.Equal("locationRequired", result.Status); Assert.Equal(30_000, result.MaxPrice);
+        var origin = new ChatbotFoodContextDto(10.84m, 106.8m);
+        result = await service.SearchAsync("dưới 50k", origin, Criteria(result));
+        Assert.Equal("results", result.Status); Assert.Equal(origin, result.Origin);
+        Assert.Equal(50_000, marketplace.Request!.MaxPrice); Assert.Equal("cơm gà", marketplace.Request.Keyword);
+        result = await service.SearchAsync("bỏ ngân sách", null, Criteria(result));
+        Assert.Null(result.MaxPrice); Assert.Equal(origin, result.Origin); Assert.Null(marketplace.Request.MaxPrice);
+        result = await service.SearchAsync("bỏ vị trí", null, Criteria(result));
+        Assert.Null(result.Origin); Assert.False(result.Nearby); Assert.Null(marketplace.Request.Latitude);
+        result = await service.SearchAsync("bỏ từ khóa", null, Criteria(result));
+        Assert.Null(result.Keyword); Assert.Null(marketplace.Request.Keyword);
+    }
+
+    [Fact]
+    public async Task InvalidPreviousCriteriaCannotReachCatalogueAndAnUnclearNewBudgetCannotSilentlyReuseOldOne()
+    {
+        var marketplace = new MarketplaceStub();
+        var service = new ChatbotFoodService(marketplace);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.SearchAsync("gần tui", null, new("private search text")));
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.SearchAsync("gần tui", null, new(MaxPrice: -1)));
+        Assert.Null(marketplace.Request);
+        var result = await service.SearchAsync("rẻ hơn", null, new("cơm gà", 40_000));
+        Assert.Equal("clarificationRequired", result.Status); Assert.Null(result.MaxPrice); Assert.Null(marketplace.Request);
+    }
+
+    [Theory]
+    [InlineData("Đồ ăn dưới 40k", 40_000)]
+    [InlineData("Đồ ăn dưới 40.000đ", 40_000)]
+    [InlineData("Đồ ăn dưới 40,000 đồng", 40_000)]
+    [InlineData("Đồ ăn dưới 30,5k", 30_500)]
+    public async Task VietnameseBudgetFormatsKeepTheirActualCurrencyValue(string message, decimal expected)
+    {
+        var marketplace = new MarketplaceStub();
+        var result = await new ChatbotFoodService(marketplace).SearchAsync(message, null);
+        Assert.Equal(expected, result.MaxPrice); Assert.Equal(expected, marketplace.Request!.MaxPrice);
+    }
+
+    [Fact]
     public async Task FoodQueryAppliesTypeBudgetAndGeoBeforePagingAndReturnsMinimalCurrentFacts()
     {
         var marketplace = new MarketplaceStub { Posts = [Food()] };
@@ -80,6 +128,7 @@ public sealed class ChatbotFoodServiceTests
     [InlineData("Đồ ăn cho người dị ứng sữa")]
     [InlineData("Đồ ăn giá 30k")]
     [InlineData("Đồ ăn dưới 79228162514264337593543950335k")]
+    [InlineData("Đồ ăn dưới 40k trên 30k")]
     public async Task UnsupportedDietaryOrBudgetConditionsRequireClarificationInsteadOfIgnoringThem(string message)
     {
         var marketplace = new MarketplaceStub { Posts = [Food()] };
@@ -108,7 +157,7 @@ public sealed class ChatbotFoodServiceTests
         Assert.Equal("unavailable", result.Status); Assert.Empty(result.Items);
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         marketplace.Error = new OperationCanceledException(cancellation.Token);
-        await Assert.ThrowsAsync<OperationCanceledException>(() => service.SearchAsync("Có gì ăn", null, cancellation.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(() => service.SearchAsync("Có gì ăn", null, cancellationToken: cancellation.Token));
     }
 
     private static MarketplacePostDto Food() => new(Guid.NewGuid(), Guid.NewGuid(), "Bếp A", "private phone",

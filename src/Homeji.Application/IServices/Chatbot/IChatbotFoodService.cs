@@ -5,5 +5,5 @@ namespace Homeji.Application.IServices.Chatbot;
 public interface IChatbotFoodService
 {
     Task<ChatbotFoodResponseDto> SearchAsync(string message, ChatbotFoodContextDto? origin,
-        CancellationToken cancellationToken = default);
+        ChatbotFoodCriteriaDto? previous = null, CancellationToken cancellationToken = default);
 }

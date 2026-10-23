@@ -25,9 +25,11 @@ public sealed class ChatbotContextApiTests
         using var factory = CreateFactory(service);
         using var client = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
         using var response = await client.PostAsJsonAsync(new Uri("/api/chatbot/messages", UriKind.Relative),
-            new { message = "Gợi ý đồ ăn gần tui", foodContext = new { latitude = 10.84m, longitude = 106.8m, radiusKm = 3 } });
+            new { message = "Gợi ý đồ ăn gần tui", foodContext = new { latitude = 10.84m, longitude = 106.8m, radiusKm = 3 },
+                previousFoodCriteria = new { keyword = "cơm gà", maxPrice = 40_000, nearby = true } });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(new ChatbotFoodContextDto(10.84m, 106.8m), service.LastRequest!.FoodContext);
+        Assert.Equal(new ChatbotFoodCriteriaDto("cơm gà", 40_000, Nearby: true), service.LastRequest.PreviousFoodCriteria);
         Assert.Null(service.LastRequest.RentalContext); Assert.Null(service.LastRequest.RentalSelection);
         var reply = await response.Content.ReadFromJsonAsync<ChatbotReplyDto>();
         Assert.Equal("empty", reply!.FoodDiscovery!.Status); Assert.Null(reply.SearchUpdate); Assert.Null(reply.RentalDecision);

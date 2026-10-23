@@ -71,6 +71,22 @@ public sealed class ChatbotServiceTests
         Assert.Equal(0, repository.SaveCount);
     }
 
+    [Theory]
+    [InlineData("gần tui")]
+    [InlineData("dưới 30k")]
+    [InlineData("30k")]
+    [InlineData("bỏ ngân sách")]
+    public async Task ShortFoodFollowupDoesNotBecomeRentalSearchOrASelectedRoomTask(string message)
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new SuccessfulClient(); var decision = new StubRentalDecisionService();
+        var reply = await CreateService(repository, ai, new GroundedSearchStub(), decision: decision).SendMessageAsync(
+            new(null, message, RentalContext: new(Guid.NewGuid(), "cost"),
+                PreviousFoodCriteria: new("cơm gà", 40_000)));
+        Assert.NotNull(reply.FoodDiscovery); Assert.Null(reply.RentalDecision); Assert.Null(reply.SearchUpdate);
+        Assert.Equal(0, ai.Calls); Assert.Equal(0, decision.Calls); Assert.Equal(0, repository.SaveCount);
+    }
+
     private sealed class CountingUnavailableClient : IChatbotAiClient
     {
         public int Calls { get; private set; }
@@ -426,7 +442,7 @@ public sealed class ChatbotServiceTests
 
     private sealed class StubFoodService : IChatbotFoodService
     {
-        public Task<ChatbotFoodResponseDto> SearchAsync(string message, ChatbotFoodContextDto? origin, CancellationToken cancellationToken = default)
+        public Task<ChatbotFoodResponseDto> SearchAsync(string message, ChatbotFoodContextDto? origin, ChatbotFoodCriteriaDto? previous = null, CancellationToken cancellationToken = default)
             => Task.FromResult(new ChatbotFoodResponseDto("empty", "Chưa có món đang bán.", []));
     }
 

@@ -103,8 +103,9 @@ public sealed class ChatbotService : IChatbotService
         }
 
         var message = ValidateMessage(request.Message);
-        var foodTopic = FoodSearchIntent.IsFoodTopic(message);
-        var foodQuery = foodTopic && FoodSearchIntent.IsDiscovery(message);
+        var foodRefinement = request.PreviousFoodCriteria is not null && FoodSearchIntent.IsRefinement(message);
+        var foodTopic = FoodSearchIntent.IsFoodTopic(message) || foodRefinement;
+        var foodQuery = foodRefinement || FoodSearchIntent.IsDiscovery(message);
         var selectionTask = foodTopic ? null : ChatbotRentalSelection.ResolveTask(request.RentalSelection, request.RentalContext, message);
         var rentalTask = foodTopic ? null : ChatbotRentalContext.ResolveTask(request.RentalContext, message);
         if (request.SaveHistory && !_options.HistoryStorageEnabled)
@@ -138,7 +139,7 @@ public sealed class ChatbotService : IChatbotService
         string assistantReply;
         if (foodQuery)
         {
-            foodDiscovery = await _food.SearchAsync(message, request.FoodContext, cancellationToken);
+            foodDiscovery = await _food.SearchAsync(message, request.FoodContext, request.PreviousFoodCriteria, cancellationToken);
             assistantReply = foodDiscovery.Summary;
             actions = [new ChatbotNavigationActionDto("food-menu", "Mở Chợ đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
         }

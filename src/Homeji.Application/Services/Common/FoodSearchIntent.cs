@@ -19,6 +19,11 @@ public static partial class FoodSearchIntent
         && !ProcedureTerms().IsMatch(RentalSearchIntent.Normalize(message));
 
     public static bool NeedsLocation(string message) => LocationTerms().IsMatch(RentalSearchIntent.Normalize(message));
+    public static bool IsRefinement(string message)
+    {
+        var text = RentalSearchIntent.Normalize(message).Trim();
+        return Refinements().IsMatch(text) && !HousingRefinement().IsMatch(text);
+    }
 
     [GeneratedRegex(@"\b(do an|thuc an|mon an|quan an|co gi an|an gi|an uong|doi bung|dang doi|minh doi|tui doi|toi doi|com|bun|pho|banh mi|mi xao|tra sua|an sang|an trua|an toi)\b")]
     private static partial Regex FoodTerms();
@@ -28,4 +33,8 @@ public static partial class FoodSearchIntent
     private static partial Regex ProcedureTerms();
     [GeneratedRegex(@"\b(gan|quanh|khu vuc|quan \d|thu duc|o dau|dia chi|tai day|o day)\b")]
     private static partial Regex LocationTerms();
+    [GeneratedRegex(@"^(?:(?:gan|quanh|duoi|toi da|khong qua|ngan sach|gia|re hon|chay|di ung|khong (?:an|cay|sua|duong)|bo (?:ngan sach|vi tri|tu khoa))\b|\d+(?:[.,]\d+)?\s*(?:k|nghin|ngan|d|dong)\s*$)")]
+    private static partial Regex Refinements();
+    [GeneratedRegex(@"^(?!gan\b|quanh\b).*\b(phong|tro|can ho|o ghep)\b")]
+    private static partial Regex HousingRefinement();
 }
