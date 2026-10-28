@@ -12,6 +12,15 @@ public sealed class SubscriptionServiceTests
     private static readonly DateTimeOffset Now = new(2026, 10, 4, 0, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Catalog_describes_listing_visibility_without_promising_ai_match_priority()
+    {
+        var packages = await CreateService(Guid.NewGuid(), new SubscriptionRepository(null)).GetPackagesAsync();
+        var premium = packages.Single(package => package.Tier == Homeji.Domain.Enums.SubscriptionTier.Premium);
+        Assert.Contains("Khung viền nổi bật cho tin phòng", premium.Benefits);
+        Assert.DoesNotContain(premium.Benefits, benefit => benefit.Contains("đề xuất AI", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Renewal_reports_paid_through_date_without_changing_current_package()
     {
         var userId = Guid.NewGuid();

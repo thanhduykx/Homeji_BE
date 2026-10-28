@@ -22,7 +22,7 @@ public sealed class SubscriptionService : ISubscriptionService
     [
         "Hiển thị nhãn Premium trên tin đăng",
         "Tin đăng được ưu tiên hiển thị",
-        "Tăng khả năng xuất hiện trong đề xuất AI",
+        "Khung viền nổi bật cho tin phòng",
     ];
 
     private readonly UserContext _userContext;
