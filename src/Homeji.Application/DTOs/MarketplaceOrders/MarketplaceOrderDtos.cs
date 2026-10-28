@@ -4,7 +4,7 @@ namespace Homeji.Application.DTOs.MarketplaceOrders;
 
 public sealed record CreateMarketplaceOrderDto(
     DateTimeOffset PickupAt, string? PickupAddress, string? Note, int Quantity = 1,
-    MarketplaceFulfillmentDto? Fulfillment = null);
+    MarketplaceFulfillmentDto? Fulfillment = null, Guid? VoucherId = null);
 
 public sealed record MarketplaceFulfillmentDto(
     MarketplaceFulfillmentType Mode,
@@ -20,7 +20,7 @@ public sealed record CreateMarketplaceCartOrderDto(
     DateTimeOffset PickupAt,
     string? PickupAddress,
     string? Note,
-    MarketplaceFulfillmentDto? Fulfillment = null);
+    MarketplaceFulfillmentDto? Fulfillment = null, Guid? VoucherId = null);
 
 public sealed record MarketplaceOrderDto(
     Guid Id,
@@ -50,4 +50,4 @@ public sealed record MarketplaceOrderDto(
     string? SellerAddress = null,
     Guid CheckoutId = default,
     MarketplaceFulfillmentType FulfillmentType = MarketplaceFulfillmentType.Pickup,
-    MarketplaceDeliveryDto? Delivery = null);
+    MarketplaceDeliveryDto? Delivery = null, decimal DiscountAmount = 0, decimal BuyerPaidAmount = 0);

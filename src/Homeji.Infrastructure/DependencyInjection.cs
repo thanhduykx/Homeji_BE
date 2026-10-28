@@ -134,6 +134,7 @@ public static class DependencyInjection
             .ValidateOnStart();
         services.AddScoped<ITransactionReceiptService, TransactionReceiptService>();
         services.AddScoped<IPremiumWalletPaymentService, PremiumWalletPaymentService>();
+        services.AddScoped<Homeji.Application.IServices.Promotions.IReferralService, ReferralService>();
         services.AddScoped<ISearchInterestService, SearchInterestService>();
         services.AddHttpClient<GeminiInterestRanker>();
         services.AddScoped<IOrderReceiptWriter, TransactionReceiptService>();

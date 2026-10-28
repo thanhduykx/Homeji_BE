@@ -244,6 +244,12 @@ namespace Homeji.Infrastructure.Migrations
                         .HasPrecision(9, 6)
                         .HasColumnType("numeric(9,6)");
 
+                    b.Property<decimal>("DiscountAmount")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)")
+                        .HasDefaultValue(0m);
+
                     b.Property<int>("FulfillmentType")
                         .HasColumnType("integer");
 
@@ -806,6 +812,123 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasIndex("SentAt", "NextAttemptAt");
 
                     b.ToTable("receipt_email_deliveries", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralAccount", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("character varying(24)");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("referral_accounts", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralCampaign", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<decimal>("Budget")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal>("Reserved")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("referral_campaigns", "homeji");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "friends-v1",
+                            Budget = 1000000m,
+                            Reserved = 0m,
+                            Version = 0L
+                        });
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("InviteeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("InviterId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InviteeId")
+                        .IsUnique();
+
+                    b.HasIndex("InviterId");
+
+                    b.ToTable("referral_claims", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralVoucher", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClaimId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Discount")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClaimId");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("ReferenceId");
+
+                    b.ToTable("referral_vouchers", "homeji");
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.RentalPost", b =>
@@ -2177,6 +2300,45 @@ namespace Homeji.Infrastructure.Migrations
                         .WithOne()
                         .HasForeignKey("Homeji.Domain.Entities.ReceiptEmailDelivery", "ReceiptId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralAccount", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralClaim", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("InviteeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("InviterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.ReferralVoucher", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.ReferralClaim", null)
+                        .WithMany()
+                        .HasForeignKey("ClaimId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

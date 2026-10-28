@@ -46,6 +46,11 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<TransactionReceipt> TransactionReceipts => Set<TransactionReceipt>();
     public DbSet<ReceiptEmailDelivery> ReceiptEmailDeliveries => Set<ReceiptEmailDelivery>();
 
+    public DbSet<ReferralCampaign> ReferralCampaigns => Set<ReferralCampaign>();
+    public DbSet<ReferralAccount> ReferralAccounts => Set<ReferralAccount>();
+    public DbSet<ReferralClaim> ReferralClaims => Set<ReferralClaim>();
+    public DbSet<ReferralVoucher> ReferralVouchers => Set<ReferralVoucher>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);

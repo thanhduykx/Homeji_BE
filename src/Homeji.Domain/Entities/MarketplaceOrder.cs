@@ -80,6 +80,8 @@ public sealed class MarketplaceOrder
     public Guid BuyerId { get; private set; }
     public Guid SellerId { get; private set; }
     public decimal AgreedPrice { get; private set; }
+    public decimal DiscountAmount { get; private set; }
+    public decimal BuyerPaidAmount => AgreedPrice - DiscountAmount;
     public decimal UnitPrice { get; private set; }
     public int Quantity { get; private set; }
     public decimal PlatformFeeRate { get; private set; }
@@ -94,6 +96,14 @@ public sealed class MarketplaceOrder
     public MarketplaceOrderStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+
+    public void ApplyVoucherDiscount(decimal amount)
+    {
+        if (Status != MarketplaceOrderStatus.Requested || DiscountAmount != 0 || amount < 0 || amount > PlatformFeeAmount)
+            throw new DomainException("Voucher không áp dụng được cho đơn này. Vui lòng kiểm tra lại.");
+        DiscountAmount = amount;
+        PlatformFeeAmount -= amount;
+    }
 
     public void Accept(DateTimeOffset updatedAt) => Transition(MarketplaceOrderStatus.Requested, MarketplaceOrderStatus.Accepted, updatedAt);
     public void Reject(DateTimeOffset updatedAt) => Transition(MarketplaceOrderStatus.Requested, MarketplaceOrderStatus.Rejected, updatedAt);

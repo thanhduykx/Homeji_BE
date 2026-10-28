@@ -15,7 +15,7 @@ namespace Homeji.Infrastructure.External;
 
 public sealed class PremiumWalletPaymentService(
     ApplicationDbContext db, UserContext userContext, IOptions<PremiumSubscriptionOptions> options,
-    TimeProvider timeProvider, ITransactionReceiptService receipts) : IPremiumWalletPaymentService
+    TimeProvider timeProvider, ITransactionReceiptService receipts, Homeji.Application.IServices.Promotions.IReferralService? referrals = null) : IPremiumWalletPaymentService
 {
     public async Task<PaymentDto> PurchaseAsync(string packageCode, WalletPremiumPaymentDto request, CancellationToken cancellationToken = default)
     {
@@ -51,20 +51,25 @@ public sealed class PremiumWalletPaymentService(
         if (plan is null) throw Invalid("packageCode", "Không tìm thấy gói Premium.");
         if (plan.Price <= 0 || decimal.Truncate(plan.Price) != plan.Price || plan.DurationDays <= 0 || string.IsNullOrWhiteSpace(plan.Name))
             throw new InvalidOperationException("Chưa cấu hình gói Premium.");
-        if (request.ExpectedAmount != plan.Price)
+        var discount = request.VoucherId.HasValue
+            ? await (referrals ?? throw Invalid("voucher", "Voucher chưa sẵn sàng.")).QuoteAsync(request.VoucherId.Value, "vip", plan.Price, cancellationToken) : 0m;
+        var amountDue = plan.Price - discount;
+        if (request.ExpectedAmount != amountDue)
             throw Invalid("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận số tiền mới.");
         var wallet = await db.WalletAccounts.SingleOrDefaultAsync(w => w.UserId == userId, cancellationToken);
         if (wallet is null) throw Invalid("wallet", "Ví chưa có số dư. Vui lòng nạp tiền trước.");
         await db.Entry(wallet).ReloadAsync(cancellationToken);
-        if (wallet.Balance < plan.Price) throw Invalid("wallet", "Số dư ví không đủ để thanh toán gói này.");
+        if (wallet.Balance < amountDue) throw Invalid("wallet", "Số dư ví không đủ để thanh toán gói này.");
         var now = timeProvider.GetUtcNow();
-        wallet.DebitPurchase(plan.Price, now);
-        var description = $"{plan.Name} · {plan.DurationDays} ngày · Thanh toán bằng số dư ví Homeji";
-        var payment = new PaymentTransaction(userId, PaymentMethod.Wallet, plan.Price, orderCode, description, now, PaymentPurpose.PremiumSubscription, plan.Code);
+        wallet.DebitPurchase(amountDue, now);
+        var description = $"{plan.Name} · {plan.DurationDays} ngày · Thanh toán bằng số dư ví Homeji" + (discount > 0 ? $" · Voucher giảm {discount:0}đ" : "");
+        var payment = new PaymentTransaction(userId, PaymentMethod.Wallet, amountDue, orderCode, description, now, PaymentPurpose.PremiumSubscription, plan.Code);
+        if (request.VoucherId.HasValue)
+            await referrals!.UseAsync(request.VoucherId.Value, "vip", plan.Price, payment.Id, cancellationToken);
         payment.MarkPaid(null, "Thanh toán bằng số dư ví Homeji", null, now);
         db.PaymentTransactions.Add(payment);
         db.WalletTransactions.Add(new WalletTransaction(userId, WalletTransactionKind.SubscriptionPurchase,
-            -plan.Price, wallet.Balance, payment.Id, description, now));
+            -amountDue, wallet.Balance, payment.Id, description, now));
         var active = await db.UserSubscriptions.AsNoTracking().Where(s => s.UserId == userId && s.Tier == SubscriptionTier.Premium && s.Status == SubscriptionStatus.Active && s.ExpiresAt > now)
             .OrderByDescending(s => s.ExpiresAt).FirstOrDefaultAsync(cancellationToken);
         db.UserSubscriptions.Add(UserSubscription.CreatePremium(userId, plan.Code, plan.Name, payment.Id,

@@ -20,6 +20,7 @@ namespace Homeji.Application.Services.MarketplaceOrders;
 
 public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketplaceOrderExpirationService
 {
+    private readonly Homeji.Application.IServices.Promotions.IReferralService? _referrals;
     private const int ExpirationBatchSize = 200;
     private readonly UserContext _userContext;
     private readonly IMarketplaceOrderRepository _orders;
@@ -46,7 +47,8 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         IValidator<CreateMarketplaceCartOrderDto> cartValidator,
         IOptions<MarketplaceFinanceOptions> financeOptions,
         IUserProfileRepository profiles,
-        IOrderReceiptWriter receipts)
+        IOrderReceiptWriter receipts,
+        Homeji.Application.IServices.Promotions.IReferralService? referrals = null)
     {
         _userContext = userContext;
         _orders = orders;
@@ -60,6 +62,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         _financeOptions = financeOptions.Value;
         _profiles = profiles;
         _receipts = receipts;
+        _referrals = referrals;
     }
 
     public async Task<MarketplaceOrderDto> CreateAsync(
@@ -78,6 +81,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                     StringComparer.Ordinal));
         }
 
+        if (request.VoucherId.HasValue) throw WalletFundingRequired("Hãy thêm món vào giỏ để dùng voucher đồ ăn. Voucher không áp dụng cho đồ cũ.");
         var buyerId = _userContext.GetRequiredUserId();
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(MarketplacePost), postId);
@@ -218,10 +222,13 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             });
         }
 
+        var discount = request.VoucherId.HasValue
+            ? await (_referrals ?? throw WalletFundingRequired("Voucher chưa sẵn sàng.")).QuoteAsync(request.VoucherId.Value, "food", grossAmount, cancellationToken) : 0m;
+        var amountDue = grossAmount - discount;
         var buyerWallet = await _wallets.GetAsync(buyerId, cancellationToken);
-        if (buyerWallet is null || !buyerWallet.IsActivated || buyerWallet.Balance < grossAmount)
+        if (buyerWallet is null || !buyerWallet.IsActivated || buyerWallet.Balance < amountDue)
         {
-            var missing = grossAmount - (buyerWallet?.Balance ?? 0);
+            var missing = amountDue - (buyerWallet?.Balance ?? 0);
             throw WalletFundingRequired($"Nạp thêm ít nhất {Math.Max(0, missing):0} đồng để thanh toán giỏ hàng.");
         }
 
@@ -237,6 +244,10 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
         var now = _timeProvider.GetUtcNow();
         var commissionRate = _financeOptions.CommissionRate;
         var checkoutId = Guid.NewGuid();
+        if (request.VoucherId.HasValue)
+            await _referrals!.UseAsync(request.VoucherId.Value, "food", grossAmount, checkoutId, cancellationToken);
+        var remainingDiscount = discount;
+        var remainingGross = grossAmount;
         var createdOrders = new List<(MarketplaceOrder Order, MarketplacePost Post)>(posts.Count);
         var notifications = new List<Notification>(posts.Count);
         foreach (var post in posts)
@@ -256,12 +267,17 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
                 checkoutId: checkoutId,
                 fulfillmentType: request.Fulfillment?.Mode ?? MarketplaceFulfillmentType.Pickup,
                 delivery: ToDelivery(request.Fulfillment));
+            var lineDiscount = remainingGross == order.AgreedPrice ? remainingDiscount
+                : decimal.Floor(discount * order.AgreedPrice / grossAmount);
+            order.ApplyVoucherDiscount(lineDiscount);
+            remainingDiscount -= lineDiscount;
+            remainingGross -= order.AgreedPrice;
             post.Reserve(item.Quantity, now);
-            buyerWallet.DebitPurchase(order.AgreedPrice, now);
+            buyerWallet.DebitPurchase(order.BuyerPaidAmount, now);
             await _wallets.AddTransactionAsync(new WalletTransaction(
                 buyerId,
                 WalletTransactionKind.Purchase,
-                -order.AgreedPrice,
+                -order.BuyerPaidAmount,
                 buyerWallet.Balance,
                 order.Id,
                 $"Thanh toán món {post.Title}",
@@ -657,7 +673,7 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
             order.FulfillmentType,
             order.DeliveryAddress is null ? null : new MarketplaceDeliveryDto(
                 order.RecipientName, order.RecipientPhone, order.DeliveryAddress,
-                order.DeliveryLatitude!.Value, order.DeliveryLongitude!.Value));
+                order.DeliveryLatitude!.Value, order.DeliveryLongitude!.Value), order.DiscountAmount, order.BuyerPaidAmount);
 
     private static MarketplaceDelivery? ToDelivery(MarketplaceFulfillmentDto? fulfillment) =>
         fulfillment?.Delivery is { } delivery
@@ -682,7 +698,9 @@ public sealed class MarketplaceOrderService : IMarketplaceOrderService, IMarketp
 
         var buyerWallet = await _wallets.GetAsync(buyerId, cancellationToken)
             ?? throw new InvalidOperationException("Buyer wallet was not found for a funded marketplace order.");
-        var refundAmount = orders.Sum(order => order.AgreedPrice);
+        var refundAmount = orders.Sum(order => order.BuyerPaidAmount);
+        if (_referrals is not null)
+            foreach (var checkout in orders.Select(order => order.CheckoutId).Distinct()) await _referrals.RestoreAsync(checkout, cancellationToken);
         buyerWallet.CreditRefund(refundAmount, now);
 
         foreach (var order in orders)

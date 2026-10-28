@@ -97,7 +97,7 @@ public sealed class PremiumWalletPaymentDatabaseTests
         var added = await db.UserSubscriptions.SingleAsync(s => s.PaymentTransactionId == paid.Id);
         Assert.InRange((added.StartedAt - expires).TotalMilliseconds, -1, 1);
         var changedOptions = Options.Create(new PremiumSubscriptionOptions { Price = 120000 });
-        var retry = new PremiumWalletPaymentService(db, Context(user), changedOptions, TimeProvider.System, new TransactionReceiptService(db, Context(user)));
+        var retry = new PremiumWalletPaymentService(db, new UserContext(new CurrentUser(user), new UserProfileRepository(db)), changedOptions, TimeProvider.System, new TransactionReceiptService(db, Context(user)));
         Assert.Equal(paid.Id, (await retry.PurchaseAsync("PREMIUM_MONTHLY", request)).Id);
     }
 
@@ -118,7 +118,7 @@ public sealed class PremiumWalletPaymentDatabaseTests
     }
     private static UserContext Context(Guid user) => new(new CurrentUser(user), null!);
     private static PremiumWalletPaymentService Service(ApplicationDbContext db, Guid user, ITransactionReceiptService? receipts = null)
-        => new(db, Context(user), Options.Create(new PremiumSubscriptionOptions()), TimeProvider.System, receipts ?? new TransactionReceiptService(db, Context(user)));
+        => new(db, new UserContext(new CurrentUser(user), new UserProfileRepository(db)), Options.Create(new PremiumSubscriptionOptions()), TimeProvider.System, receipts ?? new TransactionReceiptService(db, Context(user)));
     private sealed record CurrentUser(Guid? UserId) : ICurrentUser;
     private sealed class FailingReceipt : ITransactionReceiptService
     {

@@ -21,7 +21,7 @@ public sealed class TransactionReceiptService(ApplicationDbContext db, UserConte
             : $"{title} · Số lượng {order.Quantity} · Đơn giá {order.UnitPrice:0.##} VND · Thanh toán bằng số dư Homeji; tiền đang được giữ đảm bảo đơn hàng.";
         return RecordAsync(new TransactionReceipt(order.BuyerId, order.Id,
             refunded ? ReceiptEvent.PurchaseRefunded : ReceiptEvent.PurchasePaid,
-            order.AgreedPrice, order.Id.ToString("N"), description,
+            order.BuyerPaidAmount, order.Id.ToString("N"), description + (order.DiscountAmount > 0 ? $" Voucher giảm {order.DiscountAmount:0}đ." : ""),
             order.RefundedAt ?? order.CreatedAt), cancellationToken);
     }
 

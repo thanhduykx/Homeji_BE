@@ -9,6 +9,8 @@ public sealed class MarketplaceOrderConfiguration : IEntityTypeConfiguration<Mar
     public void Configure(EntityTypeBuilder<MarketplaceOrder> builder)
     {
         builder.ToTable("marketplace_orders", "homeji");
+        builder.Property(x => x.DiscountAmount).HasPrecision(18, 0).HasDefaultValue(0m);
+        builder.Ignore(x => x.BuyerPaidAmount);
         builder.HasKey(order => order.Id);
         builder.Property(order => order.FulfillmentType).HasConversion<int>();
         builder.Property(order => order.RecipientName).HasMaxLength(100);
