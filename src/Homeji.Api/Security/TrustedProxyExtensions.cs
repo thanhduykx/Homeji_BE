@@ -12,6 +12,7 @@ public static class TrustedProxyExtensions
         services.Configure<ForwardedHeadersOptions>(options =>
         {
             options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardLimit = 1;
             // Keep the framework's loopback defaults. Never trust arbitrary client headers.
             foreach (var value in configuration.GetSection("ReverseProxy:KnownProxies").GetChildren())
             {

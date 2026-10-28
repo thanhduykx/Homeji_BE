@@ -37,6 +37,31 @@ public sealed class TrustedProxyTests
         Assert.Equal(trusted ? "https" : "http", context.Request.Scheme);
     }
 
+    [Theory]
+    [InlineData("10.1.2.3", "198.51.100.20", "198.51.100.20")]
+    [InlineData("10.1.2.3", "198.51.100.21", "198.51.100.21")]
+    [InlineData("203.0.113.10", "198.51.100.20", "203.0.113.10")]
+    [InlineData("10.1.2.3", "192.0.2.99, 198.51.100.20", "198.51.100.20")]
+    public async Task Production_network_preserves_distinct_clients_and_ignores_spoofed_prefix(
+        string proxy, string forwarded, string expected)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.Production.json"))
+            .Build();
+        await using var provider = new ServiceCollection().AddLogging()
+            .AddTrustedProxyHeaders(configuration).BuildServiceProvider();
+        var middleware = new ForwardedHeadersMiddleware(_ => Task.CompletedTask,
+            provider.GetRequiredService<ILoggerFactory>(),
+            provider.GetRequiredService<IOptions<ForwardedHeadersOptions>>());
+        var context = new DefaultHttpContext();
+        context.Connection.RemoteIpAddress = IPAddress.Parse(proxy);
+        context.Request.Headers["X-Forwarded-For"] = forwarded;
+
+        await middleware.Invoke(context);
+
+        Assert.Equal(expected, context.Connection.RemoteIpAddress!.ToString());
+    }
+
     [Fact]
     public void Unrestricted_network_is_rejected()
     {

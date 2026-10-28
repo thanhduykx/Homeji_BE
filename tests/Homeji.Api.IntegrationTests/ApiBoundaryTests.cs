@@ -47,6 +47,9 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
         var hasOrigin = response.Headers.TryGetValues("Access-Control-Allow-Origin", out var values);
         Assert.Equal(allowed, hasOrigin);
         if (allowed) Assert.Equal(origin, Assert.Single(values!));
+        var hasCredentials = response.Headers.TryGetValues("Access-Control-Allow-Credentials", out var credentials);
+        Assert.Equal(allowed, hasCredentials);
+        if (allowed) Assert.Equal("true", Assert.Single(credentials!));
     }
 
     [Theory]
