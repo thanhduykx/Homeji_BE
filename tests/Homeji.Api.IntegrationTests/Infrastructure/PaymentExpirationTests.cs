@@ -101,8 +101,10 @@ public sealed class PaymentExpirationTests
         var repository = new MemoryPayments(new PaymentTransaction(owner, PaymentMethod.PayOs, 99_000, "existing", "Premium", now));
         using var handler = new PayOsHandler();
         using var client = new HttpClient(handler);
+        var profiles = Stub<Homeji.Application.IRepositories.Profiles.IUserProfileRepository>.Create((_, _) =>
+            Task.FromResult<UserProfile?>(UserProfile.Create(owner, "Payment test", now)));
         var service = new PaymentService(client,
-            new UserContext(new CurrentUser(owner), null!), repository, null!, null!,
+            new UserContext(new CurrentUser(owner), profiles), repository, null!, null!,
             Options.Create(new MomoOptions()), Options.Create(new PayOsOptions
             {
                 ClientId = "test-client", ApiKey = "test-key", ChecksumKey = "test-checksum",

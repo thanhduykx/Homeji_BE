@@ -108,7 +108,7 @@ public sealed class UserProfileService : IUserProfileService
 
         var userId = GetRequiredUserId();
         var profile = await _repository.GetByIdAsync(userId, cancellationToken)
-            ?? throw new ForbiddenAccessException("Vui lòng hoàn thiện hồ sơ trước khi cập nhật lối sống.");
+            ?? throw new ForbiddenAccessException("Lưu Thông tin cơ bản trong Hồ sơ trước khi thêm thông tin ở ghép.", "profile_required");
 
         profile.UpdateLifestyle(
             request.Role,

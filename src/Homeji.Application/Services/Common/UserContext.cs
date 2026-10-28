@@ -32,7 +32,7 @@ public sealed class UserContext
     {
         var userId = GetRequiredUserId();
         return await _profiles.GetByIdAsync(userId, cancellationToken)
-            ?? throw new ForbiddenAccessException("Vui lòng hoàn thiện hồ sơ trước khi dùng tính năng này.");
+            ?? throw new ForbiddenAccessException("Bạn chưa lưu thông tin tài khoản. Mở Hồ sơ → Thông tin cơ bản, nhập tên và chọn Lưu thông tin để tiếp tục.", "profile_required");
     }
 
     public static void EnsureAdmin(UserProfile profile)

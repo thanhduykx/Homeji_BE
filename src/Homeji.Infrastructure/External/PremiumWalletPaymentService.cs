@@ -20,6 +20,7 @@ public sealed class PremiumWalletPaymentService(
     public async Task<PaymentDto> PurchaseAsync(string packageCode, WalletPremiumPaymentDto request, CancellationToken cancellationToken = default)
     {
         var userId = userContext.GetRequiredUserId();
+        await userContext.GetRequiredProfileAsync(cancellationToken);
         if (request.RequestId == Guid.Empty) throw Invalid("requestId", "Mã yêu cầu thanh toán không hợp lệ.");
         return await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {

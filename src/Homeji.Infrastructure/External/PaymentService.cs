@@ -135,8 +135,9 @@ public sealed class PaymentService : IPaymentService
         string? packageCode,
         CancellationToken cancellationToken)
     {
-        EnsureMomoConfigured();
         var userId = _userContext.GetRequiredUserId();
+        await _userContext.GetRequiredProfileAsync(cancellationToken);
+        EnsureMomoConfigured();
         var amount = ToWholeVnd(requestedAmount);
         ValidateWalletTopUpAmount(purpose, amount);
         var description = NormalizeDescription(requestedDescription);
@@ -336,8 +337,9 @@ public sealed class PaymentService : IPaymentService
         string? packageCode,
         CancellationToken cancellationToken)
     {
-        EnsurePayOsConfigured();
         var userId = _userContext.GetRequiredUserId();
+        await _userContext.GetRequiredProfileAsync(cancellationToken);
+        EnsurePayOsConfigured();
         var amount = ToWholeVnd(requestedAmount);
         ValidateWalletTopUpAmount(purpose, amount);
         var description = NormalizeDescription(requestedDescription);

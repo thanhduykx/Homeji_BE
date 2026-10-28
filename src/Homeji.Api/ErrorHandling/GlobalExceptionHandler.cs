@@ -142,6 +142,8 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
         };
 
         problemDetails.Instance = context.Request.Path;
+        if (exception is ForbiddenAccessException { Code: { } code })
+            problemDetails.Extensions["code"] = code;
         problemDetails.Extensions["traceId"] = Activity.Current?.Id ?? context.TraceIdentifier;
 
         var exposeDetails = _environment.IsDevelopment()
