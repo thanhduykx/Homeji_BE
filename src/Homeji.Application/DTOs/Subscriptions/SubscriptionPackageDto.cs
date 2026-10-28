@@ -9,4 +9,8 @@ public sealed record SubscriptionPackageDto(
     decimal Price,
     int DurationDays,
     string Badge,
-    IReadOnlyCollection<string> Benefits);
+    IReadOnlyCollection<string> Benefits)
+{
+    public int MaxFollowedAreas => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(Tier == SubscriptionTier.Premium).FollowedAreas;
+    public int MaxComparedPosts => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(Tier == SubscriptionTier.Premium).ComparedPosts;
+}

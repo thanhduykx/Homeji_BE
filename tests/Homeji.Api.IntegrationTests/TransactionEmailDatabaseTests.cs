@@ -132,8 +132,8 @@ public sealed class TransactionEmailDatabaseTests
         await using var first = Open();
         await using var second = Open();
         await Task.WhenAll(Dispatcher(first, sender).DispatchBatchAsync(CancellationToken.None), Dispatcher(second, sender).DispatchBatchAsync(CancellationToken.None));
-        Assert.Equal(10, sender.Keys.Count);
-        Assert.Equal(10, sender.Keys.Distinct().Count());
+        Assert.Equal(10, sender.Keys.Count(keys.Contains));
+        Assert.Equal(10, sender.Keys.Where(keys.Contains).Distinct().Count());
         Assert.Equal(10, await setup.ReceiptEmailDeliveries.CountAsync(x => keys.Contains(x.Id) && x.SentAt != null));
 
         var uncertainPayment = Paid(user);
@@ -144,7 +144,11 @@ public sealed class TransactionEmailDatabaseTests
         var uncertainSender = new Sender { Uncertain = true };
         await Dispatcher(first, uncertainSender).DispatchBatchAsync(CancellationToken.None);
         await Dispatcher(second, uncertainSender).DispatchBatchAsync(CancellationToken.None);
-        Assert.Single(uncertainSender.Keys);
+        // Other integration tests can enqueue receipts in this shared disposable database.
+        var uncertainJobId = await setup.ReceiptEmailDeliveries
+            .Where(x => setup.TransactionReceipts.Any(r => r.Id == x.ReceiptId && r.ReferenceId == uncertainPayment.Id))
+            .Select(x => x.Id).SingleAsync();
+        Assert.Single(uncertainSender.Keys, key => key == uncertainJobId);
         var failedReceipt = Assert.Single((await service.GetMineAsync(1, 20, CancellationToken.None)).Items, x => x.ReferenceId == uncertainPayment.Id);
         Assert.True(failedReceipt.EmailFailed);
         Assert.Null(failedReceipt.EmailSentAt);

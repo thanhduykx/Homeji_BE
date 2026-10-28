@@ -16,6 +16,7 @@ public sealed class SubscriptionService : ISubscriptionService
         "Tìm phòng và liên hệ người đăng trên Homeji",
         "Tìm kiếm và xem bài đăng",
         "Lưu tin, báo cáo vi phạm và gửi lời mời ở ghép",
+        "Theo dõi tối đa 10 khu vực, so sánh tối đa 3 phòng mỗi lần",
     ];
 
     private static readonly string[] PremiumBenefits =
@@ -23,6 +24,7 @@ public sealed class SubscriptionService : ISubscriptionService
         "Hiển thị nhãn Premium trên tin đăng",
         "Tin đăng được ưu tiên hiển thị",
         "Khung viền nổi bật cho tin phòng",
+        "Theo dõi tối đa 30 khu vực, so sánh tối đa 5 phòng mỗi lần",
     ];
 
     private readonly UserContext _userContext;

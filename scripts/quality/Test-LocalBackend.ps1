@@ -34,7 +34,7 @@ try {
     $env:ConnectionStrings__DefaultConnection = $connection
     & (Join-Path $PostgresBin 'psql.exe') -h 127.0.0.1 -p $DatabasePort -U homeji_quality -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE homeji_quality;'
     if ($LASTEXITCODE -ne 0) { throw 'Could not create isolated database.' }
-    & (Join-Path $PostgresBin 'psql.exe') -h 127.0.0.1 -p $DatabasePort -U homeji_quality -d homeji_quality -v ON_ERROR_STOP=1 -c 'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY, email text, email_confirmed_at timestamptz);'
+    & (Join-Path $PostgresBin 'psql.exe') -h 127.0.0.1 -p $DatabasePort -U homeji_quality -d homeji_quality -v ON_ERROR_STOP=1 -c 'CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role; CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY, email text, email_confirmed_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), deleted_at timestamptz);'
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the local Supabase auth FK stub.' }
     Push-Location $repo
     try {

@@ -9,4 +9,8 @@ public sealed record MySubscriptionDto(
     string? PackageCode,
     string? PackageName,
     DateTimeOffset? PremiumStartedAt,
-    DateTimeOffset? PremiumExpiresAt);
+    DateTimeOffset? PremiumExpiresAt)
+{
+    public int MaxFollowedAreas => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(IsPremium).FollowedAreas;
+    public int MaxComparedPosts => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(IsPremium).ComparedPosts;
+}

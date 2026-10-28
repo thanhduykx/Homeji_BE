@@ -22,6 +22,44 @@ namespace Homeji.Api.IntegrationTests;
 public sealed class SearchInterestDatabaseTests
 {
     [LocalMarketplaceDatabaseFact]
+    public async Task Comparison_entitlement_checks_active_subscription_and_reverts_after_expiry()
+    {
+        await using var db = Open(); var user = await Seed(db); var clock = new Clock();
+        var service = new Homeji.Application.Services.AI.RentalDecisionService(new RentalPostRepository(db, clock),
+            Context(user), null!, null!, clock, null!, new UserSubscriptionRepository(db));
+        var ids = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToArray();
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.CompareAsync(new(ids), default));
+        db.UserSubscriptions.Add(UserSubscription.CreatePremium(user, "TEST", "Premium", null, clock.At, 1, clock.At));
+        await db.SaveChangesAsync();
+        Assert.Equal(5, (await service.CompareAsync(new(ids), default)).UnavailablePostIds.Count);
+        clock.At = clock.At.AddDays(2);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.CompareAsync(new(ids), default));
+        Assert.Equal(3, (await service.CompareAsync(new(ids.Take(3).ToArray()), default)).UnavailablePostIds.Count);
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Premium_extends_follow_limit_and_expiry_preserves_saved_areas_without_allowing_new_ones()
+    {
+        await using var db = Open(); var user = await Seed(db); var clock = new Clock(); var service = Service(db, user, clock);
+        await service.SettingsAsync(new(true), default);
+        for (var index = 0; index < 10; index++) await service.FollowAsync(new($"Khu kiểm thử {index}"), default);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.FollowAsync(new("Khu thứ 11"), default));
+        db.UserSubscriptions.Add(UserSubscription.CreatePremium(user, "TEST", "Premium", null, clock.At, 1, clock.At));
+        await db.SaveChangesAsync();
+        for (var index = 10; index < 30; index++) await service.FollowAsync(new($"Khu kiểm thử {index}"), default);
+        Assert.Equal(30, (await service.GetAsync(default)).MaxFollowedAreas);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.FollowAsync(new("Khu thứ 31"), default));
+        clock.At = clock.At.AddDays(2);
+        var expired = await service.GetAsync(default);
+        Assert.Equal(10, expired.MaxFollowedAreas);
+        Assert.Equal(30, expired.Following.Count);
+        Assert.Contains("vẫn được lưu", expired.Notice, StringComparison.Ordinal);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.FollowAsync(new("Khu mới sau hết hạn"), default));
+        await service.RemoveAsync(expired.Following[0].Id, default);
+        Assert.Equal(29, (await service.GetAsync(default)).Following.Count);
+    }
+
+    [LocalMarketplaceDatabaseFact]
     public async Task Automatic_defaults_enable_tracking_and_ai_once_without_enabling_email_or_overriding_later_choices()
     {
         await using var db = Open();

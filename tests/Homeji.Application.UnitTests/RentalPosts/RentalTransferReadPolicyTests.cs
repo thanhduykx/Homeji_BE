@@ -61,7 +61,9 @@ public sealed class RentalTransferReadPolicyTests
         var posts = Stub<IRentalPostRepository>((_, _) => Task.FromResult(candidates));
         var user = Guid.NewGuid();
         var profiles = Profiles(expired.OwnerId, user, UserRole.Renter);
-        var service = new RentalDecisionService(posts, new UserContext(new CurrentUser(user), profiles), null!, null!, new Clock(), profiles);
+        var subscriptions = Stub<Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository>((_, _) =>
+            Task.FromResult<UserSubscription?>(UserSubscription.CreatePremium(user, "TEST", "Premium", null, Now, 30, Now)));
+        var service = new RentalDecisionService(posts, new UserContext(new CurrentUser(user), profiles), null!, null!, new Clock(), profiles, subscriptions);
         var response = await service.CompareAsync(new(candidates.Select(post => post.Id).ToArray()), CancellationToken.None);
         Assert.Equal(new[] { today.Id, tomorrow.Id, unknown.Id }, response.Posts.Select(item => item.Post.Id));
         Assert.Equal(expired.Id, Assert.Single(response.UnavailablePostIds));

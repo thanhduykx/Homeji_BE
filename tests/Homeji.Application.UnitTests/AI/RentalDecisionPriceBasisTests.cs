@@ -9,11 +9,31 @@ using Homeji.Application.Services.AI;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Homeji.Application.IRepositories.Subscriptions;
+using Homeji.Application.Common.Exceptions;
 
 namespace Homeji.Application.UnitTests.AI;
 
 public sealed class RentalDecisionPriceBasisTests
 {
+    [Theory]
+    [InlineData(false, 3, true)]
+    [InlineData(false, 4, false)]
+    [InlineData(true, 5, true)]
+    [InlineData(true, 6, false)]
+    public async Task Comparison_limit_comes_from_current_server_subscription(bool premium, int count, bool allowed)
+    {
+        var subscriptionRepository = Stub<IUserSubscriptionRepository>((method, args) =>
+        {
+            Assert.Equal(nameof(IUserSubscriptionRepository.GetActivePremiumAsync), method.Name);
+            var now = (DateTimeOffset)args![1]!;
+            return Task.FromResult(premium ? UserSubscription.CreatePremium((Guid)args[0]!, "TEST", "Premium", null, now, 30, now) : null);
+        });
+        var profiles = Stub<IUserProfileRepository>((method, _) => throw new InvalidOperationException(method.Name));
+        var task = Service([], profiles, subscriptionRepository).CompareAsync(new(Enumerable.Range(0, count).Select(_ => Guid.NewGuid()).ToArray()), CancellationToken.None);
+        if (allowed) Assert.Equal(count, (await task).UnavailablePostIds.Count);
+        else await Assert.ThrowsAsync<RequestValidationException>(() => task);
+    }
     [Theory]
     [InlineData(UserRole.Renter, UserRole.Renter, "đồng/người/tháng", true)]
     [InlineData(UserRole.Landlord, UserRole.Landlord, "đồng/phòng/tháng", true)]
@@ -69,13 +89,13 @@ public sealed class RentalDecisionPriceBasisTests
         Assert.Equal(id, Assert.Single(response.UnavailablePostIds));
     }
 
-    private static RentalDecisionService Service(IReadOnlyList<RentalPost> posts, IUserProfileRepository profiles)
+    private static RentalDecisionService Service(IReadOnlyList<RentalPost> posts, IUserProfileRepository profiles, IUserSubscriptionRepository? subscriptions = null)
     {
         var repository = Stub<IRentalPostRepository>((method, _) => method.Name == nameof(IRentalPostRepository.GetByIdsWithMediaAsync)
             ? Task.FromResult(posts) : throw new InvalidOperationException(method.Name));
         var commute = Stub<ICommuteClient>((method, _) => throw new InvalidOperationException(method.Name));
         var moderation = Stub<IAdminWorkQueueRepository>((method, _) => throw new InvalidOperationException(method.Name));
-        return new(repository, new UserContext(new CurrentUser(Guid.NewGuid()), profiles), commute, moderation, TimeProvider.System, profiles);
+        return new(repository, new UserContext(new CurrentUser(Guid.NewGuid()), profiles), commute, moderation, TimeProvider.System, profiles, subscriptions!);
     }
 
     private static UserProfile Profile(Guid id, UserRole role)

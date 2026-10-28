@@ -20,5 +20,8 @@ public sealed record InterestProposal(string Key, InterestCriteria Criteria, int
 public sealed record FollowedInterest(Guid Id, InterestCriteria Criteria, DateTimeOffset CreatedAt);
 public sealed record InterestRecommendation(RentalPostSummaryDto Post, string Reason, Guid FollowId);
 public sealed record InterestOverview(InterestSettings Settings, IReadOnlyList<InterestProposal> Suggestions,
-    IReadOnlyList<FollowedInterest> Following, IReadOnlyList<InterestRecommendation> Rooms, string? Notice = null);
+    IReadOnlyList<FollowedInterest> Following, IReadOnlyList<InterestRecommendation> Rooms, string? Notice = null)
+{
+    public int MaxFollowedAreas { get; init; } = 10;
+}
 public sealed record AiInterestProposal(InterestCriteria? Criteria, string[] Unconfirmed, string? Notice);

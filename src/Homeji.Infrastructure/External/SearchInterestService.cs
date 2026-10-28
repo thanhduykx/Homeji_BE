@@ -7,6 +7,7 @@ using Homeji.Application.IServices.RentalPosts;
 using Homeji.Application.IServices.Emails;
 using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Application.Services.Common;
+using Homeji.Application.Services.Subscriptions;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
 using Homeji.Infrastructure.Context;
@@ -21,6 +22,8 @@ public sealed class SearchInterestService(ApplicationDbContext db, UserContext u
     private static readonly string[] CommuteWarning = ["Thời gian đi lại chưa được kiểm chứng; bán kính không tương đương số phút đi đường."];
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private DateTimeOffset Now => clock.GetUtcNow();
+    private async Task<int> FollowLimit(Guid user, CancellationToken ct) => SubscriptionUsageLimits.For(
+        await new UserSubscriptionRepository(db).GetActivePremiumAsync(user, Now, ct) is not null).FollowedAreas;
     internal sealed record Observation(Guid Session, string Key, InterestCriteria Criteria, DateTimeOffset At);
     internal sealed record Marker(Guid Id, DateTimeOffset At);
     internal sealed record Dismissal(string Key, DateTimeOffset At);
@@ -111,7 +114,8 @@ public sealed class SearchInterestService(ApplicationDbContext db, UserContext u
             if (!row.Enabled) throw InterestPolicy.Invalid("personalization", "Hãy bật cá nhân hóa trước khi theo dõi.");
             if (!s.Following.Any(x => x.Criteria == criteria || JsonSerializer.Serialize(x.Criteria, Json) == JsonSerializer.Serialize(criteria, Json)))
             {
-                if (s.Following.Count >= 10) throw InterestPolicy.Invalid("following", "Bạn có thể theo dõi tối đa 10 khu vực. Hãy bỏ một khu vực trước.");
+                var limit = await FollowLimit(row.UserId, ct);
+                if (s.Following.Count >= limit) throw InterestPolicy.Invalid("following", $"Gói hiện tại cho phép theo dõi tối đa {limit} khu vực. Hãy bỏ một khu vực trước khi thêm mới.");
                 s.Following.Add(new(Guid.NewGuid(), criteria, Now));
             }
             return await Overview(row, s, ct);
@@ -137,13 +141,16 @@ public sealed class SearchInterestService(ApplicationDbContext db, UserContext u
             .OrderByDescending(g => g.Max(x => x.At)).Take(3).Select(g => new InterestProposal(g.Key, g.OrderByDescending(x => x.At).First().Criteria, g.Select(x => x.Session).Distinct().Count())).ToArray() : [];
         var rooms = row.Enabled ? await Matches(row.UserId, s, ct) : [];
         if (row.AiEnabled && s.RankedIds.Count > 0) rooms = rooms.OrderBy(r => s.RankedIds.IndexOf(r.Post.Id) is var i && i >= 0 ? i : int.MaxValue).ToList();
-        return new(new(row.Enabled, row.AiEnabled, row.EmailEnabled), suggestions, s.Following.ToArray(), rooms,
-            s.EmailStatus == "uncertain" ? "Lần gửi email trước chưa xác định được kết quả; hệ thống không tự gửi lại để tránh trùng thư." : null);
+        var limit = await FollowLimit(row.UserId, ct);
+        var notice = s.EmailStatus == "uncertain" ? "Lần gửi email trước chưa xác định được kết quả; hệ thống không tự gửi lại để tránh trùng thư." : null;
+        if (s.Following.Count > limit) notice = $"Gói hiện tại theo dõi {limit} khu vực đầu tiên. Các khu vực còn lại vẫn được lưu; bỏ bớt khu vực hoặc gia hạn Premium để tiếp tục theo dõi tất cả. " + notice;
+        return new(new(row.Enabled, row.AiEnabled, row.EmailEnabled), suggestions, s.Following.ToArray(), rooms, notice) { MaxFollowedAreas = limit };
     }
     private async Task<List<InterestRecommendation>> Matches(Guid user, State s, CancellationToken ct)
     {
         var result = new List<InterestRecommendation>();
-        foreach (var f in s.Following)
+        var limit = await FollowLimit(user, ct);
+        foreach (var f in s.Following.Take(limit))
         {
             var c = f.Criteria;
             var query = new RentalPostRepository(db, clock).BuildActiveSearchQuery(new RentalPostSearchDto(

@@ -9,12 +9,14 @@ using Homeji.Application.Mappers.RentalPosts;
 using Homeji.Application.Services.Common;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Homeji.Application.IRepositories.Subscriptions;
+using Homeji.Application.Services.Subscriptions;
 
 namespace Homeji.Application.Services.AI;
 
 public sealed class RentalDecisionService(IRentalPostRepository posts, UserContext userContext,
     ICommuteClient commuteClient, IAdminWorkQueueRepository workQueue, TimeProvider timeProvider,
-    IUserProfileRepository profiles) : IRentalDecisionService
+    IUserProfileRepository profiles, IUserSubscriptionRepository subscriptions) : IRentalDecisionService
 {
     public async Task<RentalDecisionResponseDto> CompareAsync(RentalDecisionRequestDto request, CancellationToken cancellationToken)
     {
@@ -23,6 +25,12 @@ public sealed class RentalDecisionService(IRentalPostRepository posts, UserConte
         if (ids.Length is < 1 or > 10 || ids.Contains(Guid.Empty))
             throw Validation("postIds", "Chọn từ 1 đến 10 tin cho danh sách ngắn.");
         var now = timeProvider.GetUtcNow();
+        if (ids.Length > SubscriptionUsageLimits.Basic.ComparedPosts)
+        {
+            var premium = await subscriptions.GetActivePremiumAsync(currentUserId, now, cancellationToken);
+            var limit = SubscriptionUsageLimits.For(premium is not null).ComparedPosts;
+            if (ids.Length > limit) throw Validation("postIds", $"Gói hiện tại cho phép so sánh tối đa {limit} phòng mỗi lần. Bỏ bớt phòng để tiếp tục.");
+        }
         var found = await posts.GetByIdsWithMediaAsync(ids, cancellationToken);
         var active = found.Where(post => RentalPublicAvailability.IsPublicActive(post, RentalPublicAvailability.VietnamDate(now)) && !post.IsSynthetic
             && HomejiServiceArea.Contains(post.Latitude, post.Longitude))

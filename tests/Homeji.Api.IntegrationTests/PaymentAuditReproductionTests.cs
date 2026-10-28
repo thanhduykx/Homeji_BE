@@ -171,7 +171,7 @@ public sealed class PaymentAuditReproductionTests
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(Momo.SecretKey));
         return r with { Signature = Convert.ToHexString(hmac.ComputeHash(Encoding.UTF8.GetBytes(raw))).ToLowerInvariant() };
     }
-    private static PaymentService Service(ApplicationDbContext db, Guid user, HttpClient http) => new(http, Context(user), new PaymentTransactionRepository(db), new UserSubscriptionRepository(db), new WalletRepository(db), Options.Create(Momo), Options.Create(new PayOsOptions()), Options.Create(new PremiumSubscriptionOptions()), new Clock(), new TransactionReceiptService(db, Context(user)));
+    private static PaymentService Service(ApplicationDbContext db, Guid user, HttpClient http) => new(http, new UserContext(new CurrentUser(user), new UserProfileRepository(db)), new PaymentTransactionRepository(db), new UserSubscriptionRepository(db), new WalletRepository(db), Options.Create(Momo), Options.Create(new PayOsOptions()), Options.Create(new PremiumSubscriptionOptions()), new Clock(), new TransactionReceiptService(db, Context(user)));
     private static UserContext Context(Guid user) => new(new CurrentUser(user), null!);
     private static WalletWithdrawalService Withdrawals(ApplicationDbContext db, Guid user) => new(Context(user), new WalletRepository(db), new WalletWithdrawalRepository(db), new Clock(), new TransactionReceiptService(db, Context(user)));
     private sealed record CurrentUser(Guid? UserId) : ICurrentUser;
