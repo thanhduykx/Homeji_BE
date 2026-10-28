@@ -34,29 +34,24 @@ Script hỏi sender, nhập ẩn Brevo API key và Supabase service role key n�
 
 Supabase service role/secret key phải lấy từ project của Homeji, chỉ dùng ở backend. Publishable/anon key không thay thế quyền admin để tạo link. Restart backend sau khi thay cấu hình. `appsettings.Local.json` không được publish nên không thay thế Environment trên Render.
 
-## Thiết lập Render khi deploy
+## Thiết lập bảo mật khi triển khai (Render Environment)
 
-Nhập các biến trong Environment của backend:
+Các thông số xác thực dịch vụ email được thiết lập an toàn trong tab **Environment** của backend service trên Render (không commit lên Git):
 
-```text
-Email__Provider=Brevo
-Email__Brevo__ApiKey=<Brevo API key>
-Email__Brevo__FromEmail=<sender đã xác minh>
-Email__Brevo__FromName=Homeji
-Email__Brevo__TimeoutSeconds=30
-Supabase__ServiceRoleKey=<Supabase service role/secret key>
-```
+- Nhà cung cấp email giao dịch (Transactional Email Provider)
+- API Key gửi thư giao dịch từ nhà cung cấp
+- Địa chỉ email người gửi đã xác minh và tên hiển thị thương hiệu Homeji
+- Thời gian chờ phản hồi tối đa (Timeout)
+- Khóa dịch vụ quản trị Supabase phía máy chủ (Server Role Secret)
 
-Giữ `Supabase__ProjectUrl` và `Supabase__ApiKey` đúng project. Nếu chưa có biến tương ứng, callback mặc định của repository là:
+Đồng thời kiểm tra URL dự án và khóa công khai Supabase khớp với project. Cấu hình callback chuyển tiếp mặc định gồm:
 
-```text
-Supabase__RegistrationRedirectUrl=https://homeji.onrender.com/auth/callback
-Supabase__PasswordResetRedirectUrl=https://homeji.onrender.com/reset-password
-```
+- URL xác nhận đăng ký: `https://homeji.onrender.com/auth/callback`
+- URL đặt lại mật khẩu: `https://homeji.onrender.com/reset-password`
 
-Thêm hai URL này vào Redirect URLs được cho phép trong Supabase Auth. Local phải cấu hình callback localhost phù hợp frontend. Với Brevo, `redirectTo` do client gửi phải khớp chính xác callback đã cấu hình hoặc để trống; không nhận địa chỉ chuyển hướng tùy ý trong luồng dùng quyền admin.
+Thêm hai URL này vào danh sách Redirect URLs được cho phép trong Supabase Auth Dashboard. Môi trường local cần cấu hình callback tương ứng với frontend local. Với nhà cung cấp email giao dịch, địa chỉ `redirectTo` do client gửi phải khớp chính xác danh sách cho phép; không chấp nhận chuyển hướng tùy ý.
 
-Backend từ chối khởi động khi chọn Brevo mà thiếu API key/sender/service role key. Không tự fallback về SMTP hoặc gửi mặc định Supabase, giúp tránh đăng ký đi nhầm tuyến. Nếu rollback về `Email__Provider=Smtp`, luồng đăng ký SMTP và quên mật khẩu `/recover` của Supabase được giữ; cần SMTP hợp lệ cho môi trường đó.
+Backend từ chối khởi động nếu cấu hình chọn nhà cung cấp gửi thư nhưng thiếu API key, thông tin người gửi hoặc khóa quản trị. Điều này ngăn chặn việc bỏ sót cấu hình dẫn tới lỗi xác nhận tài khoản.
 
 ## Luồng gửi và kiểm chứng
 

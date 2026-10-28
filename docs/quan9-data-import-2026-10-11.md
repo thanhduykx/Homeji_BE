@@ -77,12 +77,12 @@ Không xóa/sửa các mục cũ nếu chúng đã có trong database; gói nh�
 - `src/Homeji.Api/appsettings.json` chỉ có `Host=localhost;Port=5432;Database=homeji;Username=homeji`, không có mật khẩu.
 - Không thấy `appsettings.Local.json`, file `.env` chứa kết nối trong hai workspace, biến môi trường kết nối hiện tại, hoặc file User Secrets.
 - Cổng PostgreSQL localhost 5432 không có dịch vụ nhận kết nối.
-- `render.yaml` khai báo `ConnectionStrings__DefaultConnection` với `sync: false`: giá trị được cấu hình riêng trên Render, không nằm trong repo. Chưa truy cập dashboard Render/Supabase.
+- `render.yaml` khai báo chuỗi kết nối cơ sở dữ liệu với `sync: false`: giá trị được cấu hình riêng trên Render, không nằm trong repo. Chưa truy cập dashboard Render/Supabase.
 - Không đọc hoặc sửa file `dataa.sql` của dự án STELLA CITY; website Homeji dùng schema PostgreSQL khác.
 
 ## Cách hoàn tất sau khi có kết nối
 
-Lưu cấu hình thật vào `src/Homeji.Api/appsettings.Local.json` (đã được repo bỏ qua), hoặc đặt biến môi trường `ConnectionStrings__DefaultConnection`. Không commit mật khẩu, không gửi connection string vào log.
+Lưu cấu hình thật vào `src/Homeji.Api/appsettings.Local.json` (đã được repo bỏ qua), hoặc đặt biến môi trường tương ứng. Không commit mật khẩu, không gửi connection string vào log.
 
 ```json
 {

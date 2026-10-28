@@ -13,7 +13,7 @@ Checked on 11 October 2026 (Asia/Saigon).
 ## Configuration
 
 - Render service: `Homeji_BE`; endpoint configured to Gemini `gemini-3.5-flash:generateContent`.
-- Server-only configuration: `Ai__Gemini__ApiKey` and `Ai__Gemini__Endpoint`. No credentials belong in frontend code or this document.
+- Server-only configuration: API key and endpoint are managed via server secrets. No credentials belong in frontend code or this document.
 - Local configuration is in ignored `src/Homeji.Api/appsettings.Local.json`, also excluded from Docker context and publish output.
 - Advanced Routes and long-term chatbot history remain disabled. Production UI displayed “Lưu lịch sử hiện đang tắt.” during verification.
 

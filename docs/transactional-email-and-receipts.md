@@ -13,25 +13,21 @@ Ngày triển khai: 17/10/2026. Frontend chuẩn: https://homeji.onrender.com.
 - Email giao dịch có nội dung HTML và file `.html` đính kèm. Lịch sử `/receipts` có phân trang, xem chi tiết trong iframe sandbox và tải HTML. API chỉ trả biên nhận của người đang đăng nhập; ID của người khác trả 404.
 - Migration tạo biên nhận từ thanh toán Paid và các trạng thái rút tiền cũ. Không xếp email cho lịch sử này; giao diện ghi rõ “Biên nhận lịch sử · không gửi email”. Không thay đổi số dư khi tạo biên nhận.
 
-## Cấu hình
+## Cấu hình bảo mật
 
-Giữ API key ở biến môi trường/secret local, không đưa vào frontend hoặc Git:
+Toàn bộ thông tin cấu hình nhạy cảm và API key được quản lý qua biến môi trường bí mật trên máy chủ (Server Secrets), không lưu trong mã nguồn hoặc kho Git:
 
-```text
-Email__Provider=Brevo
-Email__RegistrationOtpEnabled=true
-Email__Receipts__Enabled=true
-BackgroundJobs__Enabled=true
-Supabase__RegistrationRedirectUrl=https://homeji.onrender.com/auth/callback
-Supabase__PasswordResetRedirectUrl=https://homeji.onrender.com/reset-password
-Supabase__GoogleRedirectUrl=https://homeji.onrender.com/auth/callback
-Payments__Redirects__FrontendPaymentUrl=https://homeji.onrender.com/payments
-Cors__AllowedOrigins__3=https://homeji.onrender.com
-```
+- Nhà cung cấp dịch vụ gửi thư giao dịch (Email Provider)
+- Cờ tính năng kích hoạt gửi mã OTP xác nhận đăng ký
+- Cờ tính năng kích hoạt gửi biên nhận hóa đơn qua email
+- Kích hoạt tiến trình nền xử lý hàng đợi (Background Worker Jobs)
+- URL chuyển hướng callback xác thực tài khoản và khôi phục mật khẩu
+- Cổng thanh toán và cấu hình URL hoàn tất giao dịch phía người dùng
+- Danh sách nguồn gốc tên miền tin cậy (CORS Allowed Origins)
 
-Supabase Site URL và Redirect URLs phải dùng domain mới. Google OAuth Authorized JavaScript origins phải có `https://homeji.onrender.com`; OAuth redirect server vẫn là callback của project Supabase.
+Supabase Site URL và Redirect URLs phải dùng domain production chính thức. Google OAuth Authorized JavaScript origins phải chứa `https://homeji.onrender.com`; OAuth redirect server sử dụng callback chính thức của Supabase.
 
-Hai cờ OTP và email biên nhận mặc định tắt để rollout độc lập: triển khai migration/backend, triển khai frontend có trang OTP, rồi bật OTP. Biên nhận vẫn được ghi khi cờ gửi email tắt. Không tắt BackgroundJobs để ngừng riêng email; dùng `Email__Receipts__Enabled=false`.
+Các cờ tính năng OTP và gửi email biên nhận có thể điều khiển độc lập cho từng giai đoạn triển khai: triển khai cơ sở dữ liệu và backend trước, triển khai giao diện người dùng hoàn tất, sau đó bật kích hoạt tính năng gửi thư. Biên nhận giao dịch vẫn luôn được lưu trữ an toàn trong lịch sử tài khoản ngay cả khi tạm dừng dịch vụ gửi thư.
 
 ## Hàng đợi và giới hạn
 

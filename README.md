@@ -38,15 +38,15 @@ Controller không gọi DAL trực tiếp. Service không phụ thuộc HTTP. Re
 
 ## Cấu hình
 
-Cấu hình không chứa secret trong Git:
+Cấu hình hệ thống tuân thủ nguyên tắc bảo mật và quản lý bí mật (Secret Management):
 
-- `src/Homeji.Api/appsettings.json`: cấu hình chung và giá trị mặc định không bí mật.
-- Development đọc thêm `appsettings.Local.json` (đã được Git/Docker/publish bỏ qua); bản local trên máy hiện tại đã giữ lại các giá trị cấu hình cũ.
-- Environment variables ghi đè cấu hình ở mọi môi trường; ví dụ `ConnectionStrings__DefaultConnection`, `Email__Smtp__Password`, `Payments__MoMo__AccessKey`, `Payments__MoMo__SecretKey`, `Payments__PayOS__ApiKey`, `Payments__PayOS__ChecksumKey`, `Supabase__ServiceRoleKey`.
-- EF tooling đọc cấu hình chung, local và environment variables. Không chạy `database update` nếu chưa kiểm tra database đích.
-- Production không nạp file local. Các khóa từng được commit cần được rotate qua nhà cung cấp; thay đổi working tree không xóa lịch sử Git.
-- Reverse proxy phải cấu hình IP/CIDR tin cậy bằng `ReverseProxy:KnownProxies` hoặc `ReverseProxy:KnownNetworks`. Mặc định chỉ tin loopback; không dùng mạng `/0`. Cần cấu hình đúng proxy của Render trước khi deploy, để giữ HTTPS và rate limiting theo IP chính xác.
-- Production bật HSTS, không trả exception nội bộ; JSON body mặc định tối đa 128 KiB, upload ảnh có giới hạn riêng.
+- `src/Homeji.Api/appsettings.json`: Cấu hình ứng dụng chung và các giá trị mặc định an toàn, không chứa thông tin bí mật.
+- Môi trường phát triển cục bộ (Development) nạp thêm `appsettings.Local.json` (được Git, Docker và quy trình đóng gói bỏ qua); lưu trữ các thiết lập kết nối thử nghiệm riêng.
+- Biến môi trường (Environment Variables) ghi đè cấu hình ở các môi trường triển khai tương ứng (Database, Payment Gateways, Email Service, AI, Supabase Auth). Các khóa truy cập bí mật được thiết lập trực tiếp qua bảng điều khiển máy chủ (Render Environment Secrets), tuyệt đối không lưu trong kho mã nguồn.
+- EF Core tooling đọc cấu hình từ môi trường phát triển; kiểm tra kỹ đích cơ sở dữ liệu trước khi thực hiện migration.
+- Môi trường Production không sử dụng file cấu hình cục bộ; áp dụng chính sách xoay vòng định kỳ (credential rotation) cho tất cả khóa API từ các nhà cung cấp dịch vụ.
+- Cấu hình Reverse Proxy tin cậy (`KnownProxies` / `KnownNetworks`) bảo đảm nhận diện IP chính xác để phục vụ giới hạn tần suất truy cập (rate limiting) và duy trì kết nối HTTPS an toàn.
+- Bật HSTS trên môi trường Production; giới hạn dung lượng tải trọng (payload limit) an toàn cho các tác vụ API và tệp tải lên.
 
 Docker chỉ bind port bằng command argument:
 
@@ -84,9 +84,8 @@ backend vẫn tự kiểm tra lại email trong `auth.users` trước khi gọi 
 signup. Nếu email đã tồn tại, API trả `409 Conflict` với `detail` và
 `errors.email`.
 
-Supabase Auth tạo token/link xác thực chính thức; backend gửi link đó qua Gmail SMTP.
-Cấu hình callback mặc định bằng `Supabase:RegistrationRedirectUrl` (production nên
-đặt qua biến môi trường `Supabase__RegistrationRedirectUrl`). Đồng thời trong
+Supabase Auth tạo token/link xác thực chính thức; backend gửi link đó qua dịch vụ gửi email giao dịch bảo mật.
+Cấu hình callback URL mặc định được quản lý qua biến môi trường của nền tảng triển khai. Đồng thời trong
 Supabase Dashboard:
 
 1. Vào **Authentication → URL Configuration**.
@@ -96,27 +95,20 @@ Supabase Dashboard:
 4. Giữ `http://localhost:3000/**` trong Redirect URLs chỉ để phát triển local.
 
 Frontend cũng có thể truyền `redirectTo` trong request đăng ký; URL đó phải nằm
-trong allow-list của Supabase. Nếu không truyền, backend dùng
-`Supabase:RegistrationRedirectUrl`.
+trong allow-list của Supabase. Nếu không truyền, backend dùng cấu hình callback mặc định.
 
-## SMTP xác thực đăng ký
+## Dịch vụ gửi email xác thực & giao dịch
 
-`POST /api/account/register` dùng Supabase Admin `generate_link` để tạo tài khoản chưa
-xác thực và URL xác nhận, sau đó `SmtpAccountEmailSender` gửi URL qua SMTP. Người dùng
-click link để Supabase xác nhận email rồi mới đăng nhập. Supabase không gửi email trong
-luồng này nên không dùng hạn mức email mặc định của Supabase.
+`POST /api/account/register` tích hợp tạo tài khoản và URL xác nhận bảo mật, sau đó chuyển phát link xác thực hoặc mã OTP tới email người dùng thông qua dịch vụ gửi email giao dịch (Transactional Email Provider). Người dùng xác nhận email trước khi đăng nhập chính thức.
 
-Cấu hình nằm tại `Email:Smtp` trong `appsettings.json`. Trên Render có thể ghi đè bằng:
+Cấu hình dịch vụ email được quản lý an toàn qua biến môi trường máy chủ (Server Secrets):
 
-- `Email__Smtp__Enabled`
-- `Email__Smtp__Host`, `Email__Smtp__Port`, `Email__Smtp__EnableSsl`
-- `Email__Smtp__Username`, `Email__Smtp__Password`
-- `Email__Smtp__FromEmail`, `Email__Smtp__FromName`
-- `Supabase__ServiceRoleKey` — bắt buộc để backend gọi Admin `generate_link`
+- Trạng thái kích hoạt và nhà cung cấp dịch vụ gửi thư
+- Thông số kết nối mạng và bảo mật truyền tải (TLS/SSL)
+- Thông tin định danh người gửi và tên hiển thị thương hiệu Homeji
+- Khóa phân quyền quản trị phía máy chủ (lưu trữ độc quyền tại backend, tuyệt đối không gửi xuống frontend)
 
-`ServiceRoleKey` là khóa quản trị và tuyệt đối không được đưa xuống frontend. Trong
-Supabase Dashboard vẫn giữ **Confirm email** bật. Nếu SMTP gửi thất bại, backend cố gắng
-xóa tài khoản chưa xác thực vừa tạo và trả `503` để người dùng có thể đăng ký lại.
+Trong Supabase Dashboard, tính năng **Confirm email** luôn được kích hoạt. Nếu dịch vụ gửi thư gặp sự cố gián đoạn tạm thời, hệ thống tự động xử lý an toàn để bảo vệ tính nhất quán tài khoản và hỗ trợ người dùng đăng ký lại dễ dàng.
 
 ## Database migration
 
@@ -213,15 +205,9 @@ Tạo service lần đầu:
 3. Render đọc `render.yaml`, tạo Docker service và tự deploy mỗi lần push `main`.
 ```
 
-Trước khi deploy, đặt secret Gemini trong phần **Environment** của service:
+Trước khi deploy, thiết lập khóa API Gemini trong bảng điều khiển **Environment Secrets** của Render.
 
-```text
-Ai__Gemini__ApiKey = <Gemini API key>
-```
-
-API key Gemini không được lưu trong `appsettings.json`. Trong môi trường
-Production, ASP.NET Core tự động ánh xạ `Ai__Gemini__ApiKey` thành
-`Ai:Gemini:ApiKey` và sử dụng secret do Render cung cấp.
+Khóa API Gemini được quản lý dưới dạng secret môi trường máy chủ bảo mật và tuyệt đối không lưu trong mã nguồn hoặc file cấu hình công khai. Khi khởi chạy, dịch vụ ASP.NET Core sẽ tự động nạp cấu hình từ môi trường an toàn.
 
 ## Quy ước phát triển
 
