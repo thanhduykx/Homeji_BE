@@ -122,8 +122,9 @@ public sealed class ConversationsController : ControllerBase
     [RequestSizeLimit(4 * 1024 * 1024)]
     [ProducesResponseType<PostMessageDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<PostMessageDto>> SendVoice(Guid conversationId, [FromForm] IFormFile file, CancellationToken cancellationToken)
+    public async Task<ActionResult<PostMessageDto>> SendVoice(Guid conversationId, [FromForm] VoiceMessageUploadForm request, CancellationToken cancellationToken)
     {
+        var file = request.File;
         if (file is null || file.Length is <= 0 or > Homeji.Application.Services.Conversations.ConversationVoiceFormat.MaximumBytes)
         {
             ModelState.AddModelError("file", "Bản ghi không hợp lệ hoặc vượt quá 2 phút.");
@@ -133,6 +134,11 @@ public sealed class ConversationsController : ControllerBase
         await file.CopyToAsync(stream, cancellationToken);
         var result = await _conversations.SendVoiceAsync(conversationId, stream.ToArray(), cancellationToken);
         return Created($"/api/conversations/{conversationId}/messages/{result.Id}", result);
+    }
+
+    public sealed class VoiceMessageUploadForm
+    {
+        public IFormFile File { get; init; } = null!;
     }
 
     [HttpGet("{conversationId:guid}/messages/{messageId:guid}/attachments/{attachmentId:guid}/content")]
