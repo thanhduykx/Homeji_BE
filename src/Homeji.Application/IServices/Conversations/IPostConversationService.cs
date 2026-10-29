@@ -16,6 +16,7 @@ public interface IPostConversationService
         string? body,
         IReadOnlyList<ConversationImageUpload> images,
         CancellationToken cancellationToken = default);
+    Task<PostMessageDto> SendVoiceAsync(Guid conversationId, byte[] content, CancellationToken cancellationToken = default);
     Task<PostMessageAttachmentContentDto> GetAttachmentContentAsync(
         Guid conversationId,
         Guid messageId,

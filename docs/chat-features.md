@@ -58,3 +58,14 @@ References: [GIPHY API](https://developers.giphy.com/docs/api/), [WebRTC TURN](h
 Managed TURN references: [credential generation](https://developers.cloudflare.com/realtime/turn/generate-credentials/), [pricing and free allowance](https://developers.cloudflare.com/realtime/turn/faq/).
 
 Metered references: [Get Credential](https://www.metered.ca/docs/turn-rest-api/get-credential/), [credential propagation and expiry](https://www.metered.ca/docs/turn-rest-api/post-create-credential/), [free plan](https://www.metered.ca/pricing).
+
+
+## Recorded voice messages (2026-10-30)
+
+`POST /api/conversations/{id}/messages/voice` accepts a multipart `file`. Authentication, conversation membership and the costly-operation rate limiter apply. The application validates canonical RIFF/WAV PCM bytes (mono, 16 kHz, signed 16-bit, 0.3–120 seconds), exact header/data lengths and a maximum of 3,840,044 bytes. Extra chunks, trailing data and spoofed MIME declarations cannot bypass validation. The format contains only fixed headers and PCM samples, with no ancillary metadata or external media references. A PCM recording can contain any sample values; this validation does not assert that a human spoke.
+
+Voice and image attachments share the existing 30-files/24-hour quota. Audio uses `audio/wav`, `Other` context and zero image dimensions in the existing private attachment table; no schema migration is required. Content download still checks conversation membership, and deletion still checks the uploader and clears stored bytes. No recording is uploaded before the user presses **Gửi âm thoại**.
+
+The frontend captures audio in a same-origin AudioWorklet, resamples to 16 kHz off the UI thread and caps sample storage at two minutes. It stops microphone tracks and closes audio contexts before preview, on cancellation, thread changes, incoming/outgoing call activation and unmount. Permission responses and upload completions from an old conversation cannot alter the new thread. Failed uploads preserve the local preview for retry. WAV avoids a new media decoder dependency; the tradeoff is about 3.8 MB for two minutes, larger than compressed Opus. Calls continue to use TURN; recorded messages use authenticated HTTP uploads and do not consume TURN relay quota.
+
+Local generated-audio browser verification exercised record → preview → upload → private attachment playback (21.16 seconds). This proves the browser capture/playback pipeline and fixture UI, not a real microphone conversation or a production message send. Focused tests cover malformed headers, duration limits, authorization/quota rejection, deletion ownership, resampling, late permissions, stale upload responses, retry and cleanup.

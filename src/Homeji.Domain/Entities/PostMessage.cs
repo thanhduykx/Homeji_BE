@@ -35,6 +35,14 @@ public sealed class PostMessage
 
     public IReadOnlyCollection<PostMessageAttachment> Attachments => _attachments;
 
+    public PostMessageAttachment AddVoice(Guid uploaderId, byte[] content, string sha256, DateTimeOffset createdAt)
+    {
+        var attachment = new PostMessageAttachment(Id, uploaderId,
+            Homeji.Domain.Enums.MessageAttachmentContext.Other, "audio/wav", content, 0, 0, sha256, createdAt);
+        _attachments.Add(attachment);
+        return attachment;
+    }
+
     public PostMessageAttachment AddImage(
         Guid uploaderId,
         Homeji.Domain.Enums.MessageAttachmentContext context,

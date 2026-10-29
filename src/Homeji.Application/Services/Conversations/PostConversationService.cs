@@ -209,7 +209,7 @@ public sealed class PostConversationService : IPostConversationService
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
             {
-                ["files"] = ["You can send at most 30 chat images in 24 hours."],
+                ["files"] = ["Bạn có thể gửi tối đa 30 tệp ảnh và âm thoại trong 24 giờ."],
             });
         }
 
@@ -254,6 +254,33 @@ public sealed class PostConversationService : IPostConversationService
                 now);
         }
 
+        conversation.Touch(now);
+        conversation.MarkRead(senderId, now);
+        await _conversations.AddMessageAsync(message, cancellationToken);
+        var notification = CreateMessageNotification(conversation.GetOtherParticipantId(senderId), conversation.Id, now);
+        await _notifications.AddAsync(notification, cancellationToken);
+        await _conversations.SaveChangesAsync(cancellationToken);
+        await _realtimePublisher.PublishAsync(notification, cancellationToken);
+        return ToDto(message);
+    }
+
+    public async Task<PostMessageDto> SendVoiceAsync(Guid conversationId, byte[] content, CancellationToken cancellationToken = default)
+    {
+        var senderId = _userContext.GetRequiredUserId();
+        var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        ConversationVoiceFormat.Validate(content);
+        var now = _timeProvider.GetUtcNow();
+        var recentCount = await _conversations.CountAttachmentsByUploaderSinceAsync(senderId, now.AddHours(-24), cancellationToken);
+        if (recentCount >= 30)
+        {
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["file"] = ["Bạn có thể gửi tối đa 30 tệp ảnh và âm thoại trong 24 giờ."],
+            });
+        }
+
+        var message = new PostMessage(conversation.Id, senderId, "🎙 Tin nhắn thoại", now);
+        message.AddVoice(senderId, content, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(content)).ToLowerInvariant(), now);
         conversation.Touch(now);
         conversation.MarkRead(senderId, now);
         await _conversations.AddMessageAsync(message, cancellationToken);

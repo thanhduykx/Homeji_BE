@@ -41,9 +41,10 @@ public sealed class PostMessageAttachment
             throw new DomainException("Attachment MIME type is invalid.");
         }
 
-        if (content is null || content.Length == 0 || width <= 0 || height <= 0)
+        if (content is null || content.Length == 0 ||
+            (mimeType == "audio/wav" ? width != 0 || height != 0 : width <= 0 || height <= 0))
         {
-            throw new DomainException("Attachment image data is invalid.");
+            throw new DomainException("Attachment media data is invalid.");
         }
 
         if (string.IsNullOrWhiteSpace(sha256) || sha256.Length != MaxSha256Length)

@@ -71,6 +71,32 @@ public sealed class PostConversationServiceTests
         Assert.Null(conversations.AddedConversation);
     }
 
+    [Fact]
+    public async Task SendVoiceAsync_NonParticipantCannotUpload()
+    {
+        var requester = Guid.NewGuid(); var stranger = Guid.NewGuid();
+        var post = CreateWantedPost(requester);
+        var profiles = new StubUserProfileRepository(CreateProfile(stranger, UserRole.Renter));
+        var repository = new StubPostConversationRepository();
+        var conversation = new PostConversation(ConversationSubjectType.WantedPost, post.Id, requester, Guid.NewGuid(), UtcNow);
+        await repository.AddConversationAsync(conversation);
+        var service = CreateService(stranger, post, profiles, repository);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.SendVoiceAsync(conversation.Id, []));
+    }
+
+    [Fact]
+    public async Task SendVoiceAsync_SharedMediaQuotaRejectsBeforePersisting()
+    {
+        var sender = Guid.NewGuid(); var recipient = Guid.NewGuid();
+        var post = CreateWantedPost(recipient);
+        var profiles = new StubUserProfileRepository(CreateProfile(sender, UserRole.Renter));
+        var repository = new StubPostConversationRepository { RecentAttachmentCount = 30 };
+        var conversation = new PostConversation(ConversationSubjectType.WantedPost, post.Id, sender, recipient, UtcNow);
+        await repository.AddConversationAsync(conversation);
+        var service = CreateService(sender, post, profiles, repository);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.SendVoiceAsync(conversation.Id, ConversationVoiceFormatTests.Wav()));
+    }
+
     private static PostConversationService CreateService(
         Guid? currentUserId,
         RentalWantedPost wantedPost,
@@ -159,6 +185,7 @@ public sealed class PostConversationServiceTests
     private sealed class StubPostConversationRepository : IPostConversationRepository
     {
         public PostConversation? AddedConversation { get; private set; }
+        public int RecentAttachmentCount { get; init; }
 
         public Task<PostConversation?> FindAsync(
             ConversationSubjectType subjectType,
@@ -187,7 +214,7 @@ public sealed class PostConversationServiceTests
             Guid id,
             CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(AddedConversation?.Id == id ? AddedConversation : null);
         }
 
         public Task<IReadOnlyList<PostConversation>> GetForUserAsync(
@@ -218,7 +245,7 @@ public sealed class PostConversationServiceTests
             DateTimeOffset since,
             CancellationToken cancellationToken = default)
         {
-            throw new NotSupportedException();
+            return Task.FromResult(RecentAttachmentCount);
         }
 
         public Task<IReadOnlyDictionary<Guid, ConversationLastMessageDto>> GetLatestByConversationIdsAsync(
