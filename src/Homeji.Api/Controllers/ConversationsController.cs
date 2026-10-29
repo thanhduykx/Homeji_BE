@@ -4,6 +4,7 @@ using Homeji.Domain.Enums;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Homeji.Api.RateLimiting;
+using Homeji.Application.IRepositories.Subscriptions;
 
 namespace Homeji.Api.Controllers;
 
@@ -19,9 +20,15 @@ public sealed class ConversationsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<PostConversationDto>>> GetMine(CancellationToken cancellationToken)
+    public async Task<ActionResult<IReadOnlyList<PostConversationDto>>> GetMine(
+        [FromServices] IUserSubscriptionRepository subscriptions,
+        [FromServices] TimeProvider timeProvider,
+        CancellationToken cancellationToken)
     {
-        return Ok(await _conversations.GetMineAsync(cancellationToken));
+        var conversations = await _conversations.GetMineAsync(cancellationToken);
+        var premiums = await subscriptions.GetActivePremiumByUserIdsAsync(
+            conversations.Select(c => c.OtherParticipantId).Distinct().ToArray(), timeProvider.GetUtcNow(), cancellationToken);
+        return Ok(conversations.Select(c => c with { OtherParticipantIsPremium = premiums.ContainsKey(c.OtherParticipantId) }).ToArray());
     }
 
     [HttpPost("rental-posts/{postId:guid}")]

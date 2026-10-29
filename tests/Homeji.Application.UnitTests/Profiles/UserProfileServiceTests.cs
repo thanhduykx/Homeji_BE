@@ -16,6 +16,28 @@ public sealed class UserProfileServiceTests
     private static readonly DateTimeOffset UtcNow = new(2026, 7, 6, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Public_profile_excludes_private_contact_and_lifestyle_fields()
+    {
+        var repository = new InMemoryUserProfileRepository();
+        var profile = UserProfile.Create(UserId, "Public Name", UtcNow);
+        profile.UpdateProfile("Public Name", "0901234567", null, "Private school", "Private area", "Private address", "Private rental need", UtcNow);
+        await repository.UpsertAsync(profile);
+        var result = await CreateService(repository).GetPublicProfileAsync(UserId);
+        var json = System.Text.Json.JsonSerializer.Serialize(result);
+        Assert.Equal("Public Name", result.DisplayName);
+        Assert.DoesNotContain("0901234567", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Private", json, StringComparison.Ordinal);
+        Assert.False(result.IsPremium);
+    }
+
+    [Fact]
+    public async Task Missing_public_profile_returns_not_found()
+    {
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            CreateService(new InMemoryUserProfileRepository()).GetPublicProfileAsync(Guid.NewGuid()));
+    }
+
+    [Fact]
     public async Task UpsertMyProfileAsync_WhenProfileDoesNotExist_CreatesProfile()
     {
         var repository = new InMemoryUserProfileRepository();

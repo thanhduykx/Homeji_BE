@@ -1,0 +1,12 @@
+services:
+  coturn:
+    image: ${COTURN_IMAGE:-coturn/coturn:4.6.3}
+    restart: unless-stopped
+    # Run on a public Linux host. Host networking avoids thousands of Docker UDP proxies.
+    network_mode: host
+    read_only: true
+    tmpfs:
+      - /tmp
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf:ro
+    command: ["-c", "/etc/coturn/turnserver.conf"]

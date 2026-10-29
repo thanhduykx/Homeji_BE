@@ -13,7 +13,8 @@ public sealed record PostConversationDto(
     DateTimeOffset UpdatedAt,
     string? LastMessage = null,
     Guid? LastMessageSenderId = null,
-    int UnreadCount = 0);
+    int UnreadCount = 0,
+    bool OtherParticipantIsPremium = false);
 
 public sealed record PostMessageDto(
     Guid Id,

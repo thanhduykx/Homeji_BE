@@ -10,6 +10,14 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      - key: Giphy__ApiKey
+        sync: false
+      - key: VoiceCalls__Provider
+        value: Metered
+      - key: VoiceCalls__Metered__AppName
+        sync: false
+      - key: VoiceCalls__Metered__ApiKey
+        sync: false
       - key: Email__Provider
         value: Brevo
       - key: Email__Brevo__ApiKey

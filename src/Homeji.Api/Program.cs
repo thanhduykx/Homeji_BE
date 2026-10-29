@@ -70,6 +70,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSupabaseAuthentication(builder.Configuration);
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<VoiceCallRegistry>();
+builder.Services.AddHttpClient<VoiceIceService>(client => client.Timeout = TimeSpan.FromSeconds(10))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddSingleton<IUserIdProvider, SubjectUserIdProvider>();
 builder.Services.AddSingleton<IOnlineUserTracker, OnlineUserTracker>();
 builder.Services.AddSingleton<IUserSessionRevocationCache, MemoryUserSessionRevocationCache>();
@@ -168,6 +171,7 @@ app.MapGet("/health/version", () => Results.Ok(new
     commit = Environment.GetEnvironmentVariable("RENDER_GIT_COMMIT"),
 })).AllowAnonymous();
 app.MapHub<NotificationHub>("/hubs/notifications");
+app.MapHub<VoiceCallHub>("/hubs/voice");
 
 await app.RunAsync();
 

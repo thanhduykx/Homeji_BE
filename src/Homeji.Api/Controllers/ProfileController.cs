@@ -9,6 +9,13 @@ namespace Homeji.Api.Controllers;
 [Route("api/profile")]
 public sealed class ProfileController : ControllerBase
 {
+    [HttpGet("{userId:guid}")]
+    public async Task<ActionResult<Homeji.Application.DTOs.Profiles.PublicProfileDto>> GetPublicProfile(
+        Guid userId, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "private, no-store";
+        return Ok(await _profileService.GetPublicProfileAsync(userId, cancellationToken));
+    }
     private readonly IUserProfileService _profileService;
 
     public ProfileController(IUserProfileService profileService)

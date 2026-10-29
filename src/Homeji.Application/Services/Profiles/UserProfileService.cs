@@ -12,6 +12,14 @@ namespace Homeji.Application.Services.Profiles;
 
 public sealed class UserProfileService : IUserProfileService
 {
+    public async Task<PublicProfileDto> GetPublicProfileAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        _ = GetRequiredUserId();
+        var profile = await _repository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException(nameof(UserProfile), userId);
+        var premium = await _subscriptions.GetActivePremiumAsync(userId, _timeProvider.GetUtcNow(), cancellationToken);
+        return new(profile.Id, profile.DisplayName, profile.AvatarPath, profile.CreatedAt, premium is not null);
+    }
     private readonly ICurrentUser _currentUser;
     private readonly IUserProfileRepository _repository;
     private readonly IUserSubscriptionRepository _subscriptions;

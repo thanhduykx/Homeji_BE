@@ -4,6 +4,7 @@ namespace Homeji.Application.IServices.Profiles;
 
 public interface IUserProfileService
 {
+    Task<PublicProfileDto> GetPublicProfileAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<UserProfileDto> GetMyProfileAsync(CancellationToken cancellationToken = default);
 
     Task<UserProfileDto> UpsertMyProfileAsync(
