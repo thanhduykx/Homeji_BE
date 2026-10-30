@@ -12,4 +12,8 @@ public sealed record ViewingAppointmentDto(
     string? Note,
     ViewingAppointmentStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    int? ReminderMinutesBefore = null,
+    DateTimeOffset? ReminderDueAt = null,
+    DateTimeOffset? ReminderSentAt = null,
+    bool ReminderFailed = false);

@@ -7,7 +7,7 @@ using Microsoft.Extensions.Options;
 
 namespace Homeji.Infrastructure.External;
 
-public sealed class SmtpAccountEmailSender : IAccountEmailSender
+public sealed class SmtpAccountEmailSender : IAccountEmailSender, ITransactionalEmailSender
 {
     private static readonly Action<ILogger, string, Exception?> FailedToSendRegistrationEmail =
         LoggerMessage.Define<string>(
@@ -35,6 +35,41 @@ public sealed class SmtpAccountEmailSender : IAccountEmailSender
     public Task<EmailSendResultDto> SendPasswordResetAsync(
         string email, string resetUrl, CancellationToken cancellationToken = default) =>
         SendAsync(email, null, resetUrl, true, cancellationToken);
+
+    public async Task<EmailSendResultDto> SendAsync(string email, string subject, string html, string text,
+        Guid idempotencyKey, CancellationToken cancellationToken, IReadOnlyList<EmailAttachmentDto>? attachments = null)
+    {
+        if (!_options.Enabled) return new EmailSendResultDto(false, "SMTP đang tắt.");
+        try
+        {
+            ValidateOptions(HomejiEmailLayout.Website);
+            using var message = CreateMessage(email, "", new AccountEmailContent(subject, html, text));
+            message.Headers.Add("X-Homeji-Delivery-Id", idempotencyKey.ToString("D"));
+            if (attachments is not null)
+            {
+                foreach (var item in attachments)
+                    message.Attachments.Add(new Attachment(new MemoryStream(Convert.FromBase64String(item.Content)), item.Name));
+            }
+            using var client = CreateClient();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeout.CancelAfter(TimeSpan.FromSeconds(Math.Clamp(_options.TimeoutSeconds, 5, 120)));
+            await client.SendMailAsync(message, timeout.Token);
+            return new EmailSendResultDto(true, "SMTP đã tiếp nhận email.");
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or FormatException or ArgumentException)
+        {
+            return new EmailSendResultDto(false, "Cấu hình SMTP hoặc email không hợp lệ.");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return new EmailSendResultDto(false, "Chưa xác định kết quả gửi SMTP.", true);
+        }
+        catch (SmtpException)
+        {
+            // SMTP has no provider idempotency: an interrupted delivery must not be retried blindly.
+            return new EmailSendResultDto(false, "Chưa xác định kết quả gửi SMTP.", true);
+        }
+    }
 
     public Task<EmailSendResultDto> SendRegistrationConfirmationAsync(
         string email,

@@ -44,6 +44,47 @@ public sealed class ViewingAppointment
     public ViewingAppointmentStatus Status { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public int? ReminderMinutesBefore { get; private set; }
+    public DateTimeOffset? ReminderDueAt { get; private set; }
+    public DateTimeOffset? ReminderSentAt { get; private set; }
+    public Guid? ReminderDeliveryId { get; private set; }
+    public int ReminderAttempts { get; private set; }
+    public DateTimeOffset? ReminderNextAttemptAt { get; private set; }
+    public DateTimeOffset? ReminderLeaseUntil { get; private set; }
+
+    public void SetEmailReminder(int? minutesBefore, DateTimeOffset now)
+    {
+        if (minutesBefore is null)
+        {
+            ClearEmailReminder();
+            UpdatedAt = now;
+            return;
+        }
+        if (Status is not (ViewingAppointmentStatus.Pending or ViewingAppointmentStatus.Confirmed))
+            throw new DomainException("Chỉ có thể đặt lời nhắc cho lịch xem phòng đang hoạt động.");
+        if (minutesBefore is not (15 or 30 or 60 or 1440))
+            throw new DomainException("Chọn nhắc trước 15 phút, 30 phút, 1 giờ hoặc 1 ngày.");
+        if (ScheduledAt.AddMinutes(-minutesBefore.Value) <= now)
+            throw new DomainException("Thời điểm nhắc phải ở tương lai. Vui lòng chọn khoảng nhắc ngắn hơn.");
+        if (ReminderMinutesBefore == minutesBefore) return;
+        ClearEmailReminder();
+        ReminderMinutesBefore = minutesBefore;
+        ReminderDueAt = ScheduledAt.AddMinutes(-minutesBefore.Value);
+        ReminderNextAttemptAt = ReminderDueAt;
+        ReminderDeliveryId = Guid.NewGuid();
+        UpdatedAt = now;
+    }
+
+    private void ClearEmailReminder()
+    {
+        ReminderMinutesBefore = null;
+        ReminderDueAt = null;
+        ReminderSentAt = null;
+        ReminderDeliveryId = null;
+        ReminderAttempts = 0;
+        ReminderNextAttemptAt = null;
+        ReminderLeaseUntil = null;
+    }
 
     public void Confirm(DateTimeOffset updatedAt)
     {
@@ -56,6 +97,7 @@ public sealed class ViewingAppointment
     {
         EnsurePending();
         Status = ViewingAppointmentStatus.Rejected;
+        ClearEmailReminder();
         UpdatedAt = updatedAt;
     }
 
@@ -67,6 +109,7 @@ public sealed class ViewingAppointment
         }
 
         Status = ViewingAppointmentStatus.Cancelled;
+        ClearEmailReminder();
         UpdatedAt = updatedAt;
     }
 
@@ -82,8 +125,12 @@ public sealed class ViewingAppointment
             throw new DomainException("Thời gian xem phòng phải ở tương lai.");
         }
 
+        var reminderMinutes = ReminderMinutesBefore;
+        ClearEmailReminder();
         ScheduledAt = scheduledAt;
         Status = ViewingAppointmentStatus.Pending;
+        if (reminderMinutes.HasValue && scheduledAt.AddMinutes(-reminderMinutes.Value) > updatedAt)
+            SetEmailReminder(reminderMinutes, updatedAt);
         UpdatedAt = updatedAt;
     }
 
@@ -95,6 +142,7 @@ public sealed class ViewingAppointment
         }
 
         Status = ViewingAppointmentStatus.Completed;
+        ClearEmailReminder();
         UpdatedAt = updatedAt;
     }
 

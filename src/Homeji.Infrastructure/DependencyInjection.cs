@@ -139,8 +139,16 @@ public static class DependencyInjection
         services.AddHttpClient<GeminiInterestRanker>();
         services.AddScoped<IOrderReceiptWriter, TransactionReceiptService>();
         services.AddScoped<IReceiptEmailDispatcher, ReceiptEmailDispatcher>();
-        services.AddHttpClient<ITransactionalEmailSender, BrevoAccountEmailSender>()
-            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddScoped<IAppointmentReminderDispatcher, AppointmentReminderDispatcher>();
+        if (usesBrevo)
+        {
+            services.AddHttpClient<ITransactionalEmailSender, BrevoAccountEmailSender>()
+                .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        }
+        else
+        {
+            services.AddScoped<ITransactionalEmailSender, SmtpAccountEmailSender>();
+        }
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));

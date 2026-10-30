@@ -216,6 +216,25 @@ public sealed class ViewingAppointmentService : IViewingAppointmentService
             now);
     }
 
+    public async Task<ViewingAppointmentDto> SetReminderAsync(
+        Guid id, SetViewingReminderDto request, CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        var appointment = await _appointments.GetByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(ViewingAppointment), id);
+        UserContext.EnsureOwner(userId, appointment.RequesterId);
+        var post = await _posts.GetByIdAsync(appointment.RentalPostId, cancellationToken)
+            ?? throw new NotFoundException(nameof(RentalPost), appointment.RentalPostId);
+        if (request.MinutesBefore.HasValue && !await _appointments.HasVerifiedEmailAsync(userId, cancellationToken))
+            throw new RequestValidationException(new Dictionary<string, string[]>
+            {
+                ["email"] = ["Vui lòng xác thực email tài khoản trước khi đặt lời nhắc."],
+            });
+        appointment.SetEmailReminder(request.MinutesBefore, _timeProvider.GetUtcNow());
+        await _appointments.SaveChangesAsync(cancellationToken);
+        return ToDto(appointment, post.Title);
+    }
+
     private static ViewingAppointmentDto ToDto(ViewingAppointment appointment, string postTitle)
     {
         return new ViewingAppointmentDto(
@@ -228,6 +247,10 @@ public sealed class ViewingAppointmentService : IViewingAppointmentService
             appointment.Note,
             appointment.Status,
             appointment.CreatedAt,
-            appointment.UpdatedAt);
+            appointment.UpdatedAt,
+            appointment.ReminderMinutesBefore,
+            appointment.ReminderDueAt,
+            appointment.ReminderSentAt,
+            appointment.ReminderSentAt is null && appointment.ReminderAttempts >= 5);
     }
 }

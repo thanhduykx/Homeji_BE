@@ -4,6 +4,7 @@ namespace Homeji.Application.IServices.Appointments;
 
 public interface IViewingAppointmentService
 {
+    Task<ViewingAppointmentDto> SetReminderAsync(Guid id, SetViewingReminderDto request, CancellationToken cancellationToken = default);
     Task<ViewingAppointmentDto> CreateAsync(Guid rentalPostId, CreateViewingAppointmentDto request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ViewingAppointmentDto>> GetMineAsync(CancellationToken cancellationToken = default);
     Task<ViewingAppointmentDto> ConfirmAsync(Guid id, CancellationToken cancellationToken = default);

@@ -15,6 +15,12 @@ public sealed class ViewingAppointmentRepository : IViewingAppointmentRepository
         _dbContext = dbContext;
     }
 
+    public Task<bool> HasVerifiedEmailAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        _dbContext.Database.SqlQueryRaw<bool>("""
+            SELECT EXISTS (SELECT 1 FROM auth.users WHERE id = @id
+                AND email_confirmed_at IS NOT NULL AND email IS NOT NULL AND email <> '') AS "Value"
+            """, new Npgsql.NpgsqlParameter("id", userId)).SingleAsync(cancellationToken);
+
     public async Task AddAsync(ViewingAppointment appointment, CancellationToken cancellationToken = default)
     {
         await _dbContext.ViewingAppointments.AddAsync(appointment, cancellationToken);

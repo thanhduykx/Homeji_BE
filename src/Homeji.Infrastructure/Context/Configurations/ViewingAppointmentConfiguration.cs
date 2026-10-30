@@ -10,6 +10,7 @@ public sealed class ViewingAppointmentConfiguration : IEntityTypeConfiguration<V
     {
         builder.ToTable("viewing_appointments", "homeji");
         builder.HasKey(appointment => appointment.Id);
+        builder.HasIndex(appointment => new { appointment.ReminderNextAttemptAt, appointment.ReminderSentAt });
         builder.Property(appointment => appointment.Note).HasMaxLength(ViewingAppointment.MaxNoteLength);
         builder.Property(appointment => appointment.Status).HasConversion<int>();
         builder.HasIndex(appointment => new { appointment.RequesterId, appointment.CreatedAt });

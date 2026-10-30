@@ -4,6 +4,7 @@ namespace Homeji.Application.IRepositories.Appointments;
 
 public interface IViewingAppointmentRepository
 {
+    Task<bool> HasVerifiedEmailAsync(Guid userId, CancellationToken cancellationToken = default);
     Task AddAsync(ViewingAppointment appointment, CancellationToken cancellationToken = default);
     Task<ViewingAppointment?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ViewingAppointment>> GetForUserAsync(Guid userId, CancellationToken cancellationToken = default);

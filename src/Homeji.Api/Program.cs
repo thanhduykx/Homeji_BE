@@ -55,6 +55,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 {
     builder.Services.AddHostedService<ReceiptEmailWorker>();
+    builder.Services.AddHostedService<AppointmentReminderWorker>();
     builder.Services.AddHostedService<SearchInterestWorker>();
     builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
     builder.Services.AddHostedService<PaymentExpirationWorker>();

@@ -33,6 +33,13 @@ public sealed class ViewingAppointmentsController : ControllerBase
         return Created($"/api/viewing-appointments/{result.Id}", result);
     }
 
+    [HttpPut("{id:guid}/reminder")]
+    public async Task<ActionResult<ViewingAppointmentDto>> SetReminder(
+        Guid id, [FromBody] SetViewingReminderDto request, CancellationToken cancellationToken)
+    {
+        return Ok(await _appointments.SetReminderAsync(id, request, cancellationToken));
+    }
+
     [HttpPost("{id:guid}/confirm")]
     public async Task<ActionResult<ViewingAppointmentDto>> Confirm(Guid id, CancellationToken cancellationToken)
     {

@@ -1975,6 +1975,27 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<Guid>("OwnerId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("ReminderAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("ReminderDeliveryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ReminderDueAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReminderLeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ReminderMinutesBefore")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ReminderNextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReminderSentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<Guid>("RentalPostId")
                         .HasColumnType("uuid");
 
@@ -1993,6 +2014,8 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId", "CreatedAt");
+
+                    b.HasIndex("ReminderNextAttemptAt", "ReminderSentAt");
 
                     b.HasIndex("RequesterId", "CreatedAt");
 
