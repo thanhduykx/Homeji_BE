@@ -16,6 +16,25 @@ namespace Homeji.Application.UnitTests.RentalPosts;
 
 public sealed class RentalPostSearchTests
 {
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    [InlineData(3, false)]
+    public async Task Search_exposes_verification_only_for_approved_owner_profiles(int status, bool expected)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var owner = UserProfile.Create(Guid.NewGuid(), "Chủ nhà", now);
+        owner.SetRole(UserRole.Landlord, now);
+        if (status != 0) owner.SubmitLandlordVerification(now);
+        if (status is 2 or 3) owner.CompleteLandlordVerification(status == 2, now);
+        var service = CreateComparisonService(null, [CreateActiveTransfer(owner.Id)], [owner]);
+        var result = await service.SearchAsync(new RentalPostSearchDto(null, null, null, null, null, null, null, null, null, []));
+        var summary = Assert.Single(result);
+        Assert.Equal(expected, summary.IsOwnerVerified);
+        Assert.False(summary.IsOwnerPremium);
+    }
+
     [Fact]
     public async Task Synthetic_active_post_is_hidden_from_search_comparison_and_public_detail()
     {
@@ -90,9 +109,9 @@ public sealed class RentalPostSearchTests
         await Assert.ThrowsAsync<NotFoundException>(() => service.CompareAsync(new CompareRentalPostsDto([first.Id, second.Id])));
     }
 
-    private static RentalPostService CreateComparisonService(Guid? viewerId, IReadOnlyList<RentalPost> posts)
+    private static RentalPostService CreateComparisonService(Guid? viewerId, IReadOnlyList<RentalPost> posts, IReadOnlyList<UserProfile>? owners = null)
     {
-        var profiles = new MissingProfileRepository();
+        var profiles = new MissingProfileRepository(owners);
         return new RentalPostService(new UserContext(new StubCurrentUser(viewerId), profiles),
             new EmptyRentalPostRepository(posts), new EmptySubscriptionRepository(), null!, null!, null!,
             new RejectingActivityService(), new EmptyReviewRepository(), profiles, null!, null!, TimeProvider.System);
@@ -180,10 +199,10 @@ public sealed class RentalPostSearchTests
             Task.FromResult<IReadOnlyList<UserActivityDto>>([]);
     }
 
-    private sealed class MissingProfileRepository : IUserProfileRepository
+    private sealed class MissingProfileRepository(IReadOnlyList<UserProfile>? owners = null) : IUserProfileRepository
     {
         public Task<UserProfile?> GetByIdAsync(Guid userId, CancellationToken cancellationToken = default) =>
-            Task.FromResult<UserProfile?>(null);
+            Task.FromResult(owners?.SingleOrDefault(owner => owner.Id == userId));
 
         public Task<UserProfile> UpsertAsync(UserProfile profile, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
@@ -194,7 +213,7 @@ public sealed class RentalPostSearchTests
         public Task<IReadOnlyList<UserProfile>> GetByIdsAsync(
             IReadOnlyCollection<Guid> userIds,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<UserProfile>>([]);
+            Task.FromResult<IReadOnlyList<UserProfile>>(owners?.Where(owner => userIds.Contains(owner.Id)).ToArray() ?? []);
 
         public Task<IReadOnlyList<Guid>> GetAllUserIdsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<Guid>>([]);

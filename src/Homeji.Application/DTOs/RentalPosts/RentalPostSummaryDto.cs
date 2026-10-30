@@ -31,4 +31,5 @@ public sealed record RentalPostSummaryDto(
     string? OwnerSchool = null,
     int AvailableSlots = 1,
     int MaxOccupants = 1,
-    string? DescriptionExcerpt = null);
+    string? DescriptionExcerpt = null,
+    bool IsOwnerVerified = false);

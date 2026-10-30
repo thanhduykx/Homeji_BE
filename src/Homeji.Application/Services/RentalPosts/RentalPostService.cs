@@ -289,6 +289,7 @@ public sealed class RentalPostService : IRentalPostService
                     OwnerAvatarPath = author?.AvatarPath, OwnerSchool = author?.School,
                     AvailableSlots = post.AvailableSlots, MaxOccupants = post.MaxOccupants,
                     DescriptionExcerpt = PlainTextExcerpt(post.Description),
+                    IsOwnerVerified = author?.LandlordVerificationStatus == LandlordVerificationStatus.Verified,
                 };
                 return RentalPostVisibility.ForPublicSearch(summary);
             })
