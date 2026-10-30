@@ -164,6 +164,12 @@ public sealed class MarketplacePost
         UpdatedAt = updatedAt;
     }
 
+    public void RestoreAfterAiReview(DateTimeOffset now)
+    {
+        if (Status != MarketplacePostStatus.Archived) throw new DomainException("Tin đã thay đổi, không thể khôi phục tự động.");
+        Status = MarketplacePostStatus.Active; UpdatedAt = now;
+    }
+
     public void ReleaseReservation(int quantity, DateTimeOffset updatedAt)
     {
         if (quantity <= 0 || quantity > ReservedQuantity)

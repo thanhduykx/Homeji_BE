@@ -22,6 +22,180 @@ namespace Homeji.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Homeji.Domain.Entities.AiListingReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset?>("BlockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("blocked_at");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("category");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<double?>("Confidence")
+                        .HasColumnType("double precision")
+                        .HasColumnName("confidence");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Evidence")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("evidence");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(12)
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("LeaseId")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("lease_until");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<int?>("PreviousStatus")
+                        .HasColumnType("integer")
+                        .HasColumnName("previous_status");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reviewed_at");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reviewed_by");
+
+                    b.Property<string>("Snapshot")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("snapshot");
+
+                    b.Property<DateTimeOffset>("SourceUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("source_updated_at");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("State", "NextAttemptAt");
+
+                    b.HasIndex("Kind", "SubjectId", "ContentHash")
+                        .IsUnique();
+
+                    b.HasIndex("Kind", "SubjectId", "SourceUpdatedAt");
+
+                    b.ToTable("ai_listing_reviews", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.AiModerationSchedule", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AutoBlock")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTimeOffset?>("BackfillBefore")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("BatchSize")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("BudgetDay")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DailyRequestLimit")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DailyTokenBudget")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("InBatch")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("NextAllowedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PauseMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PauseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("RequestsToday")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SpacingSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TokensReservedToday")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ai_moderation_schedule", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.BadWord", b =>
                 {
                     b.Property<Guid>("Id")

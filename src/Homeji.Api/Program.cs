@@ -59,6 +59,7 @@ if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
     builder.Services.AddHostedService<SearchInterestWorker>();
     builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
     builder.Services.AddHostedService<PaymentExpirationWorker>();
+    builder.Services.AddHostedService<AiListingModerationWorker>();
     // Legacy seed repairs must be explicitly enabled; startup must preserve edits
     // made by users and imports rather than rewriting their titles or locations.
     if (builder.Configuration.GetValue("LegacyData:NormalizeLocationsOnStartup", false))

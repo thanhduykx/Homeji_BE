@@ -50,6 +50,8 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<ReferralAccount> ReferralAccounts => Set<ReferralAccount>();
     public DbSet<ReferralClaim> ReferralClaims => Set<ReferralClaim>();
     public DbSet<ReferralVoucher> ReferralVouchers => Set<ReferralVoucher>();
+    public DbSet<AiListingReview> AiListingReviews => Set<AiListingReview>();
+    public DbSet<AiModerationSchedule> AiModerationSchedules => Set<AiModerationSchedule>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -173,6 +173,8 @@ public static class DependencyInjection
         services.AddHttpClient<IPasswordRecoveryOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IExpiredPaymentCleanup, ExpiredPaymentCleanup>(client => client.Timeout = TimeSpan.FromSeconds(10));
+        services.AddScoped<Homeji.Application.IServices.Moderation.IAiListingModeration, AiListingModeration>();
+        services.AddHttpClient<Homeji.Application.IServices.Moderation.IAiListingReviewClient, GeminiListingReviewClient>(client => client.Timeout = TimeSpan.FromSeconds(30));
         services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
         services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>();
 

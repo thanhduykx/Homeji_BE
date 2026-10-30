@@ -325,6 +325,20 @@ public sealed class RentalPost
         UpdatedAt = archivedAt;
     }
 
+    public void HideForAiReview(string reason, DateTimeOffset now)
+    {
+        if (Status is not (RentalPostStatus.Active or RentalPostStatus.Pending)) throw new DomainException("Tin không còn công khai hoặc chờ duyệt.");
+        Status = RentalPostStatus.Rejected;
+        ModerationReason = NormalizeRequired(reason, MaxModerationReasonLength, nameof(reason));
+        UpdatedAt = now;
+    }
+
+    public void RestoreAfterAiReview(int previousStatus, DateTimeOffset now)
+    {
+        if (Status != RentalPostStatus.Rejected || previousStatus is not (2 or 3)) throw new DomainException("Tin đã thay đổi, không thể khôi phục tự động.");
+        Status = (RentalPostStatus)previousStatus; ModerationReason = null; UpdatedAt = now;
+    }
+
     public void MarkRented(DateTimeOffset rentedAt)
     {
         if (Status != RentalPostStatus.Active)
