@@ -38,6 +38,8 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         listing.Address, listing.District, listing.Price, listing.Area, listing.ImageUrls.ToArray(),
         listing.SourceUpdatedAt, listing.CollectedAt)
     {
+        Latitude = listing.Latitude,
+        Longitude = listing.Longitude,
         SourceExpiresAt = listing.SourceExpiresAt,
         SourceCheckedAt = listing.SourceCheckedAt,
     };

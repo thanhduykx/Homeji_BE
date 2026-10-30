@@ -12,10 +12,13 @@ public sealed class RentalSourceListingConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("rental_source_listings", "homeji", table =>
         {
+            table.HasCheckConstraint("ck_rental_source_coordinates", "(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)");
             table.HasCheckConstraint("ck_rental_source_listings_district", "district IN ('quan-9', 'thu-duc')");
             table.HasCheckConstraint("ck_rental_source_listings_price_area", "price > 0 AND price <= 100000000 AND area > 0 AND area <= 1000");
             table.HasCheckConstraint("ck_rental_source_listings_images", "jsonb_typeof(image_urls) = 'array' AND jsonb_array_length(image_urls) BETWEEN 1 AND 10");
         });
+        builder.Property(item => item.Latitude).HasColumnName("latitude").HasPrecision(10, 7);
+        builder.Property(item => item.Longitude).HasColumnName("longitude").HasPrecision(10, 7);
         builder.HasKey(listing => listing.Id);
         builder.Property(listing => listing.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(listing => listing.Source).HasColumnName("source").HasMaxLength(80).IsRequired();

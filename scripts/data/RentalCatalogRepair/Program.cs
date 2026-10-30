@@ -16,7 +16,7 @@ try {
         await using var cmd = new NpgsqlCommand(sql, connection, tx);
         return (await cmd.ExecuteScalarAsync())?.ToString() ?? "null";
     }
-    foreach (var table in new[] {"rental_posts", "rental_post_media", "rental_post_amenities", "rental_source_listings"}) {
+    foreach (var table in new[] {"rental_posts", "rental_post_media", "rental_post_amenities", "rental_source_listings", "food_source_places"}) {
         var json = await Scalar($"SELECT COALESCE(jsonb_agg(to_jsonb(t)), '[]'::jsonb)::text FROM homeji.{table} t");
         File.WriteAllText(Path.Combine(directory, table + ".json"), json);
     }

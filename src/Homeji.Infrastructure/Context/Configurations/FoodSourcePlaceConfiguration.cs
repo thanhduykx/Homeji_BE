@@ -8,7 +8,9 @@ public sealed class FoodSourcePlaceConfiguration : IEntityTypeConfiguration<Food
 {
     public void Configure(EntityTypeBuilder<FoodSourcePlace> builder)
     {
-        builder.ToTable("food_source_places", "homeji");
+        builder.ToTable("food_source_places", "homeji", table => table.HasCheckConstraint("ck_food_source_coordinates", "(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)"));
+        builder.Property(item => item.Latitude).HasColumnName("latitude").HasPrecision(10, 7);
+        builder.Property(item => item.Longitude).HasColumnName("longitude").HasPrecision(10, 7);
         builder.HasKey(place => place.Id);
         builder.Property(place => place.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(place => place.Name).HasColumnName("name").HasMaxLength(200).IsRequired();

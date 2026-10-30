@@ -1,0 +1,13 @@
+# Public catalog expansion, 30 October 2026
+
+The reviewed batch in `scripts/data/catalog-20261030.json` contains twelve unexpired rental advertisements with seventy photographs from their own galleries, plus six real food venues. No fake owner accounts, review scores, stock, orders or availability confirmations are created. Titles are shortened into readable Vietnamese while prices, areas, addresses and photographs retain their source facts. Four expired advertisements from the initial collection were excluded.
+
+Three rental addresses and six food venues have coordinates matched to Google Maps place/address results. The marker coordinates use the result's `!3d/!4d` place position, never the `@` camera center. Addresses with multiple unresolved results (52 Dương Đình Hội), missing house numbers or mismatching house suffixes are left unmapped. Satellite/address views were inspected for the mapped residential streets and venue frontage; this is not a property ownership or room availability verification.
+
+`AddSourceCatalogCoordinates` adds nullable coordinates to the existing public source tables. The same migration requires both coordinates or neither and enforces geographic ranges. Existing clients remain compatible. `FoodSourcePlaceDto` and `RentalSourceListingDto` expose these nullable values. Source records with no coordinates remain available in their directory/search APIs.
+
+Import uses `render_catalog_locations_sql.py`, which validates source domains, media origins, coordinates and advertisement expiry and produces insert-only SQL. `RentalCatalogRepair` verifies the database identity, snapshots rentals, rental media, amenities, source listings and food places, then executes inside its transaction. Duplicate identities/names keep existing data intact. Generated SQL and database snapshots are ignored output artifacts, not repository files.
+
+The map fetches the two bounded public source APIs, renders only valid numeric coordinates within the service area, and keeps public-source popups separate from native Homeji chat/order actions. Each popup links to the original advertisement or venue information. Food venues do not receive invented menu prices or Homeji ordering stock. Source image URLs are used directly; no Google review photos are copied or relabeled as room photos.
+
+The authenticated listing panel also includes the existing source browser, loaded when expanded. All twelve references can be browsed there, including the nine that deliberately have no map coordinates. Source records never substitute for native landlord posts or paid Premium entitlements.

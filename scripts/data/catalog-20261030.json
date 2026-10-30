@@ -1,0 +1,371 @@
+{
+  "reviewedAt": "2026-10-30T05:42:03.643943+00:00",
+  "rentals": [
+    {
+      "id": "6d20e70f-8174-55ad-bc63-d22f1e45f576",
+      "source": "phongtro123",
+      "source_id": "715211",
+      "source_url": "https://phongtro123.com/co-dieu-hoa-dien-nuoc-gia-dan-pr715211.html",
+      "title": "Phòng có máy lạnh, điện nước giá dân ở Long Trường",
+      "address": "7 đường Đ4, khu nhà ở thấp tầng, kp 23, Phường Long Trường, Hồ Chí Minh",
+      "district": "quan-9",
+      "price": 3000000.0,
+      "area": 40.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071991094-1911970575470517565-3747562878264179127-570c7fc0e44c87806762767d1ce7a2bc_1793072050.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071991632-1911970575470517565-3747562878264179127-f513b9f1dfa37e6c1413405cdff0e9e5_1793072055.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071991879-1911970575470517565-3747562878264179127-046d269134a68b66d6a8fd44a67ac3b5_1793072058.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071992146-1911970575470517565-3747562878264179127-93f765e36f6d4623af330f2e1fd87a1a_1793072061.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071992715-1911970575470517565-3747562878264179127-64ac5f5d9cd0ff9f986d121a565a8400_1793072064.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071992850-1911970575470517565-3747562878264179127-f8da77189d6b826959f1df26b8d82ef5_1793072066.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071992982-1911970575470517565-3747562878264179127-a02cce1c486efb7a10ce8d18f0dcb702_1793072069.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/1793071993100-1911970575470517565-3747562878264179127-c467d61f63b662f8f205eaf51576b55d_1793072072.jpg"
+      ],
+      "source_updated_at": "2026-10-29T19:00:11+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-12-26T03:34:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "7774b5ac-beac-5f6d-b851-0246af5fdb2f",
+      "source": "phongtro123",
+      "source_id": "699540",
+      "source_url": "https://phongtro123.com/pen-house-rong-40m2-ngay-nga-3-my-thanh-le-van-viet-gan-khu-cnc-q9-pr699540.html",
+      "title": "Penthouse 70 m² gần ngã ba Mỹ Thành, Lê Văn Việt",
+      "address": "5/3 Đường số 9, Phường Long Bình, Hồ Chí Minh",
+      "district": "quan-9",
+      "price": 4300000.0,
+      "area": 40.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/12/25/z7345023349083-4b22b4ee26dce35914685945b84d0813_1766635042.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/12/25/z7345023352810-1820ea8104a42e64f548ad971cbc273c_1766635055.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/12/25/z7345023365233-02b021785b5ef84933f9fddb7ae72253_1766635055.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/12/25/z7345023368310-ccec5022013cdd8924145147a1e695eb_1766635056.jpg"
+      ],
+      "source_updated_at": "2026-10-27T07:37:07+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-01T00:37:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "59ce2ebb-b147-56f1-9721-8bbee477424d",
+      "source": "phongtro123",
+      "source_id": "688841",
+      "source_url": "https://phongtro123.com/cho-thue-phong-tro-phong-tro-full-noi-that-may-lanh-tien-nghi-trung-tam-man-thien-q-9-pr688841.html",
+      "title": "Chỗ ở KTX 2 giường có máy lạnh trên đường Man Thiện",
+      "address": "102/ 14 Đường Man Thiện, Phường Tăng Nhơn Phú, Hồ Chí Minh",
+      "district": "quan-9",
+      "price": 1600000.0,
+      "area": 15.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/10/z6892087731570-8b4f9539c462d9fac6dee78b832de943_1754825924.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/10/z6342222552450-bd359e56001438d229d4022b6cb48c6f_1754825932.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/10/z6342222566513-296a8b94fe082f3052abc71b705db44f_1754825933.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/10/z6342222568993-46c90eddfc91b63269c756a16a5155c3_1754825933.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/10/z6295249930150-0bbde8d040075164c9ca4a8491a39f94_1754825932.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/14/z6904911342707-e3175ce22007f2c6cf130fb75d8a61f5_1755158229.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/08/10/z6892087763001-b06dfa5c5fed40452148130e27d0fd31_1754825934.jpg"
+      ],
+      "source_updated_at": "2026-10-27T09:52:34+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-10-31T07:34:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00",
+      "latitude": 10.8480887,
+      "longitude": 106.7878405
+    },
+    {
+      "id": "1b63c57f-d9fc-50be-8d57-c0ea891d031d",
+      "source": "phongtro123",
+      "source_id": "714986",
+      "source_url": "https://phongtro123.com/cho-thue-phong-tro-gia-re-tai-tang-nhon-phu-b-thu-duc-pr714986.html",
+      "title": "Phòng trọ giá rẻ trên đường Dương Đình Hội",
+      "address": "52 Đường Dương Đình Hội, Phường Tăng Nhơn Phú, Hồ Chí Minh",
+      "district": "quan-9",
+      "price": 3700000.0,
+      "area": 16.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/21/34a145f7-16f1-48e3-8d1a-bd161dcfc4f3_1792589654.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/21/76f05478-612a-4544-a9a3-80bfcf84df65_1792589654.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/21/877c9790-f473-47ae-ac6c-446b3d5073cb_1792589657.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/21/b5bb7ad7-e59f-41f1-a2de-21ade6511d27_1792589657.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/21/f25e78b6-3874-45a3-b415-31903fe3356a_1792589659.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/21/fdbe53e9-b6fa-427a-ab51-7e4c05660dff_1792589659.jpg"
+      ],
+      "source_updated_at": "2026-10-22T08:45:19+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-12-20T13:34:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "edd5062f-a841-5709-bd6d-18df874a4c01",
+      "source": "phongtro123",
+      "source_id": "702039",
+      "source_url": "https://phongtro123.com/sleepbox-new-100-thang-may-gan-dh-ngan-hang-spkt-cd-cong-thuong-pr702039.html",
+      "title": "Sleepbox có cửa khóa riêng và ban công trên Kha Vạn Cân",
+      "address": "Đường Kha Vạn Cân, Phường Hiệp Bình, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 1500000.0,
+      "area": 50.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8442_1772159850.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8443_1772159853.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8444_1772159853.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8445_1772159850.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8448_1772159855.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8449_1772159859.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8446_1772159855.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8450_1772159861.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/27/img-8447_1772159858.jpg"
+      ],
+      "source_updated_at": "2026-10-29T09:32:33+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-03T02:32:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "03c33bb9-3118-51f3-bea1-750eeae1d479",
+      "source": "phongtro123",
+      "source_id": "713371",
+      "source_url": "https://phongtro123.com/gan-cd-cong-nghe-tphcm-sleepbox-moi-100-co-thang-may-ban-cong-pr713371.html",
+      "title": "Sleepbox có thang máy và ban công gần Cao đẳng Công nghệ",
+      "address": "Đường Kha Vạn Cân, Phường Thủ Đức, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 1500000.0,
+      "area": 30.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/39164200b26b4f2a169673ada449a712_1789960461.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/e96c58b1381befa27ae0cc0a376bb8cd_1789960461.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/57e51d51b75617eecf4e0657647bae6e_1789960464.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/57164e8acddaf500d444cd339bccd828_1789960464.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/44ccf2ea94cb7b5311d698ceaae501fa_1789960465.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/66c03022534b7f9626b7b0376dfaa0e5_1789960466.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/389d7df54e9233efee49fd94aae94be8_1789960467.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/09/21/fa28d051ee4ff31add1876b47ff577a0_1789960467.jpg"
+      ],
+      "source_updated_at": "2026-10-29T09:31:06+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-03T02:31:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "e74ed146-5abf-5408-9d22-38c79f247113",
+      "source": "phongtro123",
+      "source_id": "669842",
+      "source_url": "https://phongtro123.com/he-thong-ky-tuc-xa-sleepbox-thu-duc-gia-khuyen-mai-thang-dau-chi-700k-tuy-chi-nhanh-2-pr669842.html",
+      "title": "Chỗ ở sleepbox trên đường số 9, Thủ Đức",
+      "address": "Đường số 9, Phường Thủ Đức, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 1300000.0,
+      "area": 35.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/02/23/405003013-1521904505233819-5682783760802737713-n-copy_1740275637.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/02/23/sleepbox-la-copy-copy-copy-copy-copy_1740275703.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/02/23/789-copy-copy-copy-copy-copy-copy_1740275703.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/02/23/z4215191943444-bbe4232f4e702f63cea1f20be5b4e30c-copy-copy-copy_1740275703.jpg"
+      ],
+      "source_updated_at": "2026-10-28T13:30:37+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-07T06:30:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "3f062458-a186-5ec5-8392-0f0c18911f15",
+      "source": "phongtro123",
+      "source_id": "715240",
+      "source_url": "https://phongtro123.com/pass-phong-tro-gap-don-vao-o-lien-pr715240.html",
+      "title": "Pass phòng có thể dọn vào ở trên Quốc lộ 1A",
+      "address": "số 55 Đường Quốc lộ 1A, Phường Thủ Đức, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 3800000.0,
+      "area": 25.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/img-5470_1793116622.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/img-5471_1793116622.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/img-5473_1793116623.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/img-5472_1793116623.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/10/27/img-5474_1793116623.jpg"
+      ],
+      "source_updated_at": "2026-10-27T22:57:45+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-12-26T15:57:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "8811092b-0e0f-5972-8830-b82760bc4cd7",
+      "source": "phongtro123",
+      "source_id": "701948",
+      "source_url": "https://phongtro123.com/phong-ban-cong-may-lanh-gan-gigamall-pr701948.html",
+      "title": "Phòng ban công có máy lạnh tại 110 Kha Vạn Cân",
+      "address": "110 Đường Kha Vạn Cân, Phường Hiệp Bình, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 4200000.0,
+      "area": 20.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/25/395daa20-b740-45a0-82d1-53404de4cbdf_1771994506.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/25/1097c10a-7f53-4e6d-a513-b81a7b936f45_1771994495.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/25/f69fb5f0-fadf-44ce-b43b-062f5b050143_1771994495.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/25/3e76b4b9-248c-4f06-920f-52b2d52f36ad_1771994500.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/25/5dcb22a7-7cb2-443e-8e8e-e27ab69f7b9b_1771994501.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2026/02/25/a8b49e5f-c267-490b-8d68-ac8a1cf08123_1771994505.jpg"
+      ],
+      "source_updated_at": "2026-10-27T22:47:24+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-01T15:47:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00",
+      "latitude": 10.850161,
+      "longitude": 106.754482
+    },
+    {
+      "id": "97803be4-631d-511e-a4bb-2c352c2c32cc",
+      "source": "phongtro123",
+      "source_id": "624450",
+      "source_url": "https://phongtro123.com/phong-moi-co-may-lanh-cua-so-thoang-mat-ngay-gigamall-pr624450.html",
+      "title": "Phòng có cửa sổ và máy lạnh tại 110 Kha Vạn Cân",
+      "address": "110 Đường Kha Vạn Cân, Phường Hiệp Bình, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 3500000.0,
+      "area": 20.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2024/12/29/146521aa-4759-4453-9ef7-617f3dfc938c_1735456182.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2024/12/29/50ac35d3-a415-4060-87fc-db485de12f45_1735456182.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2024/12/29/88ed2560-7ec9-4bd4-bc86-46d7f3cae66e_1735456185.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2024/12/29/d39182d7-1501-4702-aea0-70ed1dc90cdc_1735456186.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2024/12/29/c9b291b4-38d3-4816-b515-1dd3628cff70_1735456189.jpg"
+      ],
+      "source_updated_at": "2026-10-27T22:47:13+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-01T15:47:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "2a99c120-3ab3-58b2-91ea-abc9f8471815",
+      "source": "phongtro123",
+      "source_id": "629298",
+      "source_url": "https://phongtro123.com/chu-nha-cho-thue-phong-dep-co-thang-may-ngay-hoang-dieu-2-thu-duc-pr629298.html",
+      "title": "Phòng có thang máy tại 127C Hoàng Diệu 2",
+      "address": "127C Đường Hoàng Diệu 2, Phường Linh Xuân, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 3500000.0,
+      "area": 25.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/b394b10673a6a3f8fab73_1745033686.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/5b2bf28b302be075b93a5_1745033694.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/6cd96a6da8cd789321dc10_1745033694.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/6fffc35f01ffd1a188ee7_1745033696.jpg"
+      ],
+      "source_updated_at": "2026-10-27T07:38:17+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-01T00:38:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00"
+    },
+    {
+      "id": "3871767f-504a-50a9-89db-b0a9696cc9e5",
+      "source": "phongtro123",
+      "source_id": "679764",
+      "source_url": "https://phongtro123.com/phong-moi-ngay-hoang-dieu-2-20m-co-gac-dep-vi-tri-rat-thuan-tien-co-thang-may-pr679764.html",
+      "title": "Phòng 20 m² có gác và thang máy tại 127 Hoàng Diệu 2",
+      "address": "127 Đường Hoàng Diệu 2, Phường Linh Xuân, Hồ Chí Minh",
+      "district": "thu-duc",
+      "price": 3500000.0,
+      "area": 22.0,
+      "image_urls": [
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/302a90ca0bcddb9382dc27_1745033992.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/011fc1e25ae58abbd3f437_1745034014.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/d352a3bc38bbe8e5b1aa28_1745034015.jpg",
+        "https://pt123.cdn.static123.com/images/thumbs/900x600/fit/2025/04/19/ef63b9942293f2cdab8241_1745034016.jpg"
+      ],
+      "source_updated_at": "2026-10-27T07:37:53+07:00",
+      "collected_at": "2026-10-29T19:51:17.482741+00:00",
+      "source_expires_at": "2026-11-01T00:37:00+00:00",
+      "source_checked_at": "2026-10-29T19:51:17.482741+00:00",
+      "latitude": 10.8561693,
+      "longitude": 106.7665394
+    }
+  ],
+  "food": [
+    {
+      "name": "Tiệm Cơm Viên – Thủ Đức",
+      "address": "68A Tô Vĩnh Diện, Linh Chiểu, TP. Thủ Đức",
+      "latitude": 10.8523908,
+      "longitude": 106.7670639,
+      "sourceUrl": "https://www.tiemcomvien.com/",
+      "id": "fbc02e1a-181a-50a8-96ad-c0d262dd012b",
+      "mapsSearchUrl": "https://www.google.com/maps/search/?api=1&query=10.8523908%2C106.7670639",
+      "verificationNote": "Địa chỉ và vị trí được đối chiếu với Google Maps ngày 30/10/2026. Xem thông tin của quán trước khi ghé."
+    },
+    {
+      "name": "Cơm Gà Ngon",
+      "address": "15 Tô Vĩnh Diện, TP. Thủ Đức, TP.HCM",
+      "latitude": 10.8530743,
+      "longitude": 106.7674377,
+      "sourceUrl": "https://www.google.com/maps/search/?api=1&query=C%C6%A1m+G%C3%A0+Ngon+15+T%C3%B4+V%C4%A9nh+Di%E1%BB%87n",
+      "id": "e4e18e43-a7e7-5e6f-90ae-6da7932c164c",
+      "mapsSearchUrl": "https://www.google.com/maps/search/?api=1&query=10.8530743%2C106.7674377",
+      "verificationNote": "Địa chỉ và vị trí được đối chiếu với Google Maps ngày 30/10/2026. Xem thông tin của quán trước khi ghé."
+    },
+    {
+      "name": "Cơm gà Đệ Nhất – Lê Văn Việt",
+      "address": "31 Lê Văn Việt, Tăng Nhơn Phú, TP.HCM",
+      "latitude": 10.8477325,
+      "longitude": 106.776953,
+      "sourceUrl": "https://www.google.com/maps/search/?api=1&query=C%C6%A1m+g%C3%A0+%C4%90%E1%BB%87+Nh%E1%BA%A5t+31+L%C3%AA+V%C4%83n+Vi%E1%BB%87t",
+      "id": "3f70016b-a8fb-5709-9855-85e61d241de8",
+      "mapsSearchUrl": "https://www.google.com/maps/search/?api=1&query=10.8477325%2C106.776953",
+      "verificationNote": "Địa chỉ và vị trí được đối chiếu với Google Maps ngày 30/10/2026. Xem thông tin của quán trước khi ghé."
+    },
+    {
+      "name": "Cơm Tấm Phúc Lộc Thọ – Đỗ Xuân Hợp",
+      "address": "139 Hẻm 445, Phước Long, TP.HCM",
+      "latitude": 10.828863,
+      "longitude": 106.7686186,
+      "sourceUrl": "https://www.google.com/maps/place/C%C6%A1m+T%E1%BA%A5m+Ph%C3%BAc+L%E1%BB%99c+Th%E1%BB%8D+-+%C4%90%E1%BB%97+Xu%C3%A2n+H%E1%BB%A3p/@10.8477325,106.7743781,818m/data=!3m1!1e3!4m6!3m5!1s0x3175265533233f55:0x8e657f95e51f61cf!8m2!3d10.828863!4d106.7686186!16s%2Fg%2F11fxfxt70h",
+      "id": "8f3c0082-3b56-5ca4-b50b-1ba920d1aef8",
+      "mapsSearchUrl": "https://www.google.com/maps/search/?api=1&query=10.828863%2C106.7686186",
+      "verificationNote": "Địa chỉ và vị trí được đối chiếu với Google Maps ngày 30/10/2026. Xem thông tin của quán trước khi ghé."
+    },
+    {
+      "name": "Cơm Tấm 620 – Đỗ Xuân Hợp",
+      "address": "620 Đỗ Xuân Hợp, Phước Long, TP.HCM",
+      "latitude": 10.8150487,
+      "longitude": 106.7747152,
+      "sourceUrl": "https://www.google.com/maps/place/C%C6%A1m+T%E1%BA%A5m+620+-+%C4%90%E1%BB%97+Xu%C3%A2n+H%E1%BB%A3p/@10.8150487,106.7721403,818m/data=!3m2!1e3!4b1!4m14!1m7!3m6!1s0x3175265533233f55:0x8e657f95e51f61cf!2zQ8ahbSBU4bqlbSBQaMO6YyBM4buZYyBUaOG7jSAtIMSQ4buXIFh1w6JuIEjhu6Nw!8m2!3d10.828863!4d106.7686186!16s%2Fg%2F11fxfxt70h!3m5!1s0x317527afc078c913:0x7cc05dd06ce70c93!8m2!3d10.8150487!4d106.7747152!16s%2Fg%2F11vm6d_qhl",
+      "id": "6ec2d0a4-50a1-5ac5-b030-6e82e7ab2d5f",
+      "mapsSearchUrl": "https://www.google.com/maps/search/?api=1&query=10.8150487%2C106.7747152",
+      "verificationNote": "Địa chỉ và vị trí được đối chiếu với Google Maps ngày 30/10/2026. Xem thông tin của quán trước khi ghé."
+    },
+    {
+      "name": "Cơm Tấm Phúc Lộc Thọ – Nguyễn Văn Tăng",
+      "address": "363 Nguyễn Văn Tăng, Long Bình, TP.HCM",
+      "latitude": 10.8412639,
+      "longitude": 106.825251,
+      "sourceUrl": "https://www.google.com/maps/place/C%C6%A1m+T%E1%BA%A5m+Ph%C3%BAc+L%E1%BB%99c+Th%E1%BB%8D+Nguy%E1%BB%85n+V%C4%83n+T%C4%83ng/@10.8412639,106.8226761,818m/data=!3m2!1e3!4b1!4m6!3m5!1s0x317521b17b6185ab:0x96f64e9d7647b7c5!8m2!3d10.8412639!4d106.825251!16s%2Fg%2F11y8kn8vgy",
+      "id": "c6a22660-c773-58ca-a3d6-55956a1bef68",
+      "mapsSearchUrl": "https://www.google.com/maps/search/?api=1&query=10.8412639%2C106.825251",
+      "verificationNote": "Địa chỉ và vị trí được đối chiếu với Google Maps ngày 30/10/2026. Xem thông tin của quán trước khi ghé."
+    }
+  ],
+  "coordinateEvidence": [
+    {
+      "sourceId": "679764",
+      "latitude": 10.8561693,
+      "longitude": 106.7665394,
+      "address": "127 Hoàng Diệu 2",
+      "check": "Address result and satellite view: built-up residential streets, not water."
+    },
+    {
+      "sourceId": "701948",
+      "latitude": 10.850161,
+      "longitude": 106.754482,
+      "address": "110 Kha Vạn Cân",
+      "mapsEvidence": "https://www.google.com/maps/place/110+Kha+V%E1%BA%A1n+C%C3%A2n,+Th%E1%BB%A7+%C4%90%E1%BB%A9c,+H%E1%BB%93+Ch%C3%AD+Minh,+Vi%E1%BB%87t+Nam/@10.8232903,106.7676932,1526m/data=!3m1!1e3!4m6!3m5!1s0x317527bd9559849f:0xb0a7581dc7041e60!8m2!3d10.850161!4d106.754482!16s%2Fg%2F11c5kw2b89?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D"
+    },
+    {
+      "sourceId": "688841",
+      "latitude": 10.8480887,
+      "longitude": 106.7878405,
+      "address": "102/14 Man Thiện",
+      "mapsEvidence": "https://www.google.com/maps/place/102%2F14+Man+Thi%E1%BB%87n,+KP1,+T%C4%83ng+Nh%C6%A1n+Ph%C3%BA,+H%E1%BB%93+Ch%C3%AD+Minh+810000,+Vi%E1%BB%87t+Nam/@10.848094,106.7852656,763m/data=!3m2!1e3!4b1!4m6!3m5!1s0x3175271366e4962b:0x25764693df4202b5!8m2!3d10.8480887!4d106.7878405!16s%2Fg%2F11m6v35p80?entry=ttu&g_ep=EgoyMDI2MTAyOC4wIKXMDSoASAFQAw%3D%3D"
+    }
+  ],
+  "scope": "Public references, no invented owners, stock, ratings or rental availability."
+}

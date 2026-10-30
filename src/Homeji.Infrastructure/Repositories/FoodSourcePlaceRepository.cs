@@ -10,6 +10,6 @@ public sealed class FoodSourcePlaceRepository(ApplicationDbContext context) : IF
     public async Task<IReadOnlyList<FoodSourcePlaceDto>> ListAsync(CancellationToken cancellationToken) =>
         await context.FoodSourcePlaces.AsNoTracking().OrderBy(place => place.Name).Take(50)
             .Select(place => new FoodSourcePlaceDto(place.Id, place.Name, place.Address, place.SourceUrl,
-                place.MapsSearchUrl, place.VerificationNote, place.CollectedAt))
+                place.MapsSearchUrl, place.VerificationNote, place.CollectedAt) { Latitude = place.Latitude, Longitude = place.Longitude })
             .ToArrayAsync(cancellationToken);
 }

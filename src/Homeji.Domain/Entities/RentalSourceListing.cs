@@ -8,6 +8,8 @@ public sealed class RentalSourceListing
     private RentalSourceListing() { }
 
     public Guid Id { get; private set; }
+    public decimal? Latitude { get; private set; }
+    public decimal? Longitude { get; private set; }
     public string Source { get; private set; } = string.Empty;
     public string SourceId { get; private set; } = string.Empty;
     public string SourceUrl { get; private set; } = string.Empty;

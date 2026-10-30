@@ -135,6 +135,16 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("collected_at");
 
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)")
+                        .HasColumnName("longitude");
+
                     b.Property<string>("MapsSearchUrl")
                         .IsRequired()
                         .HasMaxLength(1000)
@@ -164,7 +174,10 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasIndex("Name", "Address")
                         .IsUnique();
 
-                    b.ToTable("food_source_places", "homeji");
+                    b.ToTable("food_source_places", "homeji", t =>
+                        {
+                            t.HasCheckConstraint("ck_food_source_coordinates", "(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)");
+                        });
                 });
 
             modelBuilder.Entity("Homeji.Domain.Entities.LandlordVerificationRequest", b =>
@@ -1326,6 +1339,16 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("image_urls");
 
+                    b.Property<decimal?>("Latitude")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)")
+                        .HasColumnName("latitude");
+
+                    b.Property<decimal?>("Longitude")
+                        .HasPrecision(10, 7)
+                        .HasColumnType("numeric(10,7)")
+                        .HasColumnName("longitude");
+
                     b.Property<decimal>("Price")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)")
@@ -1376,6 +1399,8 @@ namespace Homeji.Infrastructure.Migrations
 
                     b.ToTable("rental_source_listings", "homeji", t =>
                         {
+                            t.HasCheckConstraint("ck_rental_source_coordinates", "(latitude IS NULL AND longitude IS NULL) OR (latitude IS NOT NULL AND longitude IS NOT NULL AND latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)");
+
                             t.HasCheckConstraint("ck_rental_source_listings_district", "district IN ('quan-9', 'thu-duc')");
 
                             t.HasCheckConstraint("ck_rental_source_listings_images", "jsonb_typeof(image_urls) = 'array' AND jsonb_array_length(image_urls) BETWEEN 1 AND 10");
