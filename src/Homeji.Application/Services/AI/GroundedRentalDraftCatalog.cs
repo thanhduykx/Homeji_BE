@@ -19,29 +19,36 @@ internal sealed class GroundedRentalDraftCatalog
         if (rent.HasValue) rentText += unit;
         else if (priceBasis == "unknown") rentText += "; chưa xác nhận giá theo phòng hay theo người";
         var areaText = area.HasValue ? area.Value.ToString("0.############################", CultureInfo.GetCultureInfo("vi-VN")) + " m²" : "chưa có thông tin hợp lệ";
-        var titleFacts = new List<string> { Quote(type) };
+        var titleFacts = new List<string> { NormalizeSourceText(type) };
         if (area.HasValue) titleFacts.Add(areaText);
         if (rent.HasValue) titleFacts.Add(rentText);
         // Only the optional title summary may shorten; every fact remains in the description.
-        while (titleFacts.Count > 1 && string.Join(" · ", titleFacts).Length + 38 > 200) titleFacts.RemoveAt(1);
-        var titleSummary = string.Join(" · ", titleFacts);
+        while (titleFacts.Count > 1 && string.Join(", ", titleFacts).Length > 200) titleFacts.RemoveAt(1);
+        var titleSummary = string.Join(", ", titleFacts);
         _titles = new(StringComparer.Ordinal)
         {
-            ["brief"] = $"{titleSummary} (người đăng cung cấp)",
-            ["detail"] = $"Bản nháp: {titleSummary} (người đăng cung cấp)",
+            ["brief"] = titleSummary,
+            ["detail"] = string.Join(", ", titleFacts.Take(1).Concat(titleFacts.Skip(1).Reverse())),
         };
-        var addressText = string.IsNullOrWhiteSpace(address) ? "chưa có thông tin" : Quote(address);
-        var amenitiesText = amenities.Length == 0 ? "chưa có thông tin" : string.Join(", ", amenities.Select(Quote));
+        var addressText = string.IsNullOrWhiteSpace(address) ? "chưa có thông tin" : NormalizeSourceText(address);
+        var amenitiesText = amenities.Length == 0 ? "chưa có thông tin" : string.Join(", ", amenities.Select(NormalizeSourceText));
+        var introduction = type switch
+        {
+            "Phòng trống" => "Mình có phòng cần cho thuê.",
+            "Tìm bạn ở ghép" or "Tìm người ở ghép" => "Mình đang tìm bạn ở ghép.",
+            "Nhượng phòng" or "Pass phòng" => "Mình cần nhượng lại phòng.",
+            _ => $"{NormalizeSourceText(type)}.",
+        };
         _sections = new(StringComparer.Ordinal)
         {
-            ["type"] = Variants($"Loại tin người đăng cung cấp: {Quote(type)}.", $"Người đăng mô tả loại tin là {Quote(type)}."),
-            ["address"] = Variants($"Địa chỉ người đăng cung cấp: {addressText}.", $"Về vị trí, người đăng cung cấp: {addressText}."),
-            ["rent"] = Variants($"Giá người đăng cung cấp: {rentText}.", $"Thông tin tiền thuê do người đăng cung cấp: {rentText}."),
-            ["area"] = Variants($"Diện tích người đăng cung cấp: {areaText}.", $"Theo số liệu người đăng nhập, diện tích: {areaText}."),
-            ["amenities"] = Variants($"Tiện ích người đăng cung cấp: {amenitiesText}.", $"Người đăng liệt kê các tiện ích: {amenitiesText}."),
+            ["type"] = Variants(introduction, $"Tin {NormalizeSourceText(type)}."),
+            ["address"] = Variants(string.IsNullOrWhiteSpace(address) ? "Địa chỉ: chưa có thông tin." : $"Phòng ở {addressText}.", string.IsNullOrWhiteSpace(address) ? "Bạn có thể bổ sung địa chỉ cụ thể." : $"Địa chỉ phòng là {addressText}."),
+            ["rent"] = Variants($"Tiền thuê là {rentText}.", $"Chi phí thuê là {rentText}."),
+            ["area"] = Variants(area.HasValue ? $"Diện tích {areaText}." : "Diện tích: chưa có thông tin hợp lệ.", area.HasValue ? $"Phòng rộng {areaText}." : "Bạn có thể bổ sung diện tích phòng."),
+            ["amenities"] = Variants(amenities.Length == 0 ? "Tiện ích: chưa có thông tin." : $"Phòng có {amenitiesText}.", amenities.Length == 0 ? "Bạn có thể bổ sung các tiện ích của phòng." : $"Các tiện ích gồm {amenitiesText}."),
             ["confirmation"] = Variants(
-                "Thông tin trên do người đăng cung cấp. Bản nháp này không phải xác nhận của Homeji. Trao đổi với người đăng để xác nhận tình trạng phòng, đơn vị và đơn giá điện/nước/internet, tiền cọc và hợp đồng trước khi quyết định.",
-                "Đây là bản nháp từ thông tin người đăng, không phải xác nhận của Homeji. Trước khi quyết định, hãy hỏi lại tình trạng phòng, đơn vị và đơn giá điện/nước/internet, điều kiện cọc và hợp đồng."),
+                "Bạn nên trao đổi thêm về tình trạng phòng, tiền điện, nước, internet, tiền cọc và hợp đồng trước khi quyết định.",
+                "Hãy hỏi thêm về tình trạng phòng, các khoản điện, nước, internet, tiền cọc và hợp đồng khi liên hệ."),
         };
         // Retain every supplied fact, including the largest valid address and amenity collection.
         if (_titles.Values.Any(value => value.Length > 200) || _sections.Values.Sum(variants => variants.Values.Max(value => value.Length)) + (_sections.Count - 1) * 2 > 4000)
@@ -49,7 +56,8 @@ internal sealed class GroundedRentalDraftCatalog
         Prompt = "Chọn cách trình bày bản nháp Homeji bằng catalog IDs. Không soạn prose, không phân tích ảnh, không xác minh dữ liệu hoặc thực thi hành động. "
             + "Chỉ trả JSON đúng schema {\"titleVariantId\":\"brief|detail\",\"sections\":[{\"factId\":\"...\",\"variantId\":\"direct|detail\"}]}. "
             + "Chọn một titleVariantId; sections phải chứa đủ mỗi factId đúng một lần, bạn chọn thứ tự và variant. confirmation phải ở cuối. Không thêm trường, văn bản, Markdown hoặc IDs khác. "
-            + "brief là tiêu đề ngắn; detail là tiêu đề nhấn mạnh bản nháp. direct là câu nhãn ngắn; detail là câu dẫn đầy đủ. "
+            + "Ưu tiên brief cho tiêu đề. Dùng câu tiếng Việt tự nhiên, ngắn gọn như một tin tìm phòng thông thường. "
+            + "Ưu tiên detail cho vị trí, diện tích và tiện ích nếu đã có thông tin; direct cho tiền thuê. Không thêm emoji, dấu sao, gạch đầu dòng hoặc từ ngữ quảng cáo. "
             + "Không chuyển đổi giá theo người/phòng. Các mục chưa biết vẫn phải có để hỏi lại. Catalog: "
             + JsonSerializer.Serialize(new { factIds = _sections.Keys, titleVariantIds = _titles.Keys,
                 priceBasis, rentKnown = rent.HasValue, areaKnown = area.HasValue, addressKnown = !string.IsNullOrWhiteSpace(address), amenitiesKnown = amenities.Length > 0 });
@@ -86,7 +94,7 @@ internal sealed class GroundedRentalDraftCatalog
                 lastFactId = factId;
             }
             if (lastFactId != "confirmation") throw new JsonException();
-            return (title, string.Join("\n\n", paragraphs));
+            return (title, string.Join(" ", paragraphs.Take(paragraphs.Count - 1)) + "\n\n" + paragraphs[^1]);
         }
         catch (Exception error) when (error is JsonException or KeyNotFoundException or InvalidOperationException)
         {
@@ -110,5 +118,4 @@ internal sealed class GroundedRentalDraftCatalog
         return string.Join(' ', normalized.Split(' ', StringSplitOptions.RemoveEmptyEntries));
     }
 
-    private static string Quote(string value) => "«" + NormalizeSourceText(value).Replace('«', '‹').Replace('»', '›') + "»";
 }

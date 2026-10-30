@@ -36,7 +36,7 @@ public sealed class RentalDraftPriceBasisTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var draft = await response.Content.ReadFromJsonAsync<RentalDraftResponseDto>();
         Assert.NotNull(draft);
-        Assert.Contains("«Tìm người ở ghép»", draft.Title, StringComparison.Ordinal);
+        Assert.Contains("Tìm người ở ghép", draft.Title, StringComparison.Ordinal);
         Assert.Contains("25 m²", draft.Title, StringComparison.Ordinal);
         Assert.Contains("3.000.000", draft.Title, StringComparison.Ordinal);
         Assert.Contains(expected == "person" ? "đồng/người/tháng" : expected == "room" ? "đồng/phòng/tháng" : "chưa xác nhận giá theo phòng hay theo người", draft.Description, StringComparison.Ordinal);
