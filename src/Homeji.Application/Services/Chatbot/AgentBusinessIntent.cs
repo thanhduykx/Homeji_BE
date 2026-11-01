@@ -15,7 +15,7 @@ public static class AgentBusinessIntent
         if (Has(text, "pass phong", "chuyen nhuong phong", "sang nhuong phong", "chuyen hop dong", "cho thue lai")) return "roomTransfer";
         if (Has(text, "tim tro", "tim phong", "nhu cau thue", "can thue")) return "wanted";
         if (Has(text, "o ghep", "ban cung phong", "roommate")) return "roommate";
-        if (Has(text, "cho thue", "dang phong")) return "rental";
+        if (Has(text, "cho thue", "dang phong", "dang tin phong", "dang can ho", "dang tin can ho")) return "rental";
         if (Has(text, "do an", "mon an", "com", "bun", "pho", "tra sua", "banh", "thuc an", "thuc uong", "ca phe", "nuoc ep")) return "food";
         return "secondHand";
     }

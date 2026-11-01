@@ -7,6 +7,8 @@ public sealed class AgentBusinessTests
 {
     [Theory]
     [InlineData("tôi muốn đăng cho thuê phòng này giá 8triệu / tháng cọc 16 tr, ký ít nhất 12 tháng", "rental")]
+    [InlineData("đăng tin phòng có máy lạnh giá 3 triệu/tháng", "rental")]
+    [InlineData("đăng tin căn hộ 8 triệu/tháng", "rental")]
     [InlineData("đăng tin pass phòng 3 triệu", "roomTransfer")]
     [InlineData("đăng tin tìm bạn ở ghép", "roommate")]
     [InlineData("đăng tin tìm trọ dưới 3 triệu", "wanted")]
