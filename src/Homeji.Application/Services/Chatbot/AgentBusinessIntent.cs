@@ -15,7 +15,7 @@ public static class AgentBusinessIntent
         if (Has(text, "pass phong", "chuyen nhuong phong", "sang nhuong phong", "chuyen hop dong", "cho thue lai")) return "roomTransfer";
         if (Has(text, "tim tro", "tim phong", "nhu cau thue", "can thue")) return "wanted";
         if (Has(text, "o ghep", "ban cung phong", "roommate")) return "roommate";
-        if (Has(text, "cho thue", "phong tro", "can ho", "dang phong")) return "rental";
+        if (Has(text, "cho thue", "dang phong")) return "rental";
         if (Has(text, "do an", "mon an", "com", "bun", "pho", "tra sua", "banh", "thuc an", "thuc uong", "ca phe", "nuoc ep")) return "food";
         return "secondHand";
     }
@@ -28,5 +28,6 @@ public static class AgentBusinessIntent
     }
     public static bool IsRoommateSearch(string message) => PostingKind(message) is null
         && Has(RentalSearchIntent.Normalize(message), "tim ban o ghep", "tim nguoi o ghep", "tim ban cung phong", "tim roommate");
-    private static bool Has(string text, params string[] values) => values.Any(text.Contains);
+    private static bool Has(string text, params string[] values) => values.Any(value => Regex.IsMatch(text,
+        @"(?<![a-z0-9])" + Regex.Escape(value) + @"(?![a-z0-9])", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)));
 }
