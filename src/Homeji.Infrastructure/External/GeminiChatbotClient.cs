@@ -126,7 +126,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             payload["generationConfig"] = new { responseMimeType = "application/json", responseSchema = new {
                 type = "OBJECT", properties = new {
                     title = new { type = "STRING" }, description = new { type = "STRING" }, price = new { type = "INTEGER" },
-                    condition = new { type = "STRING" }, category = new { type = "STRING" },
+                    condition = new { type = "STRING" }, category = new { type = "STRING" }, address = new { type = "STRING", nullable = true },
                     deposit = new { type = "NUMBER", nullable = true }, area = new { type = "NUMBER", nullable = true },
                     maxOccupants = new { type = "INTEGER", nullable = true }, availableSlots = new { type = "INTEGER", nullable = true },
                     minimumLeaseMonths = new { type = "INTEGER", nullable = true }, houseRules = new { type = "STRING", nullable = true },

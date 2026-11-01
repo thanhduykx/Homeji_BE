@@ -222,6 +222,18 @@ public sealed class AgentPostingDatabaseTests
         Assert.False(await db.MarketplacePosts.AnyAsync(row => row.SellerId == user));
     }
 
+    [LocalMarketplaceDatabaseFact]
+    public async Task Explicit_property_address_does_not_inherit_coordinates_from_a_different_shared_location()
+    {
+        await using var db = Open(); var user = await Seed(db, true);
+        var author = await db.UserProfiles.SingleAsync(row => row.Id == user); author.SetRole(UserRole.Landlord, DateTimeOffset.UtcNow); await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        var details = Details with { Kind = "rental", Address = "123 Lê Văn Việt, Thủ Đức" };
+        var response = await Service(db, user, new BusinessProvider(details)).PrepareAsync("đăng cho thuê phòng tại 123 Lê Văn Việt", [], null,
+            new(10.84m, 106.8m, "Linh Trung, Thủ Đức", DateTimeOffset.UtcNow));
+        Assert.Equal(details.Address, response.Draft!.Details.Address);
+        Assert.Equal(0, response.Draft.Details.Latitude); Assert.Equal(0, response.Draft.Details.Longitude);
+    }
+
     private sealed class BusinessProvider(AgentPostDetails details) : IChatbotAiClient
     {
         private static readonly System.Text.Json.JsonSerializerOptions Json = new(System.Text.Json.JsonSerializerDefaults.Web);
