@@ -13,4 +13,4 @@ public sealed record SendChatbotMessageViewModel(
     ChatbotFoodContextDto? FoodContext = null,
     ChatbotFoodCriteriaDto? PreviousFoodCriteria = null,
     IReadOnlyCollection<ChatbotAttachmentDto>? Attachments = null,
-    Guid? AgentDraftId = null, IReadOnlyCollection<ChatbotMessageDto>? SessionMessages = null, bool PostingAgent = false);
+    Guid? AgentDraftId = null, IReadOnlyCollection<ChatbotMessageDto>? SessionMessages = null, bool PostingAgent = false, ChatbotLocationDto? Location = null);

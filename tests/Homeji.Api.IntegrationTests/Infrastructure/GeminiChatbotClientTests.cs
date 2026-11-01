@@ -11,6 +11,19 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class GeminiChatbotClientTests
 {
     [Fact]
+    public async Task Posting_uses_json_schema_and_separate_system_instructions_instead_of_chat_guidance()
+    {
+        var handler = new SequenceHttpMessageHandler(Success());
+        var client = new GeminiChatbotClient(new HttpClient(handler), Options.Create(new GeminiOptions { ApiKey = "fixture" }),
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
+        await client.GeneratePostDraftAsync("đăng pass lại cái ghế này 500k", [new("image/jpeg", [1,2,3])]);
+        using var request = JsonDocument.Parse(handler.RequestBodies[0]);
+        Assert.Equal("application/json", request.RootElement.GetProperty("generationConfig").GetProperty("responseMimeType").GetString());
+        Assert.Equal(5, request.RootElement.GetProperty("generationConfig").GetProperty("responseSchema").GetProperty("required").GetArrayLength());
+        Assert.True(request.RootElement.TryGetProperty("systemInstruction", out _));
+        Assert.DoesNotContain("Markdown formatting", ExtractPrompt(handler.RequestBodies[0]), StringComparison.Ordinal);
+    }
+    [Fact]
     public async Task MediaPayloadContainsSanitizedImageAndTranscriptionContainsAudio()
     {
         var handler = new SequenceHttpMessageHandler(Success(), Success());

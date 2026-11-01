@@ -4,6 +4,8 @@ namespace Homeji.Application.IServices.Chatbot;
 
 public interface IChatbotAiClient
 {
+    Task<string> GeneratePostDraftAsync(string prompt, IReadOnlyCollection<ChatbotMediaContent> images,
+        CancellationToken cancellationToken = default) => GenerateMediaReplyAsync([], prompt, images, cancellationToken);
     Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> conversationMessages,
         string latestUserMessage, IReadOnlyCollection<ChatbotMediaContent> attachments,
         CancellationToken cancellationToken = default);

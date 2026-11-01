@@ -12,7 +12,7 @@ public sealed record SendChatbotMessageDto(
     ChatbotFoodContextDto? FoodContext = null,
     ChatbotFoodCriteriaDto? PreviousFoodCriteria = null,
     IReadOnlyCollection<ChatbotAttachmentDto>? Attachments = null,
-    Guid? AgentDraftId = null, IReadOnlyCollection<ChatbotMessageDto>? SessionMessages = null, bool PostingAgent = false);
+    Guid? AgentDraftId = null, IReadOnlyCollection<ChatbotMessageDto>? SessionMessages = null, bool PostingAgent = false, ChatbotLocationDto? Location = null);
 
 public sealed record ChatbotRentalContextDto(Guid PostId, string? Task = null);
 public sealed record ChatbotRentalSelectionDto(IReadOnlyCollection<Guid>? PostIds,

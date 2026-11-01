@@ -20,6 +20,54 @@ namespace Homeji.Api.IntegrationTests;
 
 public sealed class AgentPostingDatabaseTests
 {
+    [LocalMarketplaceDatabaseFact]
+    public async Task Preparing_a_draft_does_not_detach_the_enclosing_opted_in_chat_history()
+    {
+        await using var db = Open(); var user = await Seed(db, true); var now = DateTimeOffset.UtcNow;
+        var conversation = ChatConversation.Create(user, "Đăng ghế", now);
+        conversation.AddUserMessage("đăng pass lại cái ghế này 500k", now);
+        db.ChatConversations.Add(conversation);
+        await Service(db, user).PrepareAsync("đăng pass lại cái ghế này 500k", [new("image/png", [1])], null);
+        conversation.AddAssistantMessage("Đã soạn bản nháp để bạn duyệt", now.AddSeconds(1));
+        await db.SaveChangesAsync(); db.ChangeTracker.Clear();
+        var saved = await db.ChatConversations.Include(row => row.Messages).SingleAsync(row => row.Id == conversation.Id);
+        Assert.Equal(2, saved.Messages.Count);
+    }
+    [LocalMarketplaceDatabaseFact]
+    public async Task Shared_location_fills_first_post_and_can_fill_an_initially_empty_draft()
+    {
+        await using var db = Open(); var user = await Seed(db, true);
+        var location = new ChatbotLocationDto(10.84m, 106.8m, "Lê Văn Việt, Thủ Đức", DateTimeOffset.UtcNow, 15);
+        var first = (await Service(db, user).PrepareAsync("đăng pass lại cái ghế này 500k", [new("image/png", [1])], null, location)).Draft!;
+        Assert.Equal(location.Address, first.Details.Address); Assert.Equal(location.Latitude, first.Details.Latitude);
+        Assert.False(await db.MarketplacePosts.AnyAsync(row => row.SellerId == user));
+        var noLocation = (await Service(db, user).PrepareAsync("đăng pass ghế", [new("image/png", [1])], null)).Draft!;
+        Assert.Equal(0, noLocation.Details.Latitude);
+        var revised = (await Service(db, user).PrepareAsync("dùng vị trí vừa chọn", [], noLocation.Id, location)).Draft!;
+        Assert.Equal(location.Address, revised.Details.Address); Assert.Equal(location.Longitude, revised.Details.Longitude);
+    }
+
+    [LocalMarketplaceDatabaseFact]
+    public async Task Nearby_search_uses_actual_coordinates_budget_and_excludes_expired_and_unlocated_rooms()
+    {
+        await using var db = Open();
+        async Task<Guid> Add(decimal price, decimal? lat, bool expired = false)
+        {
+            var key = Random.Shared.NextInt64(1000000000000000, 9000000000000000).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var row = RentalSourceListing.Create(key, "https://mogi.vn/room-id" + key, "Phòng kiểm thử vị trí", "Lê Văn Việt", "quan-9", price, 26, ["https://cloud.mogi.vn/fixture.jpg"], null, DateTimeOffset.UtcNow, "mogi");
+            row.RecordSourceExpiry(DateTimeOffset.UtcNow.AddDays(expired ? -1 : 1), DateTimeOffset.UtcNow);
+            db.RentalSourceListings.Add(row); await db.SaveChangesAsync();
+            if (lat.HasValue) await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE homeji.rental_source_listings SET latitude={lat},longitude={106.8m} WHERE id={row.Id}");
+            return row.Id;
+        }
+        var near = await Add(2500000, 10.845m); var far = await Add(2500000, 10.90m);
+        var overBudget = await Add(5000000, 10.841m); var expired = await Add(2500000, 10.841m, true); var unlocated = await Add(2500000, null);
+        var service = new ChatbotNearbyService(db, TimeProvider.System);
+        Assert.Equal("locationRequired", (await service.SearchAsync("Tìm phòng gần tôi", null, default)).Status);
+        var result = await service.SearchAsync("Tìm phòng gần tôi dưới 3 triệu", new(10.84m, 106.8m, null, DateTimeOffset.UtcNow), default);
+        Assert.Contains(result.Items, item => item.Id == near && item.DistanceKm is > 0 and < 1);
+        Assert.DoesNotContain(result.Items, item => item.Id == far || item.Id == overBudget || item.Id == expired || item.Id == unlocated);
+    }
     private static readonly AgentPostDetails Details = new("Ghế sofa", "Ghế sofa trong ảnh, xem ảnh trước khi mua.",
         500000, "Đã sử dụng", "Nội thất", "Lê Văn Việt, Thủ Đức", 10.84m, 106.8m);
 

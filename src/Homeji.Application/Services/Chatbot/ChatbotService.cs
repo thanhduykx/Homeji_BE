@@ -27,6 +27,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly ChatbotOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly IChatbotPostingAgent? _postingAgent;
+    private readonly IChatbotNearbyService? _nearby;
 
     public ChatbotService(
         UserContext userContext,
@@ -36,7 +37,7 @@ public sealed class ChatbotService : IChatbotService
         IRentalDecisionService rentalDecision,
         IChatbotFoodService food,
         IOptions<ChatbotOptions> options,
-        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null)
+        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null, IChatbotNearbyService? nearby = null)
     {
         _userContext = userContext;
         _conversations = conversations;
@@ -47,6 +48,7 @@ public sealed class ChatbotService : IChatbotService
         _options = options.Value;
         _timeProvider = timeProvider;
         _postingAgent = postingAgent;
+        _nearby = nearby;
     }
 
     public Task<ChatbotPopupConfigDto> GetPopupConfigAsync(CancellationToken cancellationToken = default)
@@ -105,6 +107,7 @@ public sealed class ChatbotService : IChatbotService
         }
 
         var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        request.Location?.Validate(_timeProvider.GetUtcNow());
         var media = ChatbotMediaValidation.Decode(request.Attachments);
         var message = ValidateMessage(string.IsNullOrWhiteSpace(request.Message) && media.Count > 0
             ? "Hãy xem hoặc nghe nội dung đính kèm và hỗ trợ mình." : request.Message);
@@ -145,14 +148,21 @@ public sealed class ChatbotService : IChatbotService
         AiHighlightResponseDto? searchUpdate = null;
         RentalDecisionResponseDto? rentalDecision = null;
         ChatbotFoodResponseDto? foodDiscovery = null;
+        ChatbotNearbyDto? nearbyRooms = null;
+        var nearbyQuery = ChatbotSessionContext.RequestsNearbyRooms(message);
         string assistantReply;
-        if (_postingAgent is not null && (request.PostingAgent || request.AgentDraftId.HasValue || ChatbotSessionContext.RequestsPosting(message)))
+        if (_postingAgent is not null && (ChatbotSessionContext.RequestsPosting(message) || (request.PostingAgent || request.AgentDraftId.HasValue) && !foodQuery && !nearbyQuery))
         {
             var agentMessage = message + "\nYêu cầu người dùng gần đây (chỉ tham khảo nếu cùng món đồ; yêu cầu mới nhất được ưu tiên): "
                 + JsonSerializer.Serialize(history.Where(row => row.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
                     .TakeLast(3).Select(row => row.Content));
-            agentResult = await _postingAgent.PrepareAsync(agentMessage, media, request.AgentDraftId, cancellationToken);
+            agentResult = await _postingAgent.PrepareAsync(agentMessage, media, request.AgentDraftId, request.Location, cancellationToken);
             assistantReply = agentResult.Message;
+        }
+        else if (nearbyQuery && _nearby is not null)
+        {
+            nearbyRooms = await _nearby.SearchAsync(message, request.Location, cancellationToken);
+            assistantReply = nearbyRooms.Summary;
         }
         else if (media.Count > 0)
         {
@@ -162,7 +172,7 @@ public sealed class ChatbotService : IChatbotService
         }
         else if (foodQuery)
         {
-            foodDiscovery = await _food.SearchAsync(message, request.FoodContext, request.PreviousFoodCriteria, cancellationToken);
+            foodDiscovery = await _food.SearchAsync(message, request.FoodContext ?? (request.Location is null ? null : new ChatbotFoodContextDto(request.Location.Latitude, request.Location.Longitude)), request.PreviousFoodCriteria, cancellationToken);
             assistantReply = foodDiscovery.Summary;
             actions = [new ChatbotNavigationActionDto("food-menu", "Mở Chợ đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
         }
@@ -198,7 +208,7 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = agentResult?.UpgradeRequired == true };
+            actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = agentResult?.UpgradeRequired == true };
     }
 
     public async Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default)

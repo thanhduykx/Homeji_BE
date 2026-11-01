@@ -10,6 +10,7 @@ public sealed record ChatbotReplyDto(
     IReadOnlyCollection<ChatbotNavigationActionDto> Actions)
 {
     public AgentPostDraftDto? AgentDraft { get; init; }
+    public ChatbotNearbyDto? NearbyRooms { get; init; }
     public bool AgentRequested { get; init; }
     public bool UpgradeRequired { get; init; }
     public RentalDecisionResponseDto? RentalDecision { get; init; }

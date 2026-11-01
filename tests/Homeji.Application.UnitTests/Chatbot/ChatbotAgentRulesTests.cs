@@ -41,10 +41,30 @@ public sealed class ChatbotAgentRulesTests
 
     [Theory]
     [InlineData("Hãy tự đăng bài bán ghế trong ảnh 500k", true)]
+    [InlineData("đăng pass lại cái ghế này 500k.", true)]
+    [InlineData("mình muốn pass cái ghế 500k", true)]
+    [InlineData("pass ghế này 500k nhé", true)]
+    [InlineData("Có ai đang bán ghế không?", false)]
     [InlineData("Tìm phòng có máy lạnh", false)]
     [InlineData("Premium bao nhiêu tiền?", false)]
     public void Agent_is_requested_for_posting_not_every_general_question(string message, bool expected)
         => Assert.Equal(expected, ChatbotSessionContext.RequestsPosting(message));
+
+    [Theory]
+    [InlineData("Tìm phòng gần tui dưới 3 triệu", true)]
+    [InlineData("Tìm phòng quanh mình", true)]
+    [InlineData("Đồ ăn gần tui", false)]
+    public void Nearby_intent_understands_colloquial_location_without_mixing_food_and_rooms(string message, bool expected)
+        => Assert.Equal(expected, ChatbotSessionContext.RequestsNearbyRooms(message));
+
+    [Fact]
+    public void Location_rejects_stale_or_invalid_coordinates_and_keeps_valid_explicit_input()
+    {
+        var now = DateTimeOffset.UtcNow;
+        new ChatbotLocationDto(10.84m, 106.8m, "Lê Văn Việt", now).Validate(now);
+        Assert.Throws<Homeji.Application.Common.Exceptions.RequestValidationException>(() => new ChatbotLocationDto(0, 0, null, now).Validate(now));
+        Assert.Throws<Homeji.Application.Common.Exceptions.RequestValidationException>(() => new ChatbotLocationDto(10.84m, 106.8m, null, now.AddHours(-1)).Validate(now));
+    }
 
     [Fact]
     public void Published_draft_drops_image_bytes_but_keeps_approval_receipt()

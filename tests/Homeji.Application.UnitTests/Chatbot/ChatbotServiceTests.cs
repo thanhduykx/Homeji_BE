@@ -17,6 +17,26 @@ namespace Homeji.Application.UnitTests.Chatbot;
 
 public sealed class ChatbotServiceTests
 {
+    [Fact]
+    public async Task Exact_pass_request_with_photo_routes_to_the_posting_tool_in_chat_mode()
+    {
+        var ai = new MediaClient(); var agent = new CapturingAgent();
+        var reply = await CreateService(new(), ai, posting: agent).SendMessageAsync(new(null,
+            "đăng pass lại cái ghế này 500k.", Attachments: [new("image/png", "AA==")],
+            Location: new(10.84m, 106.8m, "Lê Văn Việt", UtcNow)));
+        Assert.Equal(1, agent.Calls); Assert.Equal(0, ai.MediaCalls);
+        Assert.True(reply.AgentRequested); Assert.Equal("Bản nháp đã soạn", reply.AssistantMessage.Content);
+        Assert.Equal("Lê Văn Việt", agent.Location!.Address);
+    }
+    private sealed class CapturingAgent : IChatbotPostingAgent
+    {
+        public int Calls { get; private set; }
+        public ChatbotLocationDto? Location { get; private set; }
+        public Task<AgentPostResultDto> PrepareAsync(string message, IReadOnlyCollection<ChatbotMediaContent> media, Guid? previousDraftId, ChatbotLocationDto? location = null, CancellationToken cancellationToken = default)
+        { Calls++; Location = location; return Task.FromResult(new AgentPostResultDto(null, false, "Bản nháp đã soạn")); }
+        public Task<Guid> ConfirmAsync(Guid draftId, AgentPostDetails details, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task CancelAsync(Guid draftId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    }
     private static readonly Guid UserId = Guid.Parse("8e996f4c-ec40-4b5e-b66b-9f33c4f29b63");
     private static readonly DateTimeOffset UtcNow = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 
@@ -188,7 +208,7 @@ public sealed class ChatbotServiceTests
         IChatbotAiClient aiClient,
         IAiSearchService? search = null,
         bool historyStorageEnabled = true,
-        IRentalDecisionService? decision = null)
+        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null)
     {
         return new ChatbotService(
             new UserContext(new StubCurrentUser(UserId), new StubUserProfileRepository()),
@@ -198,7 +218,7 @@ public sealed class ChatbotServiceTests
             decision ?? new StubRentalDecisionService(),
             new StubFoodService(),
             Options.Create(new ChatbotOptions { HistoryStorageEnabled = historyStorageEnabled }),
-            new StubTimeProvider());
+            new StubTimeProvider(), posting);
     }
 
     [Theory]

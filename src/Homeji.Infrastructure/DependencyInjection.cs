@@ -75,6 +75,7 @@ public static class DependencyInjection
                         errorCodesToAdd: null);
                 }));
 
+        services.AddScoped<IChatbotNearbyService, ChatbotNearbyService>();
         services.AddScoped<IChatbotPostingAgent, ChatbotPostingAgent>();
         services.AddScoped<IUserProfileRepository, UserProfileRepository>();
         services.AddScoped<Homeji.Application.IRepositories.Roommates.IRoommateDirectoryRepository, RoommateDirectoryRepository>();

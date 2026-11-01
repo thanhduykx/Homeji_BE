@@ -9,6 +9,6 @@ public static class ChatbotViewMapper
     {
         ArgumentNullException.ThrowIfNull(viewModel);
         return new SendChatbotMessageDto(viewModel.ConversationId, viewModel.Message, viewModel.SaveHistory,
-            viewModel.PreviousCriteria, viewModel.RentalContext, viewModel.RentalSelection, viewModel.FoodContext, viewModel.PreviousFoodCriteria, viewModel.Attachments, viewModel.AgentDraftId, viewModel.SessionMessages, viewModel.PostingAgent);
+            viewModel.PreviousCriteria, viewModel.RentalContext, viewModel.RentalSelection, viewModel.FoodContext, viewModel.PreviousFoodCriteria, viewModel.Attachments, viewModel.AgentDraftId, viewModel.SessionMessages, viewModel.PostingAgent, viewModel.Location);
     }
 }
