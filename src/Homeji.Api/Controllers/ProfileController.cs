@@ -23,6 +23,20 @@ public sealed class ProfileController : ControllerBase
         _profileService = profileService;
     }
 
+    [HttpGet("me/social-contacts")]
+    public async Task<IActionResult> GetSocialContacts(CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "private, no-store";
+        return Ok(await _profileService.GetMySocialContactsAsync(cancellationToken));
+    }
+
+    [HttpPut("me/social-contacts")]
+    public async Task<IActionResult> UpdateSocialContacts(Homeji.Application.DTOs.Profiles.UpdateSocialContactsDto request, CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "private, no-store";
+        return Ok(await _profileService.UpdateMySocialContactsAsync(request, cancellationToken));
+    }
+
     [HttpGet("me")]
     [ProducesResponseType<UserProfileViewModel>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]

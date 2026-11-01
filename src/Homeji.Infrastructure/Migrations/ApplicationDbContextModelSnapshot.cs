@@ -2224,6 +2224,11 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(100)")
                         .HasColumnName("display_name");
 
+                    b.Property<string>("FacebookUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("facebook_url");
+
                     b.Property<int>("LandlordVerificationStatus")
                         .HasColumnType("integer")
                         .HasColumnName("landlord_verification_status");
@@ -2280,6 +2285,11 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
+
+                    b.Property<string>("ZaloPhone")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("zalo_phone");
 
                     b.HasKey("Id")
                         .HasName("pk_user_profiles");

@@ -31,6 +31,9 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
             .HasColumnName("phone")
             .HasMaxLength(UserProfile.MaxPhoneLength);
 
+        builder.Property(profile => profile.FacebookUrl).HasColumnName("facebook_url").HasMaxLength(500);
+        builder.Property(profile => profile.ZaloPhone).HasColumnName("zalo_phone").HasMaxLength(10);
+
         builder.Property(profile => profile.AvatarPath)
             .HasColumnName("avatar_path")
             .HasMaxLength(UserProfile.MaxAvatarPathLength);

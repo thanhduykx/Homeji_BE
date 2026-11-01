@@ -18,8 +18,34 @@ public sealed class UserProfileService : IUserProfileService
         var profile = await _repository.GetByIdAsync(userId, cancellationToken)
             ?? throw new NotFoundException(nameof(UserProfile), userId);
         var premium = await _subscriptions.GetActivePremiumAsync(userId, _timeProvider.GetUtcNow(), cancellationToken);
-        return new(profile.Id, profile.DisplayName, profile.AvatarPath, profile.CreatedAt, premium is not null);
+        return new(profile.Id, profile.DisplayName, profile.AvatarPath, profile.CreatedAt, premium is not null)
+        { FacebookUrl = premium is not null ? profile.FacebookUrl : null, ZaloPhone = premium is not null ? profile.ZaloPhone : null };
     }
+    public async Task<ProfileSocialContactsDto> GetMySocialContactsAsync(CancellationToken cancellationToken = default)
+    {
+        var userId = GetRequiredUserId();
+        var profile = await _repository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException(nameof(UserProfile), userId);
+        var premium = await _subscriptions.GetActivePremiumAsync(userId, _timeProvider.GetUtcNow(), cancellationToken);
+        return new(profile.FacebookUrl, profile.ZaloPhone, profile.CreatedAt, premium is not null, premium?.ExpiresAt);
+    }
+
+    public async Task<ProfileSocialContactsDto> UpdateMySocialContactsAsync(UpdateSocialContactsDto request, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var userId = GetRequiredUserId();
+        var profile = await _repository.GetByIdAsync(userId, cancellationToken)
+            ?? throw new NotFoundException(nameof(UserProfile), userId);
+        var now = _timeProvider.GetUtcNow();
+        var premium = await _subscriptions.GetActivePremiumAsync(userId, now, cancellationToken);
+        // Everyone may remove their published contacts, including after expiry.
+        if (premium is null && (!string.IsNullOrWhiteSpace(request.FacebookUrl) || !string.IsNullOrWhiteSpace(request.ZaloPhone)))
+            throw new ForbiddenAccessException("Tính năng liên hệ Facebook và Zalo dành cho thành viên Premium còn hiệu lực.");
+        profile.UpdateSocialContacts(request.FacebookUrl, request.ZaloPhone, now);
+        await _repository.SaveAsync(profile, cancellationToken);
+        return new(profile.FacebookUrl, profile.ZaloPhone, profile.CreatedAt, premium is not null, premium?.ExpiresAt);
+    }
+
     private readonly ICurrentUser _currentUser;
     private readonly IUserProfileRepository _repository;
     private readonly IUserSubscriptionRepository _subscriptions;

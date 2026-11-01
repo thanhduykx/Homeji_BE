@@ -124,12 +124,54 @@ public sealed class UserProfileServiceTests
         Assert.False(repository.Profile.OnboardingCompleted);
     }
 
-    private static UserProfileService CreateService(InMemoryUserProfileRepository repository)
+    [Fact]
+    public async Task Premium_social_contacts_are_opt_in_and_hidden_after_expiry()
+    {
+        var repository = new InMemoryUserProfileRepository();
+        var profile = UserProfile.Create(UserId, "VIP", UtcNow.AddYears(-2));
+        profile.UpdateProfile("VIP", "0911111111", null, null, null, null, null, UtcNow);
+        await repository.UpsertAsync(profile);
+        var subscriptions = new EmptyUserSubscriptionRepository { Active = UserSubscription.CreatePremium(UserId, "PREMIUM_MONTHLY", "Premium", null, UtcNow, 30, UtcNow) };
+        var service = CreateService(repository, subscriptions);
+        var before = await service.GetPublicProfileAsync(UserId);
+        Assert.Null(before.FacebookUrl); Assert.Null(before.ZaloPhone);
+        var saved = await service.UpdateMySocialContactsAsync(new UpdateSocialContactsDto(" https://www.facebook.com/homeji.test ", "+84 901 234 567"));
+        Assert.Equal("0901234567", saved.ZaloPhone);
+        Assert.Equal(UtcNow.AddYears(-2), saved.CreatedAt);
+        var published = await service.GetPublicProfileAsync(UserId);
+        Assert.Equal(saved.FacebookUrl, published.FacebookUrl); Assert.Equal(saved.ZaloPhone, published.ZaloPhone);
+        Assert.DoesNotContain("0911111111", System.Text.Json.JsonSerializer.Serialize(published), StringComparison.Ordinal);
+        subscriptions.Active = null;
+        var expired = await service.GetPublicProfileAsync(UserId);
+        Assert.Null(expired.FacebookUrl); Assert.Null(expired.ZaloPhone);
+        Assert.Equal(saved.ZaloPhone, (await service.GetMySocialContactsAsync()).ZaloPhone);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.UpdateMySocialContactsAsync(new UpdateSocialContactsDto(saved.FacebookUrl, saved.ZaloPhone)));
+        var cleared = await service.UpdateMySocialContactsAsync(new UpdateSocialContactsDto(null, null));
+        Assert.Null(cleared.FacebookUrl); Assert.Null(cleared.ZaloPhone);
+    }
+
+    [Theory]
+    [InlineData("javascript:alert(1)", "0901234567")]
+    [InlineData("https://facebook.com.evil.test/profile", "0901234567")]
+    [InlineData("https://user:pass@facebook.com/name", "0901234567")]
+    [InlineData("https://facebook.com:8443/name", "0901234567")]
+    [InlineData("https://facebook.com/l.php?u=https://evil.test", "0901234567")]
+    [InlineData("http://facebook.com/name", "0901234567")]
+    [InlineData("https://facebook.com/name", "1234567890")]
+    [InlineData("https://facebook.com/name", "090123456789")]
+    public void Invalid_social_contacts_do_not_mutate_the_profile(string facebook, string zalo)
+    {
+        var profile = UserProfile.Create(UserId, "VIP", UtcNow);
+        Assert.Throws<Homeji.Domain.Exceptions.DomainException>(() => profile.UpdateSocialContacts(facebook, zalo, UtcNow));
+        Assert.Null(profile.FacebookUrl); Assert.Null(profile.ZaloPhone);
+    }
+
+    private static UserProfileService CreateService(InMemoryUserProfileRepository repository, IUserSubscriptionRepository? subscriptions = null)
     {
         return new UserProfileService(
             new StubCurrentUser(UserId),
             repository,
-            new EmptyUserSubscriptionRepository(),
+            subscriptions ?? new EmptyUserSubscriptionRepository(),
             new UpdateMyProfileDtoValidator(),
             new UpdateLifestyleDtoValidator(),
             new StubTimeProvider(UtcNow));
@@ -206,13 +248,14 @@ public sealed class UserProfileServiceTests
 
     private sealed class EmptyUserSubscriptionRepository : IUserSubscriptionRepository
     {
+        public UserSubscription? Active { get; set; }
         public Task<UserSubscription?> GetPremiumTailAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken = default) => GetActivePremiumAsync(userId, now, cancellationToken);
         public Task<UserSubscription?> GetActivePremiumAsync(
             Guid userId,
             DateTimeOffset now,
             CancellationToken cancellationToken = default)
         {
-            return Task.FromResult<UserSubscription?>(null);
+            return Task.FromResult(Active);
         }
 
         public Task<IReadOnlyDictionary<Guid, UserSubscription>> GetActivePremiumByUserIdsAsync(

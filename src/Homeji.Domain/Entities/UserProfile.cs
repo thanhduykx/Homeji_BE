@@ -38,6 +38,9 @@ public sealed class UserProfile
 
     public string? Phone { get; private set; }
 
+    public string? FacebookUrl { get; private set; }
+    public string? ZaloPhone { get; private set; }
+
     public string? AvatarPath { get; private set; }
 
     public string? School { get; private set; }
@@ -97,6 +100,29 @@ public sealed class UserProfile
         PreferredArea = NormalizeOptional(preferredArea, MaxAreaLength, nameof(PreferredArea));
         ContactAddress = NormalizeOptional(contactAddress, MaxContactAddressLength, nameof(ContactAddress));
         RentalNeed = NormalizeOptional(rentalNeed, MaxRentalNeedLength, nameof(RentalNeed));
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdateSocialContacts(string? facebookUrl, string? zaloPhone, DateTimeOffset updatedAt)
+    {
+        var facebook = facebookUrl?.Trim();
+        if (string.IsNullOrEmpty(facebook)) facebook = null;
+        if (facebook is not null)
+        {
+            if (facebook.Length > 500 || !Uri.TryCreate(facebook, UriKind.Absolute, out var uri)
+                || uri.Scheme != Uri.UriSchemeHttps || !uri.IsDefaultPort || !string.IsNullOrEmpty(uri.UserInfo)
+                || uri.Host is not ("facebook.com" or "www.facebook.com" or "m.facebook.com")
+                || uri.AbsolutePath is "/" or "/l.php" || uri.AbsolutePath.StartsWith("/flx/", StringComparison.OrdinalIgnoreCase))
+                throw new DomainException("Nhập link Facebook hợp lệ, bắt đầu bằng https://www.facebook.com/.");
+            facebook = uri.AbsoluteUri;
+        }
+        if (zaloPhone?.Length > 30) throw new DomainException("Số Zalo không được dài quá 30 ký tự.");
+        var zalo = string.IsNullOrWhiteSpace(zaloPhone) ? null : System.Text.RegularExpressions.Regex.Replace(zaloPhone, @"[\s().-]", "");
+        if (zalo?.StartsWith("+84", StringComparison.Ordinal) == true) zalo = "0" + zalo[3..];
+        if (zalo is not null && !System.Text.RegularExpressions.Regex.IsMatch(zalo, @"^0[35789][0-9]{8}$"))
+            throw new DomainException("Nhập số Zalo Việt Nam gồm 10 số, bắt đầu bằng 03, 05, 07, 08 hoặc 09.");
+        FacebookUrl = facebook;
+        ZaloPhone = zalo;
         UpdatedAt = updatedAt;
     }
 
