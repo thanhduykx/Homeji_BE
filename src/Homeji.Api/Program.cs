@@ -52,6 +52,8 @@ builder.Services.AddOptions<PaymentRedirectOptions>()
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+// Temporary production probe; remove after the bounded memory observation.
+builder.Services.AddHostedService<MemoryUsageWorker>();
 if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 {
     builder.Services.AddHostedService<ReceiptEmailWorker>();
