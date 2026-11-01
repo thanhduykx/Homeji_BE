@@ -47,7 +47,7 @@ public sealed class PremiumWalletPaymentService(
             await transaction.CommitAsync(cancellationToken);
             return PaymentMapper.ToDto(existing);
         }
-        var plan = options.Value.GetPlans().SingleOrDefault(p => string.Equals(p.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
+        var plan = options.Value.GetPlansAt(timeProvider.GetUtcNow()).SingleOrDefault(p => string.Equals(p.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
         if (plan is null) throw Invalid("packageCode", "Không tìm thấy gói Premium.");
         if (plan.Price <= 0 || decimal.Truncate(plan.Price) != plan.Price || plan.DurationDays <= 0 || string.IsNullOrWhiteSpace(plan.Name))
             throw new InvalidOperationException("Chưa cấu hình gói Premium.");

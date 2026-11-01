@@ -24,6 +24,7 @@ public sealed class SubscriptionService : ISubscriptionService
         "Hiển thị nhãn Premium trên tin đăng",
         "Tin đăng được ưu tiên hiển thị",
         "Khung viền nổi bật cho tin phòng",
+        "AI soạn bài từ ảnh và đăng sau khi bạn xác nhận",
         "Theo dõi tối đa 30 khu vực, so sánh tối đa 5 phòng mỗi lần",
     ];
 
@@ -61,14 +62,15 @@ public sealed class SubscriptionService : ISubscriptionService
                 BasicBenefits),
         };
 
-        packages.AddRange(_options.GetPlans().Select(plan => new SubscriptionPackageDto(
+        packages.AddRange(_options.GetPlansAt(_timeProvider.GetUtcNow()).Select(plan => new SubscriptionPackageDto(
             NormalizePackageCode(plan.Code),
             NormalizePackageName(plan.Name),
             SubscriptionTier.Premium,
             RequirePositivePrice(plan.Price),
             RequirePositiveDuration(plan.DurationDays),
             "Premium",
-            PremiumBenefits)));
+            PremiumBenefits) { OriginalPrice = plan.Price == 49_000 && _options.IsLaunchOffer(_timeProvider.GetUtcNow()) ? 99_000 : null,
+                OfferEndsAt = plan.Price == 49_000 && _options.IsLaunchOffer(_timeProvider.GetUtcNow()) ? _options.LaunchOfferEndsAt : null }));
 
         return Task.FromResult<IReadOnlyList<SubscriptionPackageDto>>(packages);
     }
@@ -102,16 +104,16 @@ public sealed class SubscriptionService : ISubscriptionService
 
     public Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
         string packageCode,
-        CancellationToken cancellationToken = default)
+        decimal? expectedAmount = null, CancellationToken cancellationToken = default)
     {
-        return _payments.CreatePremiumMomoPaymentAsync(packageCode, cancellationToken);
+        return _payments.CreatePremiumMomoPaymentAsync(packageCode, expectedAmount, cancellationToken);
     }
 
     public Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(
         string packageCode,
-        CancellationToken cancellationToken = default)
+        decimal? expectedAmount = null, CancellationToken cancellationToken = default)
     {
-        return _payments.CreatePremiumPayOsPaymentAsync(packageCode, cancellationToken);
+        return _payments.CreatePremiumPayOsPaymentAsync(packageCode, expectedAmount, cancellationToken);
     }
 
     private static string NormalizePackageCode(string? value)

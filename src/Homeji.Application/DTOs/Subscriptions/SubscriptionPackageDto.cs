@@ -11,6 +11,8 @@ public sealed record SubscriptionPackageDto(
     string Badge,
     IReadOnlyCollection<string> Benefits)
 {
+    public decimal? OriginalPrice { get; init; }
+    public DateTimeOffset? OfferEndsAt { get; init; }
     public int MaxFollowedAreas => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(Tier == SubscriptionTier.Premium).FollowedAreas;
     public int MaxComparedPosts => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(Tier == SubscriptionTier.Premium).ComparedPosts;
 }

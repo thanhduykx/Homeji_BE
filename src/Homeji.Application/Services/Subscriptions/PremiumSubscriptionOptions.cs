@@ -16,6 +16,16 @@ public sealed class PremiumSubscriptionOptions
 
     public List<PremiumPlanOptions> Plans { get; set; } = [];
 
+    public DateTimeOffset? LaunchOfferStartsAt { get; set; }
+    public DateTimeOffset? LaunchOfferEndsAt { get; set; }
+    public bool IsLaunchOffer(DateTimeOffset now) => LaunchOfferStartsAt.HasValue && LaunchOfferEndsAt.HasValue
+        && now >= LaunchOfferStartsAt.Value && now < LaunchOfferEndsAt.Value;
+
+    public IReadOnlyList<PremiumPlanOptions> GetPlansAt(DateTimeOffset now) => GetPlans().Select(plan =>
+        IsLaunchOffer(now) && plan.Code == "PREMIUM_MONTHLY" && plan.Price == 99_000
+            ? new PremiumPlanOptions { Code = plan.Code, Name = plan.Name, Price = 49_000, DurationDays = plan.DurationDays }
+            : plan).ToArray();
+
     public IReadOnlyList<PremiumPlanOptions> GetPlans()
     {
         return Plans.Count > 0

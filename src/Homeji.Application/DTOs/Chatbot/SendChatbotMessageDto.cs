@@ -11,7 +11,8 @@ public sealed record SendChatbotMessageDto(
     ChatbotRentalSelectionDto? RentalSelection = null,
     ChatbotFoodContextDto? FoodContext = null,
     ChatbotFoodCriteriaDto? PreviousFoodCriteria = null,
-    IReadOnlyCollection<ChatbotAttachmentDto>? Attachments = null);
+    IReadOnlyCollection<ChatbotAttachmentDto>? Attachments = null,
+    Guid? AgentDraftId = null, IReadOnlyCollection<ChatbotMessageDto>? SessionMessages = null, bool PostingAgent = false);
 
 public sealed record ChatbotRentalContextDto(Guid PostId, string? Task = null);
 public sealed record ChatbotRentalSelectionDto(IReadOnlyCollection<Guid>? PostIds,

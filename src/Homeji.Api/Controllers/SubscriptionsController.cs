@@ -48,9 +48,9 @@ public sealed class SubscriptionsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<MomoPaymentResponseDto>> CreatePremiumMomoPayment(
         string packageCode,
-        CancellationToken cancellationToken)
+        [FromQuery] decimal? expectedAmount, CancellationToken cancellationToken)
     {
-        return Ok(await _subscriptions.CreatePremiumMomoPaymentAsync(packageCode, cancellationToken));
+        return Ok(await _subscriptions.CreatePremiumMomoPaymentAsync(packageCode, expectedAmount, cancellationToken));
     }
 
     [HttpPost("premium/{packageCode}/payos/create")]
@@ -58,8 +58,8 @@ public sealed class SubscriptionsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<PayOsPaymentResponseDto>> CreatePremiumPayOsPayment(
         string packageCode,
-        CancellationToken cancellationToken)
+        [FromQuery] decimal? expectedAmount, CancellationToken cancellationToken)
     {
-        return Ok(await _subscriptions.CreatePremiumPayOsPaymentAsync(packageCode, cancellationToken));
+        return Ok(await _subscriptions.CreatePremiumPayOsPaymentAsync(packageCode, expectedAmount, cancellationToken));
     }
 }

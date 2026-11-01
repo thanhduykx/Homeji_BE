@@ -13,10 +13,12 @@ namespace Homeji.Api.Controllers;
 public sealed class ChatbotController : ControllerBase
 {
     private readonly IChatbotService _chatbot;
+    private readonly IChatbotPostingAgent _posting;
 
-    public ChatbotController(IChatbotService chatbot)
+    public ChatbotController(IChatbotService chatbot, IChatbotPostingAgent posting)
     {
         _chatbot = chatbot;
+        _posting = posting;
     }
 
     [HttpGet("popup-config")]
@@ -68,6 +70,19 @@ public sealed class ChatbotController : ControllerBase
     public async Task<IActionResult> Transcribe([FromBody] ChatbotTranscriptionDto request, CancellationToken cancellationToken)
     {
         return Ok(new { text = await _chatbot.TranscribeAsync(request, cancellationToken) });
+    }
+
+    [HttpPost("agent-drafts/{draftId:guid}/confirm")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    public async Task<IActionResult> ConfirmDraft(Guid draftId, [FromBody] AgentPostDetails details, CancellationToken cancellationToken)
+        => Ok(new { postId = await _posting.ConfirmAsync(draftId, details, cancellationToken) });
+
+    [HttpDelete("agent-drafts/{draftId:guid}")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    public async Task<IActionResult> CancelDraft(Guid draftId, CancellationToken cancellationToken)
+    {
+        await _posting.CancelAsync(draftId, cancellationToken);
+        return NoContent();
     }
 
     [HttpDelete("conversations/{conversationId:guid}")]

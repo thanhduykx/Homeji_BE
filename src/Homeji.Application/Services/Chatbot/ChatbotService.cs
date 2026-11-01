@@ -26,6 +26,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly IChatbotFoodService _food;
     private readonly ChatbotOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly IChatbotPostingAgent? _postingAgent;
 
     public ChatbotService(
         UserContext userContext,
@@ -35,7 +36,7 @@ public sealed class ChatbotService : IChatbotService
         IRentalDecisionService rentalDecision,
         IChatbotFoodService food,
         IOptions<ChatbotOptions> options,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null)
     {
         _userContext = userContext;
         _conversations = conversations;
@@ -45,6 +46,7 @@ public sealed class ChatbotService : IChatbotService
         _food = food;
         _options = options.Value;
         _timeProvider = timeProvider;
+        _postingAgent = postingAgent;
     }
 
     public Task<ChatbotPopupConfigDto> GetPopupConfigAsync(CancellationToken cancellationToken = default)
@@ -136,12 +138,23 @@ public sealed class ChatbotService : IChatbotService
             .Select(ChatbotMapper.ToMessageDto)
             .ToArray();
 
+        if (!request.SaveHistory) history = ChatbotSessionContext.Bound(request.SessionMessages).Concat(history.TakeLast(1)).ToArray();
+        history = ChatbotSessionContext.Bound(history).ToArray();
+        AgentPostResultDto? agentResult = null;
         IReadOnlyCollection<ChatbotNavigationActionDto> actions = [];
         AiHighlightResponseDto? searchUpdate = null;
         RentalDecisionResponseDto? rentalDecision = null;
         ChatbotFoodResponseDto? foodDiscovery = null;
         string assistantReply;
-        if (media.Count > 0)
+        if (_postingAgent is not null && (request.PostingAgent || request.AgentDraftId.HasValue || ChatbotSessionContext.RequestsPosting(message)))
+        {
+            var agentMessage = message + "\nYêu cầu người dùng gần đây (chỉ tham khảo nếu cùng món đồ; yêu cầu mới nhất được ưu tiên): "
+                + JsonSerializer.Serialize(history.Where(row => row.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
+                    .TakeLast(3).Select(row => row.Content));
+            agentResult = await _postingAgent.PrepareAsync(agentMessage, media, request.AgentDraftId, cancellationToken);
+            assistantReply = agentResult.Message;
+        }
+        else if (media.Count > 0)
         {
             // Media is untrusted input, never a source of verified catalog/account data.
             // Provider errors propagate so the sender can retry the actual attachment.
@@ -185,7 +198,7 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery };
+            actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = agentResult?.UpgradeRequired == true };
     }
 
     public async Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default)

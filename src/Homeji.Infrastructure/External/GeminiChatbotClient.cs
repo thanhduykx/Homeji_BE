@@ -263,7 +263,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         }
         builder.AppendLine("Lịch sử chat gần nhất:");
 
-        foreach (var message in conversationMessages.OrderBy(message => message.CreatedAt))
+        foreach (var message in ChatbotSessionContext.Bound(conversationMessages.OrderBy(message => message.CreatedAt)))
         {
             var sender = message.Sender == ChatMessageSender.User ? "User" : "Assistant";
             builder.AppendLine(CultureInfo.InvariantCulture, $"{sender}: {message.Content}");

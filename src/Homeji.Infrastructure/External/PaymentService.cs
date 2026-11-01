@@ -116,9 +116,11 @@ public sealed class PaymentService : IPaymentService
 
     public async Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
         string packageCode,
-        CancellationToken cancellationToken = default)
+        decimal? expectedAmount = null, CancellationToken cancellationToken = default)
     {
         var plan = GetPremiumPlan(packageCode);
+        if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
+            throw Validation("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
 
         return await CreateMomoPaymentInternalAsync(
             plan.Price,
@@ -318,9 +320,11 @@ public sealed class PaymentService : IPaymentService
 
     public async Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(
         string packageCode,
-        CancellationToken cancellationToken = default)
+        decimal? expectedAmount = null, CancellationToken cancellationToken = default)
     {
         var plan = GetPremiumPlan(packageCode);
+        if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
+            throw Validation("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
 
         return await CreatePayOsPaymentInternalAsync(
             plan.Price,
@@ -688,7 +692,7 @@ public sealed class PaymentService : IPaymentService
             throw Validation("packageCode", "Mã gói Premium là bắt buộc.");
         }
 
-        var plan = _premiumOptions.GetPlans().SingleOrDefault(candidate =>
+        var plan = _premiumOptions.GetPlansAt(_timeProvider.GetUtcNow()).SingleOrDefault(candidate =>
             string.Equals(candidate.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
 
         if (plan is null)

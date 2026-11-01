@@ -56,6 +56,7 @@ if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 {
     builder.Services.AddHostedService<ReceiptEmailWorker>();
     builder.Services.AddHostedService<AdminReportEmailWorker>();
+    builder.Services.AddHostedService<AgentDraftCleanupWorker>();
     builder.Services.AddHostedService<AppointmentReminderWorker>();
     builder.Services.AddHostedService<SearchInterestWorker>();
     builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();

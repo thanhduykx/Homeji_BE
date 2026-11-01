@@ -16,13 +16,13 @@ public interface IPaymentService
 
     Task<MomoPaymentResponseDto> CreateMomoPaymentAsync(CreateMomoPaymentDto request, CancellationToken cancellationToken = default);
 
-    Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(string packageCode, CancellationToken cancellationToken = default);
+    Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(string packageCode, decimal? expectedAmount = null, CancellationToken cancellationToken = default);
 
     Task<PaymentDto> HandleMomoIpnAsync(MomoIpnDto request, CancellationToken cancellationToken = default);
 
     Task<PayOsPaymentResponseDto> CreatePayOsPaymentAsync(CreatePayOsPaymentDto request, CancellationToken cancellationToken = default);
 
-    Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(string packageCode, CancellationToken cancellationToken = default);
+    Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(string packageCode, decimal? expectedAmount = null, CancellationToken cancellationToken = default);
 
     Task<PaymentDto?> HandlePayOsWebhookAsync(PayOsWebhookDto request, CancellationToken cancellationToken = default);
 }
