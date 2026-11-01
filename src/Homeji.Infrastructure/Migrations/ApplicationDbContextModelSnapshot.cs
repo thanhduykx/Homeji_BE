@@ -1608,6 +1608,20 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("collected_at");
 
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(11)
+                        .HasColumnType("character varying(11)")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(16000)
+                        .HasColumnType("character varying(16000)")
+                        .HasColumnName("description");
+
+                    b.Property<DateTimeOffset?>("DetailsCollectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("details_collected_at");
+
                     b.Property<string>("District")
                         .IsRequired()
                         .HasMaxLength(20)

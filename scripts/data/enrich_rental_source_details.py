@@ -26,20 +26,35 @@ def publisher(value):
 def extract_details(text,source,url):
     soup=BeautifulSoup(text,'html.parser')
     schemas=list(linked_data(soup))
-    name=None
+    name=None; phone=None; description=None
     if source=='mogi':
         candidates=[item for item in schemas if item.get('@type')=='Person' and item.get('makesOffer')]
-        if len(candidates)==1:name=publisher(candidates[0].get('name'))
+        if len(candidates)==1:
+            person=candidates[0];name=publisher(person.get('name'));phone=person.get('telephone')
+            description=person.get('makesOffer',{}).get('itemOffered',{}).get('description')
     elif source=='phongtro123':
         for item in schemas:
             if item.get('@type')!='WebPage' or item.get('url','').rstrip('/')!=url.rstrip('/'):continue
             author=item.get('author')
             if isinstance(author,dict):name=publisher(author.get('name'))
+        own=[item for item in schemas if item.get('@type')=='Hostel' and item.get('url','').rstrip('/')==url.rstrip('/')]
+        if len(own)==1:phone=own[0].get('telephone')
     else:
         for item in schemas:
             if item.get('@type')=='RealEstateListing' and item.get('url')==url:
                 author=item.get('author') or item.get('seller')
                 if isinstance(author,dict):name=publisher(author.get('name'))
+    if source in ('phongtro123','phongtrovn'):
+        heading=soup.find(['h2','h3'],string=lambda value: value and value.strip()=='Thông tin mô tả')
+        if heading:
+            parts=[node.get_text('\n',strip=True) for node in heading.find_next_siblings()]
+            description='\n'.join(parts)
+    if description:
+        description=BeautifulSoup(html_module.unescape(description),'html.parser').get_text('\n',strip=True)
+        description='\n'.join(line.strip() for line in description.splitlines() if line.strip())[:16000]
+    digits=re.sub(r'[\s.()\-]','',phone) if isinstance(phone,str) else ''
+    if digits.startswith('+84'):digits='0'+digits[3:]
+    phone=digits if re.fullmatch(r'0\d{9,10}',digits) else None
     points=set()
     # Read only listing embed q=latitude,longitude. Organization.geo is an office, not the rental.
     for raw in re.findall(r'''https://(?:www\.)?google\.com/maps/embed/v1/place\?[^\s<>"']+''',text):
@@ -49,7 +64,7 @@ def extract_details(text,source,url):
             lat,lng=map(float,match.groups())
             if 10.70<=lat<=10.97 and 106.70<=lng<=106.91:points.add((lat,lng))
     coordinate=next(iter(points)) if len(points)==1 else None
-    return {'publisher_name':name,'latitude':coordinate[0] if coordinate else None,'longitude':coordinate[1] if coordinate else None,
+    return {'publisher_name':name,'description':description or None,'contact_phone':phone,'latitude':coordinate[0] if coordinate else None,'longitude':coordinate[1] if coordinate else None,
         'coordinate_evidence':'listing_google_embed_query' if coordinate else None}
 
 def collect_source(source,rows,output):

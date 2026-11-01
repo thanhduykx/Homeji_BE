@@ -23,23 +23,26 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         }
 
         var records = await repository.SearchAsync(query with { Keyword = query.Keyword?.Trim() }, cancellationToken);
-        return records.Select(ToDto).ToArray();
+        return records.Select(listing => ToDto(listing)).ToArray();
     }
 
     public async Task<RentalSourceListingDto> GetAsync(Guid id, CancellationToken cancellationToken)
     {
         var listing = await repository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalSourceListing), id);
-        return ToDto(listing);
+        return ToDto(listing, true);
     }
 
-    private static RentalSourceListingDto ToDto(RentalSourceListing listing) => new(
+    private static RentalSourceListingDto ToDto(RentalSourceListing listing, bool details = false) => new(
         listing.Id, listing.Source, listing.SourceId, listing.SourceUrl, listing.Title,
         listing.Address, listing.District, listing.Price, listing.Area, listing.ImageUrls.ToArray(),
         listing.SourceUpdatedAt, listing.CollectedAt)
     {
         Latitude = listing.Latitude,
         PublisherName = listing.PublisherName,
+        Description = details ? listing.Description : null,
+        ContactPhone = details ? listing.ContactPhone : null,
+        DetailsCollectedAt = listing.DetailsCollectedAt,
         Longitude = listing.Longitude,
         SourceExpiresAt = listing.SourceExpiresAt,
         SourceCheckedAt = listing.SourceCheckedAt,

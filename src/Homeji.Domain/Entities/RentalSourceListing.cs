@@ -13,6 +13,9 @@ public sealed class RentalSourceListing
     public string Source { get; private set; } = string.Empty;
     public string SourceId { get; private set; } = string.Empty;
     public string? PublisherName { get; private set; }
+    public string? Description { get; private set; }
+    public string? ContactPhone { get; private set; }
+    public DateTimeOffset? DetailsCollectedAt { get; private set; }
     public string SourceUrl { get; private set; } = string.Empty;
     public string Title { get; private set; } = string.Empty;
     public string Address { get; private set; } = string.Empty;
@@ -31,6 +34,16 @@ public sealed class RentalSourceListing
         if (value?.Length > 100 || value?.Any(char.IsControl) == true)
             throw new DomainException("Tên người đăng nguồn không hợp lệ.");
         PublisherName = string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    public void RecordDetails(string? description, string? contactPhone, DateTimeOffset checkedAt)
+    {
+        if (description?.Length > 16000 || description?.Any(value => char.IsControl(value) && value is not ('\n' or '\r' or '\t')) == true
+            || contactPhone is not null && (contactPhone.Length is < 10 or > 11 || contactPhone[0] != '0' || contactPhone.Any(value => !char.IsAsciiDigit(value))))
+            throw new DomainException("Thông tin nguồn không hợp lệ.");
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        ContactPhone = contactPhone;
+        DetailsCollectedAt = checkedAt.ToUniversalTime();
     }
 
     public void RecordSourceExpiry(DateTimeOffset? expiresAt, DateTimeOffset checkedAt)

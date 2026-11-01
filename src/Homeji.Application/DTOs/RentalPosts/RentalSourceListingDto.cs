@@ -6,6 +6,9 @@ public sealed record RentalSourceListingDto(
     IReadOnlyList<string> ImageUrls, DateTimeOffset? SourceUpdatedAt, DateTimeOffset CollectedAt)
 {
     public string? PublisherName { get; init; }
+    public string? Description { get; init; }
+    public string? ContactPhone { get; init; }
+    public DateTimeOffset? DetailsCollectedAt { get; init; }
     public decimal? Latitude { get; init; }
     public decimal? Longitude { get; init; }
     public DateTimeOffset? SourceExpiresAt { get; init; }
