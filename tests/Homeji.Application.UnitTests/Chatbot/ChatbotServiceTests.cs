@@ -28,6 +28,36 @@ public sealed class ChatbotServiceTests
         Assert.True(reply.AgentRequested); Assert.Equal("Bản nháp đã soạn", reply.AssistantMessage.Content);
         Assert.Equal("Lê Văn Việt", agent.Location!.Address);
     }
+    [Fact]
+    public async Task Agent_mode_general_question_does_not_generate_a_sale_draft()
+    {
+        var ai = new SuccessfulClient(); var agent = new CapturingAgent();
+        await CreateService(new(), ai, posting: agent).SendMessageAsync(new(null, "Premium bao nhiêu tiền?", PostingAgent: true));
+        Assert.Equal(0, agent.Calls);
+    }
+    [Fact]
+    public async Task Agent_mode_roommate_search_does_not_generate_a_post()
+    {
+        var ai = new MediaClient(); var agent = new CapturingAgent();
+        var reply = await CreateService(new(), ai, posting: agent).SendMessageAsync(new(null, "tìm bạn ở ghép", PostingAgent: true));
+        Assert.Equal(0, agent.Calls); Assert.Contains(reply.Actions, action => action.Target == "invitations");
+    }
+    [Fact]
+    public async Task Roommate_search_returns_actual_opted_in_directory_profiles_without_posting_or_invitations()
+    {
+        var agent = new CapturingAgent(); var directory = new DirectoryStub();
+        var reply = await CreateService(new(), new SuccessfulClient(), posting: agent, roommates: directory).SendMessageAsync(new(null, "tìm bạn ở ghép", PostingAgent: true));
+        Assert.Equal(0, agent.Calls); Assert.Equal(directory.UserId, Assert.Single(reply.RoommateCandidates!).UserId);
+    }
+    private sealed class DirectoryStub : Homeji.Application.IServices.Roommates.IRoommateDirectoryService
+    {
+        public Guid UserId { get; } = Guid.NewGuid();
+        public Task<Homeji.Application.DTOs.Roommates.RoommateDirectoryPageDto> SearchAsync(RoommateIntent? intent, string? keyword, int page, int pageSize, CancellationToken cancellationToken = default)
+            => Task.FromResult(new Homeji.Application.DTOs.Roommates.RoommateDirectoryPageDto([new(UserId, "Người tìm ở ghép", null, null, "Thủ Đức", 3000000,
+                (SleepHabit)0, (PetPreference)0, (SmokingPreference)0, RoommateIntent.SeekingAccommodation, "Tìm bạn cùng thuê", null)], 1, page, pageSize));
+        public Task<Homeji.Application.DTOs.Roommates.RoommateProfileDto> GetMineAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<Homeji.Application.DTOs.Roommates.RoommateProfileDto> UpdateMineAsync(Homeji.Application.DTOs.Roommates.RoommateProfileDto request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
     private sealed class CapturingAgent : IChatbotPostingAgent
     {
         public int Calls { get; private set; }
@@ -208,7 +238,7 @@ public sealed class ChatbotServiceTests
         IChatbotAiClient aiClient,
         IAiSearchService? search = null,
         bool historyStorageEnabled = true,
-        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null)
+        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null)
     {
         return new ChatbotService(
             new UserContext(new StubCurrentUser(UserId), new StubUserProfileRepository()),
@@ -218,7 +248,7 @@ public sealed class ChatbotServiceTests
             decision ?? new StubRentalDecisionService(),
             new StubFoodService(),
             Options.Create(new ChatbotOptions { HistoryStorageEnabled = historyStorageEnabled }),
-            new StubTimeProvider(), posting);
+            new StubTimeProvider(), posting, roommates: roommates);
     }
 
     [Theory]

@@ -27,6 +27,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly ChatbotOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly IChatbotPostingAgent? _postingAgent;
+    private readonly Homeji.Application.IServices.Roommates.IRoommateDirectoryService? _roommates;
     private readonly IChatbotNearbyService? _nearby;
 
     public ChatbotService(
@@ -37,7 +38,7 @@ public sealed class ChatbotService : IChatbotService
         IRentalDecisionService rentalDecision,
         IChatbotFoodService food,
         IOptions<ChatbotOptions> options,
-        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null, IChatbotNearbyService? nearby = null)
+        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null, IChatbotNearbyService? nearby = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null)
     {
         _userContext = userContext;
         _conversations = conversations;
@@ -49,6 +50,7 @@ public sealed class ChatbotService : IChatbotService
         _timeProvider = timeProvider;
         _postingAgent = postingAgent;
         _nearby = nearby;
+        _roommates = roommates;
     }
 
     public Task<ChatbotPopupConfigDto> GetPopupConfigAsync(CancellationToken cancellationToken = default)
@@ -150,14 +152,35 @@ public sealed class ChatbotService : IChatbotService
         ChatbotFoodResponseDto? foodDiscovery = null;
         ChatbotNearbyDto? nearbyRooms = null;
         var nearbyQuery = ChatbotSessionContext.RequestsNearbyRooms(message);
+        IReadOnlyList<Homeji.Application.DTOs.Roommates.RoommateDirectoryCandidateDto>? roommateCandidates = null;
         string assistantReply;
-        if (_postingAgent is not null && (ChatbotSessionContext.RequestsPosting(message) || (request.PostingAgent || request.AgentDraftId.HasValue) && !foodQuery && !nearbyQuery))
+        if (_postingAgent is not null && (AgentBusinessIntent.PostingKind(message) is not null || request.AgentDraftId.HasValue && !AgentBusinessIntent.IsDiscovery(message) && !foodQuery && !nearbyQuery))
         {
             var agentMessage = message + "\nYêu cầu người dùng gần đây (chỉ tham khảo nếu cùng món đồ; yêu cầu mới nhất được ưu tiên): "
                 + JsonSerializer.Serialize(history.Where(row => row.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
                     .TakeLast(3).Select(row => row.Content));
             agentResult = await _postingAgent.PrepareAsync(agentMessage, media, request.AgentDraftId, request.Location, cancellationToken);
             assistantReply = agentResult.Message;
+            if (agentResult.UpgradeRequired)
+            {
+                var kind = AgentBusinessIntent.PostingKind(message);
+                var target = kind switch { "rental" or "roommate" => profile.Role == Homeji.Domain.Enums.UserRole.Landlord ? "/posts/new" : "/?section=profile",
+                    "roomTransfer" => "/posts/new?type=pass", "wanted" => "/?section=wanted", _ => "/?section=marketplace" };
+                actions = [new("manual-post", "Mở biểu mẫu phù hợp", "Tự điền thông tin và kiểm tra trước khi đăng", ChatbotNavigationActionKind.Navigate, target)];
+            }
+        }
+        else if (AgentBusinessIntent.IsRoommateSearch(message))
+        {
+            if (_roommates is not null && profile.Role == Homeji.Domain.Enums.UserRole.Renter)
+            {
+                var directory = await _roommates.SearchAsync(null, null, 1, 5, cancellationToken);
+                roommateCandidates = directory.Items;
+                assistantReply = directory.Items.Count > 0
+                    ? "Đây là các hồ sơ đang công khai tìm ở ghép trên Homeji. Mức tương đồng (nếu có) chỉ dựa trên thói quen đã khai; bạn cần kiểm tra khu vực, ngân sách và trao đổi trước khi gửi lời mời. Mình chưa gửi lời mời thay bạn."
+                    : "Chưa có hồ sơ công khai tìm ở ghép lúc này. Bạn có thể mở mục Ở ghép để cập nhật nhu cầu và bật xuất hiện trong danh sách.";
+            }
+            else assistantReply = "Mở mục Ở ghép để xem và cập nhật nhu cầu. Tìm hồ sơ bạn ở ghép yêu cầu tài khoản người thuê; chủ trọ có thể đăng tin phòng tìm người ở ghép.";
+            actions = [new("roommate", "Tìm bạn ở ghép", "Xem người đang công khai tìm ở ghép", ChatbotNavigationActionKind.OpenSection, "invitations")];
         }
         else if (nearbyQuery && _nearby is not null)
         {
@@ -208,7 +231,7 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = agentResult?.UpgradeRequired == true };
+            actions) { RoommateCandidates = roommateCandidates, RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = agentResult?.UpgradeRequired == true };
     }
 
     public async Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default)

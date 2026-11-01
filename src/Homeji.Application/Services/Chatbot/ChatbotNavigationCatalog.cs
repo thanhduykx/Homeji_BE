@@ -11,6 +11,7 @@ public static class ChatbotNavigationCatalog
 
     public const string FeaturePrompt = """
         Các tính năng thật đang có trong Homeji:
+        - Agent Premium soạn đúng mẫu: cho thuê phòng, pass phòng, phòng tìm người ở ghép, tin tìm trọ, bán đồ ăn, đồ cũ. Người dùng sửa và xác nhận trước khi đăng; tin phòng gửi kiểm duyệt. Không đổi vai trò, tự xác nhận chủ nhà đồng ý hoặc tự gửi lời mời.
         - Tìm phòng trên bản đồ, lọc khu vực, ngân sách, tiện ích và xem chi tiết tin.
         - Lưu tin phòng; đăng tin tìm phòng; quản lý tin đã đăng.
         - Tìm bạn ở ghép, gửi/nhận lời mời và nhắn tin sau khi kết nối.

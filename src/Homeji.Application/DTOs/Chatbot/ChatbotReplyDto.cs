@@ -9,6 +9,7 @@ public sealed record ChatbotReplyDto(
     AiHighlightResponseDto? SearchUpdate,
     IReadOnlyCollection<ChatbotNavigationActionDto> Actions)
 {
+    public IReadOnlyList<Homeji.Application.DTOs.Roommates.RoommateDirectoryCandidateDto>? RoommateCandidates { get; init; }
     public AgentPostDraftDto? AgentDraft { get; init; }
     public ChatbotNearbyDto? NearbyRooms { get; init; }
     public bool AgentRequested { get; init; }
