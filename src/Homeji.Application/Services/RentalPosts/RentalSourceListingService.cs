@@ -39,6 +39,7 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         listing.SourceUpdatedAt, listing.CollectedAt)
     {
         Latitude = listing.Latitude,
+        PublisherName = listing.PublisherName,
         Longitude = listing.Longitude,
         SourceExpiresAt = listing.SourceExpiresAt,
         SourceCheckedAt = listing.SourceCheckedAt,

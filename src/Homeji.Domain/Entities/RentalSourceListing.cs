@@ -12,6 +12,7 @@ public sealed class RentalSourceListing
     public decimal? Longitude { get; private set; }
     public string Source { get; private set; } = string.Empty;
     public string SourceId { get; private set; } = string.Empty;
+    public string? PublisherName { get; private set; }
     public string SourceUrl { get; private set; } = string.Empty;
     public string Title { get; private set; } = string.Empty;
     public string Address { get; private set; } = string.Empty;
@@ -23,6 +24,14 @@ public sealed class RentalSourceListing
     public DateTimeOffset CollectedAt { get; private set; }
     public DateTimeOffset? SourceExpiresAt { get; private set; }
     public DateTimeOffset? SourceCheckedAt { get; private set; }
+
+    public void RecordPublisher(string? name)
+    {
+        var value = name?.Trim();
+        if (value?.Length > 100 || value?.Any(char.IsControl) == true)
+            throw new DomainException("Tên người đăng nguồn không hợp lệ.");
+        PublisherName = string.IsNullOrEmpty(value) ? null : value;
+    }
 
     public void RecordSourceExpiry(DateTimeOffset? expiresAt, DateTimeOffset checkedAt)
     {

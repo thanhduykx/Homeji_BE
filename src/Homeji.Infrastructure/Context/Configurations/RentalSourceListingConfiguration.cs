@@ -23,6 +23,7 @@ public sealed class RentalSourceListingConfiguration : IEntityTypeConfiguration<
         builder.Property(listing => listing.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(listing => listing.Source).HasColumnName("source").HasMaxLength(80).IsRequired();
         builder.Property(listing => listing.SourceId).HasColumnName("source_id").HasMaxLength(80).IsRequired();
+        builder.Property(listing => listing.PublisherName).HasColumnName("publisher_name").HasMaxLength(100);
         builder.Property(listing => listing.SourceUrl).HasColumnName("source_url").HasMaxLength(1000).IsRequired();
         builder.Property(listing => listing.Title).HasColumnName("title").HasMaxLength(200).IsRequired();
         builder.Property(listing => listing.Address).HasColumnName("address").HasMaxLength(500).IsRequired();

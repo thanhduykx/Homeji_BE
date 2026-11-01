@@ -1596,6 +1596,11 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("price");
 
+                    b.Property<string>("PublisherName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("publisher_name");
+
                     b.Property<string>("Source")
                         .IsRequired()
                         .HasMaxLength(80)

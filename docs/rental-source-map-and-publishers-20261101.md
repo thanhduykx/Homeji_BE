@@ -1,0 +1,13 @@
+# Complete source inventory, publisher attribution and map locations
+
+The public source API contained 136 records, but only one had coordinates. The map loaded just the first 50 source records; that first page had no coordinates. Consequently most imported rooms were absent from the map even though their data existed. The native listing endpoint and clustered/food pins are distinct from the source directory.
+
+Re-read all 136 public source pages, respecting each site's robots rules and using bounded per-host requests. Collected 131 actual public publisher names (111 Mogi, 20 Phongtro123), and 105 listing-specific map positions from Mogi. No Homeji account was selected or assigned as the owner of an external advertisement. Phongtro.vn's five records lacked a usable publisher name in the selected structured metadata; their source brand remains the fallback.
+
+Coordinates are taken only from a listing's Google map embed `q=latitude,longitude`. No Google API key is reused, stored in the enrichment output or called. Platform office `Organization`/`RealEstateAgent.geo` data is deliberately ignored. Conflicting, absent or out-of-area positions are not invented. A pin represents the location supplied by the source, not a verified room entrance or vacancy.
+
+`enrich_rental_source_details.py` produces the attributed maintenance batch. `import_rental_source_details.py` requires the explicit database project, validates identities and bounds, locks/backups only the matching source rows, and defaults to dry run. Applying updates adds publisher names and fills missing coordinate pairs only. Existing coordinates, native rental posts, ownership links, primary keys, source IDs, conversations and transactions are preserved.
+
+Frontend changes load the complete bounded source catalog across all pages, share the request between map/list, support Phongtro.vn links/images and cluster nearby source pins. The side list automatically exposes sourced rooms, including those without coordinates, with a clear located/unlocated count and incremental display. Basic price/area/text/bounds filters apply to both source list and map; records without location remain in the list. Unknown amenities/occupancy and native-only AI IDs do not turn into false matches.
+
+Publisher names are displayed as the original publisher, not Homeji landlord verification. Source references use the original source ID (e.g. `MG-…`, `PT123-…`, `PTVN-…`). Native display references reversibly encode the actual UUID in base36; raw zero/repeated fixture-looking sequences are not used as visible references. No database identity is re-keyed. Null UUIDs do not receive a fake reference.
