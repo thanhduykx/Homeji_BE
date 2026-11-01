@@ -145,7 +145,11 @@ public static class DependencyInjection
         services.AddScoped<IPremiumWalletPaymentService, PremiumWalletPaymentService>();
         services.AddScoped<Homeji.Application.IServices.Promotions.IReferralService, ReferralService>();
         services.AddScoped<ISearchInterestService, SearchInterestService>();
-        services.AddHttpClient<GeminiInterestRanker>();
+        services.AddSingleton<AiProviderBudget>();
+        services.AddTransient<AiProviderBudgetHandler>();
+        services.AddSingleton<ImageProcessingBudget>();
+        services.AddHttpClient<GeminiInterestRanker>(client => client.MaxResponseContentBufferSize = 256 * 1024)
+            .AddHttpMessageHandler<AiProviderBudgetHandler>();
         services.AddScoped<IOrderReceiptWriter, TransactionReceiptService>();
         services.AddScoped<IReceiptEmailDispatcher, ReceiptEmailDispatcher>();
         services.AddScoped<IAppointmentReminderDispatcher, AppointmentReminderDispatcher>();
@@ -183,12 +187,17 @@ public static class DependencyInjection
         services.AddHttpClient<IPaymentService, PaymentService>();
         services.AddHttpClient<IExpiredPaymentCleanup, ExpiredPaymentCleanup>(client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<Homeji.Application.IServices.Moderation.IAiListingModeration, AiListingModeration>();
-        services.AddHttpClient<Homeji.Application.IServices.Moderation.IAiListingReviewClient, GeminiListingReviewClient>(client => client.Timeout = TimeSpan.FromSeconds(30));
-        services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>();
-        services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>();
+        services.AddHttpClient<Homeji.Application.IServices.Moderation.IAiListingReviewClient, GeminiListingReviewClient>(client => { client.Timeout = TimeSpan.FromSeconds(30); client.MaxResponseContentBufferSize = 256 * 1024; })
+            .AddHttpMessageHandler<AiProviderBudgetHandler>();
+        services.AddHttpClient<IAiSearchTextParser, GeminiSearchTextParser>(client => client.MaxResponseContentBufferSize = 256 * 1024)
+            .AddHttpMessageHandler<AiProviderBudgetHandler>();
+        services.AddHttpClient<IChatbotAiClient, GeminiChatbotClient>(client => client.MaxResponseContentBufferSize = 256 * 1024)
+            .AddHttpMessageHandler<AiProviderBudgetHandler>();
 
         services.Configure<CloudinaryOptions>(configuration.GetSection(CloudinaryOptions.SectionName));
-        services.AddHttpClient<IImageUploadService, CloudinaryImageUploadService>();
+        services.AddHttpClient<ModerationImageReader>(client => client.Timeout = TimeSpan.FromSeconds(8))
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddHttpClient<IImageUploadService, CloudinaryImageUploadService>(client => client.MaxResponseContentBufferSize = 256 * 1024);
         services.AddScoped<IConversationImageProcessor, ConversationImageProcessor>();
 
         return services;

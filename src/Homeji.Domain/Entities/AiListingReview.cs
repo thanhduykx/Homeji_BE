@@ -78,15 +78,16 @@ public sealed class AiModerationSchedule
         if (BudgetDay.Date == now.UtcDateTime.Date) return;
         BudgetDay = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero); RequestsToday = 0; TokensReservedToday = 0;
     }
-    public bool Reserve(int tokens, DateTimeOffset now)
+    public bool Reserve(int tokens, DateTimeOffset now, int requests = 1)
     {
         ResetDay(now);
         if (!Enabled || now < NextAllowedAt) return false;
-        if (RequestsToday >= DailyRequestLimit || TokensReservedToday + tokens > DailyTokenBudget)
+        if (requests is < 1 or > 2 || tokens < 0) throw new ArgumentOutOfRangeException(nameof(requests));
+        if (RequestsToday + requests > DailyRequestLimit || TokensReservedToday + tokens > DailyTokenBudget)
         {
             NextAllowedAt = BudgetDay.AddDays(1); PauseReason = "Đã đạt giới hạn kiểm tra trong ngày."; return false;
         }
-        RequestsToday++; TokensReservedToday += tokens; InBatch++;
+        RequestsToday += requests; TokensReservedToday += tokens; InBatch++;
         NextAllowedAt = now.AddSeconds(SpacingSeconds);
         if (InBatch >= BatchSize) { InBatch = 0; NextAllowedAt = now.AddMinutes(PauseMinutes); }
         PauseReason = null; return true;

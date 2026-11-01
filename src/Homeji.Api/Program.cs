@@ -152,6 +152,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserActivityMiddleware>();
 app.UseRateLimiter();
+app.UseMiddleware<MediaAdmissionMiddleware>();
 
 app.MapHealthChecks(
         "/health/live",

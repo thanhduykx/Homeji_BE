@@ -18,5 +18,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Update="Fixtures/large-20mp.jpg" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="Fixtures/large-20mp.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

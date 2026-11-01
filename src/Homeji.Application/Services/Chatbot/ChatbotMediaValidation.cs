@@ -12,7 +12,7 @@ public static class ChatbotMediaValidation
     public static IReadOnlyList<ChatbotMediaContent> Decode(IReadOnlyCollection<ChatbotAttachmentDto>? attachments)
     {
         if (attachments is null || attachments.Count == 0) return [];
-        if (attachments.Count > 4) throw Invalid();
+        if (attachments.Count > 6) throw Invalid();
         var result = new List<ChatbotMediaContent>();
         var total = 0;
         var images = 0;
@@ -33,7 +33,7 @@ public static class ChatbotMediaValidation
                 if (++audio > 1) throw Invalid();
                 ConversationVoiceFormat.Validate(content);
             }
-            else if (++images > 3 || content.Length > MaxImageBytes) throw Invalid();
+            else if (++images > 5 || content.Length > MaxImageBytes) throw Invalid();
             result.Add(new(mime, content));
         }
         return result;
@@ -41,6 +41,6 @@ public static class ChatbotMediaValidation
 
     public static RequestValidationException Invalid() => new(new Dictionary<string, string[]>
     {
-        ["attachments"] = ["Tối đa 3 ảnh JPEG/PNG/WebP (4 MB/ảnh) và 1 bản ghi WAV 2 phút; tổng không quá 8 MB."],
+        ["attachments"] = ["Tối đa 5 ảnh JPEG/PNG/WebP (4 MB/ảnh) và 1 bản ghi WAV 2 phút; tổng không quá 8 MB."],
     });
 }

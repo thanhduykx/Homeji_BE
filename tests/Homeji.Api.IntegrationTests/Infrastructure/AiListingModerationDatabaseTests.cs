@@ -118,6 +118,23 @@ public sealed class AiListingModerationDatabaseTests
         clock.Now = clock.Now.AddMinutes(11); ai.Result = new("clear", "none", "Chưa thấy dấu hiệu vi phạm.", "", .8);
         await using (var backfill = Open()) await Service(backfill).TickAsync(default);
         await using (var check = Open()) Assert.True(await check.AiListingReviews.AnyAsync(j => j.SubjectId == old.Id));
+        clock.Now = clock.Now.AddMinutes(11);
+        await using (var editImages = Open())
+        {
+            var post = await editImages.MarketplacePosts.Include(p => p.Media).SingleAsync(p => p.Id == old.Id);
+            post.Update(post.Title, post.Description, post.Price, post.Condition, post.Category, post.Address,
+                post.Latitude, post.Longitude, post.LinkedRentalPostId, ["https://example.test/replaced-only-image.jpg"], clock.Now);
+            await editImages.SaveChangesAsync();
+        }
+        clock.Now = clock.Now.AddMinutes(1);
+        await using (var discoverImages = Open()) await Service(discoverImages).TickAsync(default);
+        await using (var verifyImages = Open())
+        {
+            var versions = await verifyImages.AiListingReviews.Where(j => j.SubjectId == old.Id).ToListAsync();
+            Assert.Equal(2, versions.Count);
+            Assert.Equal(2, versions.Select(j => j.ContentHash).Distinct().Count());
+            Assert.Contains(versions, version => version.Snapshot.Contains("replaced-only-image.jpg", StringComparison.Ordinal));
+        }
     }
     private sealed record CurrentUser(Guid? UserId) : ICurrentUser;
     private sealed class Clock(DateTimeOffset now) : TimeProvider { public DateTimeOffset Now { get; set; } = now; public override DateTimeOffset GetUtcNow() => Now; }

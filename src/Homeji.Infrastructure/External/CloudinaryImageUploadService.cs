@@ -95,7 +95,7 @@ public sealed class CloudinaryImageUploadService : IImageUploadService
 
         UploadStarted(_logger, fileName, folder ?? "(root)", null);
 
-        var response = await _httpClient.PostAsync(uploadUrl, form, cancellationToken);
+        using var response = await _httpClient.PostAsync(uploadUrl, form, cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {

@@ -5,10 +5,11 @@ using SkiaSharp;
 
 namespace Homeji.Infrastructure.External;
 
-public sealed class ConversationImageProcessor : IConversationImageProcessor
+public sealed class ConversationImageProcessor(ImageProcessingBudget? budget = null) : IConversationImageProcessor
 {
     public const int MaxInputBytes = 8 * 1024 * 1024;
-    private const int MaxDimension = 4_096;
+    private const int MaxDimension = 2_048;
+    private const long MaxDecodedPixels = 4_194_304;
     private const long MaxPixels = 20_000_000;
     private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -16,7 +17,7 @@ public sealed class ConversationImageProcessor : IConversationImageProcessor
         "image/png",
         "image/webp",
     };
-    public Task<ProcessedConversationImage> ProcessAsync(
+    public async Task<ProcessedConversationImage> ProcessAsync(
         ConversationImageUpload upload,
         CancellationToken cancellationToken = default)
     {
@@ -30,7 +31,7 @@ public sealed class ConversationImageProcessor : IConversationImageProcessor
             throw new InvalidOperationException("Each image must be between 1 byte and 8 MB.");
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
+        using var lease = await (budget ?? ImageProcessingBudget.Shared).EnterAsync(cancellationToken);
         using var data = SKData.CreateCopy(upload.Content);
         using var codec = SKCodec.Create(data);
         if (codec is null || codec.EncodedFormat is not (SKEncodedImageFormat.Jpeg or SKEncodedImageFormat.Png or SKEncodedImageFormat.Webp))
@@ -44,15 +45,23 @@ public sealed class ConversationImageProcessor : IConversationImageProcessor
             throw new InvalidOperationException("The image dimensions are too large.");
         }
 
-        using var decoded = new SKBitmap(new SKImageInfo(info.Width, info.Height, SKColorType.Bgra8888, SKAlphaType.Premul));
+        // Ask the codec to downsample before allocating pixels; resizing after full decode is too late.
+        var desiredScale = Math.Min(1f, (float)MaxDimension / Math.Max(info.Width, info.Height));
+        var decodedSize = codec.GetScaledDimensions(desiredScale);
+        if (decodedSize.Width <= 0 || decodedSize.Height <= 0
+            || (long)decodedSize.Width * decodedSize.Height > MaxDecodedPixels)
+        {
+            throw new InvalidOperationException("Ảnh này chưa hỗ trợ giải mã trong giới hạn bộ nhớ. Hãy thu nhỏ cạnh dài xuống tối đa 2048 pixel rồi thử lại.");
+        }
+        using var decoded = new SKBitmap(new SKImageInfo(decodedSize.Width, decodedSize.Height, SKColorType.Bgra8888, SKAlphaType.Premul));
         if (codec.GetPixels(decoded.Info, decoded.GetPixels()) != SKCodecResult.Success)
         {
             throw new InvalidOperationException("The uploaded file is not a valid image.");
         }
         cancellationToken.ThrowIfCancellationRequested();
-        var scale = Math.Min(1d, (double)MaxDimension / Math.Max(info.Width, info.Height));
-        var width = Math.Max(1, (int)Math.Round(info.Width * scale));
-        var height = Math.Max(1, (int)Math.Round(info.Height * scale));
+        var scale = Math.Min(1d, (double)MaxDimension / Math.Max(decodedSize.Width, decodedSize.Height));
+        var width = Math.Max(1, (int)Math.Round(decodedSize.Width * scale));
+        var height = Math.Max(1, (int)Math.Round(decodedSize.Height * scale));
         // Encode a fresh pixel surface: no input EXIF/XMP/IPTC is copied.
         using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque))
             ?? throw new InvalidOperationException("The image could not be processed.");
@@ -65,6 +74,6 @@ public sealed class ConversationImageProcessor : IConversationImageProcessor
         cancellationToken.ThrowIfCancellationRequested();
         var sanitized = output.ToArray();
         var hash = Convert.ToHexStringLower(SHA256.HashData(sanitized));
-        return Task.FromResult(new ProcessedConversationImage("image/jpeg", sanitized, width, height, hash));
+        return new ProcessedConversationImage("image/jpeg", sanitized, width, height, hash);
     }
 }

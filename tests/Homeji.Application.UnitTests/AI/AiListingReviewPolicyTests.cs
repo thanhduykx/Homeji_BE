@@ -8,6 +8,25 @@ namespace Homeji.Application.UnitTests.AI;
 public sealed class AiListingReviewPolicyTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.Parse("2026-10-30T00:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+    [Fact] public void Two_image_batches_reserve_two_provider_requests_before_network()
+    {
+        var schedule = new AiModerationSchedule { DailyRequestLimit = 1 };
+        Assert.False(schedule.Reserve(5000, Now, 2));
+        Assert.Equal(0, schedule.RequestsToday);
+        schedule = new AiModerationSchedule { DailyRequestLimit = 2 };
+        Assert.True(schedule.Reserve(5000, Now, 2));
+        Assert.Equal(2, schedule.RequestsToday);
+    }
+
+    [Theory]
+    [InlineData("image_mismatch")]
+    [InlineData("unsafe_image")]
+    [InlineData("abusive_language")]
+    public void Visual_or_uncertain_findings_do_not_auto_block(string category)
+    {
+        var snapshot = JsonSerializer.Serialize(new { title = "Bán bàn", description = "Bàn cũ" });
+        Assert.False(AiListingReviewPolicy.CanAutoBlock(new("block", category, "Ảnh cần kiểm tra", "Bán bàn", 1), snapshot));
+    }
     [Fact] public void Batch_reserves_before_network_and_enforces_spacing_pause_and_daily_budget()
     {
         var schedule = new AiModerationSchedule();

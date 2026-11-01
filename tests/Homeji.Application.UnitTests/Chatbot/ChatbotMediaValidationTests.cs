@@ -7,6 +7,16 @@ namespace Homeji.Application.UnitTests.Chatbot;
 
 public sealed class ChatbotMediaValidationTests
 {
+    [Fact]
+    public void AcceptsFiveImagesAndOneAudioButRejectsSixImages()
+    {
+        var image = new ChatbotAttachmentDto("image/jpeg", "AA==");
+        var five = Enumerable.Repeat(image, 5).ToList();
+        Assert.Equal(5, ChatbotMediaValidation.Decode(five).Count);
+        five.Add(CreateAudio());
+        Assert.Equal(6, ChatbotMediaValidation.Decode(five).Count);
+        Assert.Throws<RequestValidationException>(() => ChatbotMediaValidation.Decode(Enumerable.Repeat(image, 6).ToArray()));
+    }
     [Theory]
     [InlineData("image/svg+xml", "PHN2Zz4=")]
     [InlineData("image/png", "not-base64")]
@@ -21,7 +31,7 @@ public sealed class ChatbotMediaValidationTests
     public void EnforcesPerImageCountAndCombinedByteBudgets()
     {
         var small = new ChatbotAttachmentDto("image/png", "AA==");
-        Assert.Throws<RequestValidationException>(() => ChatbotMediaValidation.Decode([small, small, small, small]));
+        Assert.Throws<RequestValidationException>(() => ChatbotMediaValidation.Decode([small, small, small, small, small, small]));
         var large = new ChatbotAttachmentDto("image/png", Convert.ToBase64String(new byte[ChatbotMediaValidation.MaxImageBytes + 1]));
         Assert.Throws<RequestValidationException>(() => ChatbotMediaValidation.Decode([large]));
         var full = new ChatbotAttachmentDto("image/png", Convert.ToBase64String(new byte[ChatbotMediaValidation.MaxImageBytes]));

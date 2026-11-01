@@ -6,6 +6,7 @@ using SkiaSharp;
 
 namespace Homeji.Api.IntegrationTests.Infrastructure;
 
+[Collection("NativeImageProcessing")]
 public sealed class ConversationImageProcessorTests
 {
     [Fact]
@@ -63,7 +64,7 @@ public sealed class ConversationImageProcessorTests
     public async Task ProcessAsync_ResizesLongEdgeWithoutUpscaling()
     {
         var result = await new ConversationImageProcessor().ProcessAsync(Upload(Encode(5000, 10, SKEncodedImageFormat.Png), "image/png"));
-        Assert.Equal(4096, result.Width); Assert.Equal(8, result.Height);
+        Assert.Equal(2048, result.Width); Assert.Equal(4, result.Height);
     }
 
     [Fact]

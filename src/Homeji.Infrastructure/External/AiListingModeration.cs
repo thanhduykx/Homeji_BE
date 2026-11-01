@@ -37,10 +37,14 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
                 || source.Value.Market is { Status: not MarketplacePostStatus.Active })
             { job.Complete("superseded", "none", "Tin đã đổi hoặc ngừng hiển thị, không cần gọi AI cho phiên bản cũ.", "", 0, now); return null; }
             // UTF-8 bytes conservatively bound input token use; reserve the full output allowance, never refund uncertain requests.
-            var tokenReservation = Encoding.UTF8.GetByteCount(GeminiListingReviewClient.Instructions + job.Snapshot) + GeminiListingReviewClient.MaxOutputTokens;
+            using var snapshot = JsonDocument.Parse(job.Snapshot);
+            var imageCount = snapshot.RootElement.TryGetProperty("images", out var imageList) ? imageList.GetArrayLength() : 0;
+            var requests = imageCount > 5 ? 2 : 1;
+            var tokenReservation = requests * (Encoding.UTF8.GetByteCount(GeminiListingReviewClient.Instructions + job.Snapshot)
+                + GeminiListingReviewClient.MaxOutputTokens) + Math.Min(imageCount, 10) * 2048;
             if (tokenReservation > schedule.DailyTokenBudget)
             { job.Complete("needs_review", "other", "Tin dài hơn ngân sách AI đã đặt. Cần người duyệt kiểm tra hoặc tăng ngân sách.", "", 0, now); return null; }
-            if (!schedule.Reserve(tokenReservation, now)) return null;
+            if (!schedule.Reserve(tokenReservation, now, requests)) return null;
             return new Claim(job.Id, job.Claim(now), job.Snapshot);
         }, cancellationToken);
         if (claim is null) return;
@@ -174,17 +178,17 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
 
     private async Task DiscoverAsync(AiModerationSchedule schedule, CancellationToken ct)
     {
-        var rentals = await db.RentalPosts.Where(p => (p.Status == RentalPostStatus.Active || p.Status == RentalPostStatus.Pending)
+        var rentals = await db.RentalPosts.Include(p => p.Media).Where(p => (p.Status == RentalPostStatus.Active || p.Status == RentalPostStatus.Pending)
             && (p.UpdatedAt >= schedule.StartedAt || schedule.BackfillBefore != null && p.CreatedAt <= schedule.BackfillBefore)
-            && !db.AiListingReviews.Any(j => j.Kind == "rental" && j.SubjectId == p.Id && j.SourceUpdatedAt >= p.UpdatedAt))
+            && !db.AiListingReviews.Any(j => j.Kind == "rental" && j.SubjectId == p.Id && j.SourceUpdatedAt >= p.UpdatedAt && j.State != "superseded"))
             .OrderByDescending(p => p.UpdatedAt).Take(3).ToListAsync(ct);
         foreach (var rental in rentals) await EnqueueAsync(rental.Id, "rental", rental.Title, Snapshot(rental), rental.UpdatedAt, ct);
         foreach (var kind in new[] { MarketplaceListingType.SecondHand, MarketplaceListingType.Food })
         {
             var name = kind == MarketplaceListingType.Food ? "food" : "goods";
-            var markets = await db.MarketplacePosts.Where(p => p.Status == MarketplacePostStatus.Active && p.ListingType == kind
+            var markets = await db.MarketplacePosts.Include(p => p.Media).Where(p => p.Status == MarketplacePostStatus.Active && p.ListingType == kind
                 && (p.UpdatedAt >= schedule.StartedAt || schedule.BackfillBefore != null && p.CreatedAt <= schedule.BackfillBefore)
-                && !db.AiListingReviews.Any(j => j.Kind == name && j.SubjectId == p.Id && j.SourceUpdatedAt >= p.UpdatedAt))
+                && !db.AiListingReviews.Any(j => j.Kind == name && j.SubjectId == p.Id && j.SourceUpdatedAt >= p.UpdatedAt && j.State != "superseded"))
                 .OrderByDescending(p => p.UpdatedAt).Take(3).ToListAsync(ct);
             foreach (var market in markets) await EnqueueAsync(market.Id, name, market.Title, Snapshot(market), market.UpdatedAt, ct);
         }
@@ -201,13 +205,15 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
     {
         if (job.Kind == "rental")
         {
-            var p = await db.RentalPosts.FromSqlInterpolated($"SELECT * FROM homeji.rental_posts WHERE id = {job.SubjectId} FOR UPDATE").SingleOrDefaultAsync(ct);
+            var p = await db.RentalPosts.FromSqlInterpolated($"SELECT * FROM homeji.rental_posts WHERE id = {job.SubjectId} FOR UPDATE").Include(p => p.Media).SingleOrDefaultAsync(ct);
             return p is null ? null : (Snapshot(p), p.UpdatedAt, p, null);
         }
-        var market = await db.MarketplacePosts.FromSqlInterpolated($"SELECT * FROM homeji.marketplace_posts WHERE id = {job.SubjectId} FOR UPDATE").SingleOrDefaultAsync(ct);
+        var market = await db.MarketplacePosts.FromSqlInterpolated($"SELECT * FROM homeji.marketplace_posts WHERE id = {job.SubjectId} FOR UPDATE").Include(p => p.Media).SingleOrDefaultAsync(ct);
         return market is null ? null : (Snapshot(market), market.UpdatedAt, null, market);
     }
-    private static string Snapshot(RentalPost p) => JsonSerializer.Serialize(new { kind = "rental", p.Title, p.Description, p.Price, p.Area, p.Type }, JsonOptions);
-    private static string Snapshot(MarketplacePost p) => JsonSerializer.Serialize(new { kind = p.ListingType == MarketplaceListingType.Food ? "food" : "goods", p.Title, p.Description, p.Price, p.Category, p.Condition, p.Unit }, JsonOptions);
-    private static string Hash(string content) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("policy-v1:" + content)));
+    private static string Snapshot(RentalPost p) => JsonSerializer.Serialize(new { policyVersion = 2, kind = "rental", p.Title, p.Description, p.Price, p.Area, p.Type, p.HouseRules, p.TransferReason, p.Address,
+        images = p.Media.Where(item => item.MediaType == MediaType.Image).OrderBy(item => item.SortOrder).Select(item => item.Path).Take(11).ToArray() }, JsonOptions);
+    private static string Snapshot(MarketplacePost p) => JsonSerializer.Serialize(new { policyVersion = 2, kind = p.ListingType == MarketplaceListingType.Food ? "food" : "goods", p.Title, p.Description, p.Price, p.Category, p.Condition, p.Unit, p.Address,
+        images = p.Media.OrderBy(item => item.SortOrder).Select(item => item.Url).Take(11).ToArray() }, JsonOptions);
+    private static string Hash(string content) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("policy-v2:" + content)));
 }
