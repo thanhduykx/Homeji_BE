@@ -1070,6 +1070,56 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("post_message_attachments", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.PremiumPriceChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AdminId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PackageCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("PackageName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<decimal>("PreviousPrice")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18)
+                        .HasColumnType("numeric(18,0)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("RequestId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AdminId");
+
+                    b.HasIndex("RequestId")
+                        .IsUnique();
+
+                    b.HasIndex("PackageCode", "CreatedAt");
+
+                    b.ToTable("premium_price_changes", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.ReceiptEmailDelivery", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2677,6 +2727,15 @@ namespace Homeji.Infrastructure.Migrations
                         .WithMany("Attachments")
                         .HasForeignKey("MessageId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.PremiumPriceChange", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("AdminId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

@@ -35,6 +35,7 @@ public sealed class PaymentService : IPaymentService
     private readonly PremiumSubscriptionOptions _premiumOptions;
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionReceiptService _receipts;
+    private readonly Homeji.Application.IServices.Subscriptions.IPremiumPricing? _pricing;
 
     public PaymentService(
         HttpClient httpClient,
@@ -46,7 +47,7 @@ public sealed class PaymentService : IPaymentService
         IOptions<PayOsOptions> payOsOptions,
         IOptions<PremiumSubscriptionOptions> premiumOptions,
         TimeProvider timeProvider,
-        ITransactionReceiptService receipts)
+        ITransactionReceiptService receipts, Homeji.Application.IServices.Subscriptions.IPremiumPricing? pricing = null)
     {
         _httpClient = httpClient;
         _userContext = userContext;
@@ -58,6 +59,7 @@ public sealed class PaymentService : IPaymentService
         _premiumOptions = premiumOptions.Value;
         _timeProvider = timeProvider;
         _receipts = receipts;
+        _pricing = pricing;
     }
 
     public async Task<PaymentDto> GetPaymentByIdAsync(
@@ -118,7 +120,7 @@ public sealed class PaymentService : IPaymentService
         string packageCode,
         decimal? expectedAmount = null, CancellationToken cancellationToken = default)
     {
-        var plan = GetPremiumPlan(packageCode);
+        var plan = await GetPremiumPlanAsync(packageCode, cancellationToken);
         if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
             throw Validation("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
 
@@ -322,7 +324,7 @@ public sealed class PaymentService : IPaymentService
         string packageCode,
         decimal? expectedAmount = null, CancellationToken cancellationToken = default)
     {
-        var plan = GetPremiumPlan(packageCode);
+        var plan = await GetPremiumPlanAsync(packageCode, cancellationToken);
         if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
             throw Validation("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
 
@@ -522,7 +524,7 @@ public sealed class PaymentService : IPaymentService
             return;
         }
 
-        var plan = GetPremiumPlan(payment.PackageCode);
+        var plan = await GetPremiumPlanAsync(payment.PackageCode, cancellationToken);
 
         var existingSubscription = await _subscriptions.GetByPaymentTransactionIdAsync(payment.Id, cancellationToken);
         if (existingSubscription is not null)
@@ -685,14 +687,15 @@ public sealed class PaymentService : IPaymentService
         return $"HJ{suffix}";
     }
 
-    private PremiumPlanOptions GetPremiumPlan(string? packageCode)
+    private async Task<PremiumPlanOptions> GetPremiumPlanAsync(string? packageCode, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(packageCode))
         {
             throw Validation("packageCode", "Mã gói Premium là bắt buộc.");
         }
 
-        var plan = _premiumOptions.GetPlansAt(_timeProvider.GetUtcNow()).SingleOrDefault(candidate =>
+        var plans = _pricing is null ? _premiumOptions.GetPlansAt(_timeProvider.GetUtcNow()) : await _pricing.GetPlansAsync(cancellationToken);
+        var plan = plans.SingleOrDefault(candidate =>
             string.Equals(candidate.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
 
         if (plan is null)

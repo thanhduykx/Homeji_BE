@@ -15,7 +15,7 @@ namespace Homeji.Infrastructure.External;
 
 public sealed class PremiumWalletPaymentService(
     ApplicationDbContext db, UserContext userContext, IOptions<PremiumSubscriptionOptions> options,
-    TimeProvider timeProvider, ITransactionReceiptService receipts, Homeji.Application.IServices.Promotions.IReferralService? referrals = null) : IPremiumWalletPaymentService
+    TimeProvider timeProvider, ITransactionReceiptService receipts, Homeji.Application.IServices.Promotions.IReferralService? referrals = null, Homeji.Application.IServices.Subscriptions.IPremiumPricing? pricing = null) : IPremiumWalletPaymentService
 {
     public async Task<PaymentDto> PurchaseAsync(string packageCode, WalletPremiumPaymentDto request, CancellationToken cancellationToken = default)
     {
@@ -47,7 +47,8 @@ public sealed class PremiumWalletPaymentService(
             await transaction.CommitAsync(cancellationToken);
             return PaymentMapper.ToDto(existing);
         }
-        var plan = options.Value.GetPlansAt(timeProvider.GetUtcNow()).SingleOrDefault(p => string.Equals(p.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
+        var plans = pricing is null ? options.Value.GetPlansAt(timeProvider.GetUtcNow()) : await pricing.GetPlansAsync(cancellationToken);
+        var plan = plans.SingleOrDefault(p => string.Equals(p.Code, packageCode.Trim(), StringComparison.OrdinalIgnoreCase));
         if (plan is null) throw Invalid("packageCode", "Không tìm thấy gói Premium.");
         if (plan.Price <= 0 || decimal.Truncate(plan.Price) != plan.Price || plan.DurationDays <= 0 || string.IsNullOrWhiteSpace(plan.Name))
             throw new InvalidOperationException("Chưa cấu hình gói Premium.");

@@ -33,22 +33,24 @@ public sealed class SubscriptionService : ISubscriptionService
     private readonly IPaymentService _payments;
     private readonly PremiumSubscriptionOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly IPremiumPricing? _pricing;
 
     public SubscriptionService(
         UserContext userContext,
         IUserSubscriptionRepository subscriptions,
         IPaymentService payments,
         IOptions<PremiumSubscriptionOptions> options,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider, IPremiumPricing? pricing = null)
     {
         _userContext = userContext;
         _subscriptions = subscriptions;
         _payments = payments;
         _options = options.Value;
         _timeProvider = timeProvider;
+        _pricing = pricing;
     }
 
-    public Task<IReadOnlyList<SubscriptionPackageDto>> GetPackagesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SubscriptionPackageDto>> GetPackagesAsync(CancellationToken cancellationToken = default)
     {
         var packages = new List<SubscriptionPackageDto>
         {
@@ -62,17 +64,17 @@ public sealed class SubscriptionService : ISubscriptionService
                 BasicBenefits),
         };
 
-        packages.AddRange(_options.GetPlansAt(_timeProvider.GetUtcNow()).Select(plan => new SubscriptionPackageDto(
+        var plans = _pricing is null ? _options.GetPlansAt(_timeProvider.GetUtcNow()) : await _pricing.GetPlansAsync(cancellationToken);
+        packages.AddRange(plans.Select(plan => new SubscriptionPackageDto(
             NormalizePackageCode(plan.Code),
             NormalizePackageName(plan.Name),
             SubscriptionTier.Premium,
             RequirePositivePrice(plan.Price),
             RequirePositiveDuration(plan.DurationDays),
             "Premium",
-            PremiumBenefits) { OriginalPrice = plan.Price == 49_000 && _options.IsLaunchOffer(_timeProvider.GetUtcNow()) ? 99_000 : null,
-                OfferEndsAt = plan.Price == 49_000 && _options.IsLaunchOffer(_timeProvider.GetUtcNow()) ? _options.LaunchOfferEndsAt : null }));
+            PremiumBenefits) { OriginalPrice = plan.OriginalPrice, OfferEndsAt = plan.OfferEndsAt }));
 
-        return Task.FromResult<IReadOnlyList<SubscriptionPackageDto>>(packages);
+        return packages;
     }
 
     public async Task<MySubscriptionDto> GetMySubscriptionAsync(CancellationToken cancellationToken = default)

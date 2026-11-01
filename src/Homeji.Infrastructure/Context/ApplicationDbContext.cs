@@ -37,6 +37,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<WebsitePageView> WebsitePageViews => Set<WebsitePageView>();
     public DbSet<PostConversation> PostConversations => Set<PostConversation>();
     public DbSet<UserMessageBlock> UserMessageBlocks => Set<UserMessageBlock>();
+    public DbSet<PremiumPriceChange> PremiumPriceChanges => Set<PremiumPriceChange>();
     public DbSet<AgentPostDraft> AgentPostDrafts => Set<AgentPostDraft>();
     public DbSet<AdminReportExport> AdminReportExports => Set<AdminReportExport>();
     public DbSet<PostMessage> PostMessages => Set<PostMessage>();

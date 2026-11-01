@@ -23,7 +23,7 @@ public sealed class PremiumSubscriptionOptions
 
     public IReadOnlyList<PremiumPlanOptions> GetPlansAt(DateTimeOffset now) => GetPlans().Select(plan =>
         IsLaunchOffer(now) && plan.Code == "PREMIUM_MONTHLY" && plan.Price == 99_000
-            ? new PremiumPlanOptions { Code = plan.Code, Name = plan.Name, Price = 49_000, DurationDays = plan.DurationDays }
+            ? new PremiumPlanOptions { Code = plan.Code, Name = plan.Name, Price = 49_000, DurationDays = plan.DurationDays, OriginalPrice = 99_000, OfferEndsAt = LaunchOfferEndsAt }
             : plan).ToArray();
 
     public IReadOnlyList<PremiumPlanOptions> GetPlans()
@@ -36,6 +36,8 @@ public sealed class PremiumSubscriptionOptions
 
 public sealed class PremiumPlanOptions
 {
+    public decimal? OriginalPrice { get; set; }
+    public DateTimeOffset? OfferEndsAt { get; set; }
     public string Code { get; set; } = "PREMIUM_MONTHLY";
     public string Name { get; set; } = "Gói Trải Nghiệm";
     public decimal Price { get; set; } = 99_000;

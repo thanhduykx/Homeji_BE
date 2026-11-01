@@ -140,6 +140,7 @@ public static class DependencyInjection
             .Validate(options => !options.Enabled || usesBrevo, "Receipt email delivery requires Brevo.")
             .ValidateOnStart();
         services.AddScoped<ITransactionReceiptService, TransactionReceiptService>();
+        services.AddScoped<Homeji.Application.IServices.Subscriptions.IPremiumPricing, PremiumPricing>();
         services.AddScoped<IPremiumWalletPaymentService, PremiumWalletPaymentService>();
         services.AddScoped<Homeji.Application.IServices.Promotions.IReferralService, ReferralService>();
         services.AddScoped<ISearchInterestService, SearchInterestService>();
