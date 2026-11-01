@@ -20,7 +20,7 @@ public sealed class GeminiDeadlineTests
         });
         var stopwatch = Stopwatch.StartNew();
         Task Call(CancellationToken token) => chatbot
-            ? new GeminiChatbotClient(new HttpClient(handler), options, NullLogger<GeminiChatbotClient>.Instance)
+            ? new GeminiChatbotClient(new HttpClient(handler), options, NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor())
                 .GenerateReplyAsync([], "Explain HTTPS", token)
             : new GeminiSearchTextParser(new HttpClient(handler), options, NullLogger<GeminiSearchTextParser>.Instance)
                 .ParseAsync("Phòng", token);

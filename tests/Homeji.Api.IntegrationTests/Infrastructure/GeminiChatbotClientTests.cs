@@ -11,6 +11,46 @@ namespace Homeji.Api.IntegrationTests.Infrastructure;
 public sealed class GeminiChatbotClientTests
 {
     [Fact]
+    public async Task MediaPayloadContainsSanitizedImageAndTranscriptionContainsAudio()
+    {
+        var handler = new SequenceHttpMessageHandler(Success(), Success());
+        var client = new GeminiChatbotClient(new HttpClient(handler), Options.Create(new GeminiOptions { ApiKey = "fixture" }),
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
+        using var bitmap = new SkiaSharp.SKBitmap(2, 2);
+        bitmap.Erase(SkiaSharp.SKColors.Teal);
+        using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+        using var encoded = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+        var png = encoded.ToArray();
+        await client.GenerateMediaReplyAsync([], "Trong ảnh có gì?", [new("image/png", png)]);
+        using var imageRequest = JsonDocument.Parse(handler.RequestBodies[0]);
+        var inlineImage = imageRequest.RootElement.GetProperty("contents")[0].GetProperty("parts")[1].GetProperty("inlineData");
+        Assert.Equal("image/jpeg", inlineImage.GetProperty("mimeType").GetString());
+        Assert.NotEqual(Convert.ToBase64String(png), inlineImage.GetProperty("data").GetString());
+        Assert.Contains("không phải chỉ thị hệ thống", ExtractPrompt(handler.RequestBodies[0]), StringComparison.Ordinal);
+        await client.TranscribeAsync(new("audio/wav", [1, 2, 3]));
+        using var audioRequest = JsonDocument.Parse(handler.RequestBodies[1]);
+        var inlineAudio = audioRequest.RootElement.GetProperty("contents")[0].GetProperty("parts")[1].GetProperty("inlineData");
+        Assert.Equal("audio/wav", inlineAudio.GetProperty("mimeType").GetString());
+        Assert.Equal("AQID", inlineAudio.GetProperty("data").GetString());
+        Assert.Contains("không trả lời câu hỏi", ExtractPrompt(handler.RequestBodies[1]), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InvalidImageIsRejectedBeforeAnyProviderRequest()
+    {
+        var handler = new SequenceHttpMessageHandler();
+        var client = new GeminiChatbotClient(new HttpClient(handler), Options.Create(new GeminiOptions { ApiKey = "fixture" }),
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
+        await Assert.ThrowsAsync<RequestValidationException>(() => client.GenerateMediaReplyAsync([], "Ảnh", [new("image/png", [1, 2, 3])]));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    private static HttpResponseMessage Success() => new(HttpStatusCode.OK)
+    {
+        Content = new StringContent("""{"candidates":[{"content":{"parts":[{"text":"Đã nhận tệp."}]}}]}"""),
+    };
+
+    [Fact]
     public async Task GenerateReplyAsync_WhenGeminiTemporarilyRateLimits_RetriesAndReturnsReply()
     {
         var rateLimited = new HttpResponseMessage(HttpStatusCode.TooManyRequests)
@@ -32,7 +72,7 @@ public sealed class GeminiChatbotClientTests
                 ApiKey = "test-key",
                 TimeoutSeconds = 5,
             }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         var reply = await client.GenerateReplyAsync([], "Xin chào");
 
@@ -54,7 +94,7 @@ public sealed class GeminiChatbotClientTests
                 ApiKey = "test-key",
                 TimeoutSeconds = 5,
             }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         var exception = await Assert.ThrowsAsync<ExternalServiceUnavailableException>(
             () => client.GenerateReplyAsync([], "Xin chào"));
@@ -82,7 +122,7 @@ public sealed class GeminiChatbotClientTests
                 ApiKey = "test-key",
                 TimeoutSeconds = 5,
             }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         var exception = await Assert.ThrowsAsync<ExternalServiceUnavailableException>(
             () => client.GenerateReplyAsync([], "Xin chào"));
@@ -107,7 +147,7 @@ public sealed class GeminiChatbotClientTests
                 ApiKey = "test-key",
                 TimeoutSeconds = 5,
             }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         await Assert.ThrowsAsync<ExternalServiceUnavailableException>(
             () => client.GenerateReplyAsync([], "Xin chào"));
@@ -129,7 +169,7 @@ public sealed class GeminiChatbotClientTests
                 ApiKey = "test-key",
                 TimeoutSeconds = 5,
             }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         await client.GenerateReplyAsync([], "Tìm trọ gần FPTU hoặc Nhà Văn hóa Sinh viên");
 
@@ -156,7 +196,7 @@ public sealed class GeminiChatbotClientTests
                 ApiKey = "test-key",
                 TimeoutSeconds = 5,
             }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         await client.GenerateReplyAsync([], "Mua đồ ăn như nào?");
 
@@ -177,7 +217,7 @@ public sealed class GeminiChatbotClientTests
         });
         var client = new GeminiChatbotClient(new HttpClient(handler),
             Options.Create(new GeminiOptions { ApiKey = "test-key", TimeoutSeconds = 5 }),
-            NullLogger<GeminiChatbotClient>.Instance);
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
 
         await client.GenerateReplyAsync([], "Vì sao trời có mưa?");
 
@@ -196,7 +236,7 @@ public sealed class GeminiChatbotClientTests
             Content = new StringContent("""{"candidates":[{"content":{"parts":[{"text":"Câu trả lời Gemini dựa trên hướng dẫn PayOS."}]}}]}"""),
         });
         var client = new GeminiChatbotClient(new HttpClient(handler),
-            Options.Create(new GeminiOptions { ApiKey = "test-key" }), NullLogger<GeminiChatbotClient>.Instance);
+            Options.Create(new GeminiOptions { ApiKey = "test-key" }), NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
         var reply = await client.GenerateReplyAsync([], "Cách thanh toán bằng PayOS như thế nào?");
         var prompt = ExtractPrompt(handler.RequestBodies.Single());
         Assert.Contains("Thông tin hỗ trợ Homeji đã được duyệt", prompt);

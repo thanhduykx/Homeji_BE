@@ -11,13 +11,21 @@ public static partial class RentalSearchIntent
     public static readonly IReadOnlyDictionary<string, string[]> AmenityAliases = new Dictionary<string, string[]>(StringComparer.Ordinal)
     {
         ["KITCHEN"] = ["bep", "nau an"],
-        ["AIR_CONDITIONER"] = ["may lanh", "dieu hoa"],
+        ["AIR_CONDITIONER"] = ["may lanh", "dieu hoa", "airconditioner", "air conditioner", "air_conditioner"],
+        ["WATER_HEATER"] = ["may nuoc nong", "binh nong lanh", "nuoc nong", "waterheater", "water heater", "water_heater"],
         ["WIFI"] = ["wifi", "internet"],
         ["PARKING"] = ["giu xe", "bai xe"],
-        ["PRIVATE_BATHROOM"] = ["wc rieng", "toilet rieng", "ve sinh rieng"],
-        ["PET_FRIENDLY"] = ["thu cung", "nuoi meo", "nuoi cho"],
-        ["FREE_TIME"] = ["gio giac tu do"],
+        ["PRIVATE_BATHROOM"] = ["wc rieng", "toilet rieng", "ve sinh rieng", "nha tam rieng", "privatetoilet", "private_bathroom"],
+        ["PET_FRIENDLY"] = ["thu cung", "nuoi meo", "nuoi cho", "petfriendly", "pet_friendly"],
+        ["FREE_TIME"] = ["gio giac tu do", "freetime", "free_time"],
     };
+
+    public static string CanonicalAmenity(string value)
+    {
+        var normalized = Normalize(value.Trim());
+        return AmenityAliases.FirstOrDefault(pair => Normalize(pair.Key) == normalized || pair.Value.Contains(normalized)).Key
+            ?? value.Trim();
+    }
 
     public static string Normalize(string value)
     {
@@ -42,9 +50,9 @@ public static partial class RentalSearchIntent
         if (IsKeywordClearCommand(message)) return state with { Keyword = null };
         if (text.Contains("tim lai", StringComparison.Ordinal) || text.Contains("bat dau lai", StringComparison.Ordinal))
             state = new AiParsedSearchCriteriaDto(null, null, null, null, null, null, []);
-        var required = state.RequiredAmenities.ToHashSet(StringComparer.Ordinal);
-        var excluded = state.ExcludedAmenities.ToHashSet(StringComparer.Ordinal);
-        var optional = state.Criteria.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var required = state.RequiredAmenities.Select(CanonicalAmenity).ToHashSet(StringComparer.Ordinal);
+        var excluded = state.ExcludedAmenities.Select(CanonicalAmenity).ToHashSet(StringComparer.Ordinal);
+        var optional = state.Criteria.Select(CanonicalAmenity).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var unknown = state.Unknown.ToHashSet(StringComparer.Ordinal);
         foreach (var (code, aliases) in AmenityAliases)
         {
@@ -54,7 +62,7 @@ public static partial class RentalSearchIntent
                 if (!match.Success) continue;
                 var prefix = match.Groups["prefix"].Value.Trim();
                 required.Remove(code); excluded.Remove(code); optional.Remove(code);
-                if (prefix is "khong can" or "bo") continue;
+                if (prefix is "khong can" or "bo") break;
                 if (prefix is "khong co" or "khong muon") excluded.Add(code);
                 else if (prefix is "uu tien" or "mong muon") optional.Add(code);
                 else required.Add(code);
@@ -155,6 +163,7 @@ public static partial class RentalSearchIntent
         }
         if (text.Contains("bo dien tich", StringComparison.Ordinal)) { state = state with { AreaMin = null, AreaMax = null }; unknown.Remove("area"); }
         if (state.AreaMin > state.AreaMax) unknown.Add("area");
+        optional.ExceptWith(required); optional.ExceptWith(excluded);
         return state with { RequiredAmenities = required.Order(StringComparer.Ordinal).ToArray(), ExcludedAmenities = excluded.Order(StringComparer.Ordinal).ToArray(), Criteria = optional.Order(StringComparer.Ordinal).ToArray(), Unknown = unknown.Order(StringComparer.Ordinal).ToArray() };
     }
 
@@ -174,7 +183,7 @@ public static partial class RentalSearchIntent
     [GeneratedRegex(@"(?:tu\s+)?(?<min>\d+(?:[.,]\d+)?)\s*(?:m2|m²|met vuong)?\s*(?:den|toi|-)\s*(?<max>\d+(?:[.,]\d+)?)\s*(?:m2|m²|met vuong)(?=$|[\s,.;!?])", RegexOptions.CultureInvariant)]
     private static partial Regex AreaRange();
 
-    [GeneratedRegex(@"\b(phong|tro|thue|o ghep|ngan sach|gia|gan|bep|may lanh|re hon|nguoi|ca phi|diem den|tien thue|wifi|internet|thu cung|giu xe|wc rieng|ve sinh rieng|fpt|khu cong nghe cao|phut|di bo|o to|xe buyt|xe may|spkt|hcmute|uit|hcmut|hcmus|uel|hutech|dai hoc|truong|dien tich)\b", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"\b(phong|tro|thue|o ghep|ngan sach|gia|gan|bep|may lanh|dieu hoa|nuoc nong|binh nong lanh|re hon|nguoi|ca phi|diem den|tien thue|wifi|internet|thu cung|giu xe|wc rieng|ve sinh rieng|fpt|khu cong nghe cao|phut|di bo|o to|xe buyt|xe may|spkt|hcmute|uit|hcmut|hcmus|uel|hutech|dai hoc|truong|dien tich)\b", RegexOptions.CultureInvariant)]
     private static partial Regex RentalTerms();
     [GeneratedRegex(@"(?<bound>duoi|toi da|khong qua|cao nhat|tu|tren)?\s*(?<amount>\d+(?:[.,]\d+)*)\s*(?<unit>trieu|tr|vnd|dong|nghin|ngan|k|d)\b", RegexOptions.CultureInvariant)]
     private static partial Regex Money();

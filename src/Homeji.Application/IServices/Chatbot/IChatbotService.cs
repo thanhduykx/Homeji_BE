@@ -4,6 +4,7 @@ namespace Homeji.Application.IServices.Chatbot;
 
 public interface IChatbotService
 {
+    Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default);
     Task DeleteConversationAsync(Guid conversationId, CancellationToken cancellationToken = default);
     Task<ChatbotPopupConfigDto> GetPopupConfigAsync(CancellationToken cancellationToken = default);
 

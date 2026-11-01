@@ -49,6 +49,7 @@ public sealed class ChatbotController : ControllerBase
     }
 
     [HttpPost("messages")]
+    [RequestSizeLimit(12 * 1024 * 1024)]
     [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
     [ProducesResponseType<ChatbotReplyDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -59,6 +60,14 @@ public sealed class ChatbotController : ControllerBase
         CancellationToken cancellationToken)
     {
         return Ok(await _chatbot.SendMessageAsync(ChatbotViewMapper.ToDto(request), cancellationToken));
+    }
+
+    [HttpPost("transcriptions")]
+    [RequestSizeLimit(6 * 1024 * 1024)]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    public async Task<IActionResult> Transcribe([FromBody] ChatbotTranscriptionDto request, CancellationToken cancellationToken)
+    {
+        return Ok(new { text = await _chatbot.TranscribeAsync(request, cancellationToken) });
     }
 
     [HttpDelete("conversations/{conversationId:guid}")]

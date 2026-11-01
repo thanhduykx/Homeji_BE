@@ -5,6 +5,41 @@ namespace Homeji.Application.UnitTests.AI;
 public sealed class RentalSearchIntentTests
 {
     [Theory]
+    [InlineData("nước nóng")]
+    [InlineData("máy nước nóng")]
+    [InlineData("bình nóng lạnh")]
+    [InlineData("nuoc nong")]
+    public void HotWaterSynonyms_AreRequiredAndBudgetIsPreserved(string amenity)
+    {
+        var result = RentalSearchIntent.Apply($"tìm phòng có máy lạnh, {amenity} dưới 3 triệu");
+        Assert.Equal(3_000_000, result.PriceMax);
+        Assert.Contains("AIR_CONDITIONER", result.RequiredAmenities);
+        Assert.Contains("WATER_HEATER", result.RequiredAmenities);
+        Assert.True(RentalSearchIntent.IsRentalQuery(amenity));
+        var removed = RentalSearchIntent.Apply($"không cần {amenity}", result);
+        Assert.DoesNotContain("WATER_HEATER", removed.RequiredAmenities);
+        Assert.DoesNotContain("WATER_HEATER", removed.ExcludedAmenities);
+        Assert.Contains("AIR_CONDITIONER", removed.RequiredAmenities);
+        Assert.Equal(result.PriceMax, removed.PriceMax);
+        var excluded = RentalSearchIntent.Apply($"không có {amenity}", result);
+        Assert.Contains("WATER_HEATER", excluded.ExcludedAmenities);
+        Assert.DoesNotContain("WATER_HEATER", excluded.RequiredAmenities);
+    }
+
+    [Fact]
+    public void ProviderAliases_DoNotDuplicateOrSurviveAnExplicitRemoval()
+    {
+        var previous = new Homeji.Application.DTOs.AI.AiParsedSearchCriteriaDto(null, null, null, 3_000_000, null, null, ["airConditioner", "waterHeater"]);
+        var result = RentalSearchIntent.Apply("có máy lạnh, nước nóng", previous);
+        Assert.Empty(result.Criteria);
+        Assert.Equal(2, result.RequiredAmenities.Count);
+        Assert.Contains("AIR_CONDITIONER", result.RequiredAmenities);
+        Assert.Contains("WATER_HEATER", result.RequiredAmenities);
+        var removed = RentalSearchIntent.Apply("không cần nước nóng", previous);
+        Assert.DoesNotContain("WATER_HEATER", removed.Criteria);
+        Assert.Contains("AIR_CONDITIONER", removed.Criteria);
+    }
+    [Theory]
     [InlineData("Bỏ từ khóa")]
     [InlineData("Bo tu khoa")]
     [InlineData("  BỎ TỪ KHÓA  ")]

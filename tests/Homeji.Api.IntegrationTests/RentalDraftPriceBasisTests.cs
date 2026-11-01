@@ -109,6 +109,8 @@ public sealed class RentalDraftPriceBasisTests
 
     private sealed class CapturingClient(string? output = null) : IChatbotAiClient
     {
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> attachments, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public int Calls { get; private set; }
         public string Prompt { get; private set; } = "";
 

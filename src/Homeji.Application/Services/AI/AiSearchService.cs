@@ -251,7 +251,7 @@ public sealed class AiSearchService : IAiSearchService
     {
         var normalizedCriteria = (criteria.Criteria ?? [])
             .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Select(item => item.Trim())
+            .Select(RentalSearchIntent.CanonicalAmenity)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Take(20)
             .ToArray();
@@ -357,7 +357,7 @@ public sealed class AiSearchService : IAiSearchService
 
     private static string[] NormalizeAmenityCodes(IReadOnlyCollection<string> codes) => codes
         .Where(code => !string.IsNullOrWhiteSpace(code))
-        .Select(code => code.Trim().ToUpperInvariant())
+        .Select(RentalSearchIntent.CanonicalAmenity)
         .Where(RentalSearchIntent.AmenityAliases.ContainsKey)
         .Distinct(StringComparer.Ordinal).Take(20).ToArray();
 

@@ -123,8 +123,9 @@ public sealed class GeminiSearchTextParser : IAiSearchTextParser
             Quy tắc:
             - Chuyển tiền Việt sang VND: "2tr", "2 triệu" => 2000000.
             - "cao nhất", "không được hơn", "tối đa" => price_max.
-            - Chuẩn hóa criteria sang camelCase tiếng Anh nếu phù hợp: parking, freeTime, wifi, airConditioner, privateToilet, security, quiet, petFriendly, kitchen.
-            - Criteria chỉ là mong muốn. "Có/bắt buộc" đưa vào required_amenities dùng mã PARKING, FREE_TIME, WIFI, AIR_CONDITIONER, PRIVATE_BATHROOM, PET_FRIENDLY, KITCHEN, QUIET.
+            - Chuẩn hóa criteria sang camelCase tiếng Anh nếu phù hợp: parking, freeTime, wifi, airConditioner, waterHeater, privateToilet, security, quiet, petFriendly, kitchen.
+            - Criteria chỉ là mong muốn. "Có/bắt buộc" đưa vào required_amenities dùng mã PARKING, FREE_TIME, WIFI, AIR_CONDITIONER, WATER_HEATER, PRIVATE_BATHROOM, PET_FRIENDLY, KITCHEN, QUIET.
+            - "Nước nóng", "bình nóng lạnh" là máy nước nóng: WATER_HEATER. Không suy ra tiện ích từ lời phủ định.
             - "Không cần máy lạnh" bỏ yêu cầu, không loại trừ phòng có máy lạnh. "Không có máy lạnh" đưa AIR_CONDITIONER vào excluded_amenities.
             - "Không ở ghép" => exclude_shared true. "Tổng/cả phí" => budget_kind total; "tiền thuê" => rent.
             - Tên trường vào destination; không tự gán địa chỉ trường thành location hay khẳng định gần trường.

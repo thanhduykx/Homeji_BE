@@ -20,6 +20,61 @@ public sealed class ChatbotServiceTests
     private static readonly Guid UserId = Guid.Parse("8e996f4c-ec40-4b5e-b66b-9f33c4f29b63");
     private static readonly DateTimeOffset UtcNow = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public async Task MediaUsesProviderWithoutPretendingToSearchOrPersistFiles()
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new MediaClient();
+        var response = await CreateService(repository, ai, historyStorageEnabled: false).SendMessageAsync(
+            new(null, "Tìm phòng giống ảnh", Attachments: [new("image/png", "AA==")]));
+        Assert.Equal("Đã phân tích tệp.", response.AssistantMessage.Content);
+        Assert.Equal(1, ai.MediaCalls);
+        Assert.Null(response.SearchUpdate);
+        Assert.Null(response.FoodDiscovery);
+        Assert.Null(repository.Conversation);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task MediaProviderFailurePropagatesForRetryInsteadOfReturningTextOnlyFallback()
+    {
+        var repository = new InMemoryChatConversationRepository();
+        await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => CreateService(repository, new MediaClient(fail: true))
+            .SendMessageAsync(new(null, null, Attachments: [new("image/png", "AA==")])));
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
+    public async Task TranscriptionReturnsDraftWithoutCreatingConversationAndRejectsImages()
+    {
+        var repository = new InMemoryChatConversationRepository();
+        var ai = new MediaClient();
+        var service = CreateService(repository, ai);
+        Assert.Equal("Tìm phòng dưới ba triệu.", await service.TranscribeAsync(new(ChatbotMediaValidationTests.CreateAudio())));
+        Assert.Null(repository.Conversation);
+        await Assert.ThrowsAsync<RequestValidationException>(() => service.TranscribeAsync(new(new("image/png", "AA=="))));
+        Assert.Equal(1, ai.TranscriptionCalls);
+    }
+
+    private sealed class MediaClient(bool fail = false) : IChatbotAiClient
+    {
+        public int MediaCalls { get; private set; }
+        public int TranscriptionCalls { get; private set; }
+        public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, CancellationToken cancellationToken = default) => throw new InvalidOperationException("Media must not use text-only generation.");
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> attachments, CancellationToken cancellationToken = default)
+        {
+            MediaCalls++;
+            if (fail) throw new ExternalServiceUnavailableException("Gemini", "Unavailable");
+            Assert.Single(attachments);
+            return Task.FromResult("Đã phân tích tệp.");
+        }
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default)
+        {
+            TranscriptionCalls++;
+            return Task.FromResult("Tìm phòng dưới ba triệu.");
+        }
+    }
+
     [Theory]
     [InlineData("hi")]
     [InlineData("Cách thanh toán bằng PayOS như thế nào?")]
@@ -48,6 +103,8 @@ public sealed class ChatbotServiceTests
 
     private sealed class SuccessfulClient : IChatbotAiClient
     {
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> attachments, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public int Calls { get; private set; }
         public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string latestUserMessage, CancellationToken cancellationToken = default)
         {
@@ -89,6 +146,8 @@ public sealed class ChatbotServiceTests
 
     private sealed class CountingUnavailableClient : IChatbotAiClient
     {
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> attachments, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public int Calls { get; private set; }
         public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string latestUserMessage, CancellationToken cancellationToken = default)
         {
@@ -453,6 +512,8 @@ public sealed class ChatbotServiceTests
 
     private sealed class UnavailableChatbotAiClient : IChatbotAiClient
     {
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> attachments, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<string> GenerateReplyAsync(
             IReadOnlyCollection<ChatbotMessageDto> conversationMessages,
             string latestUserMessage,

@@ -11,4 +11,5 @@ public sealed record SendChatbotMessageViewModel(
     ChatbotRentalContextDto? RentalContext = null,
     ChatbotRentalSelectionDto? RentalSelection = null,
     ChatbotFoodContextDto? FoodContext = null,
-    ChatbotFoodCriteriaDto? PreviousFoodCriteria = null);
+    ChatbotFoodCriteriaDto? PreviousFoodCriteria = null,
+    IReadOnlyCollection<ChatbotAttachmentDto>? Attachments = null);

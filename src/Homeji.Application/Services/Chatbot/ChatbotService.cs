@@ -102,7 +102,10 @@ public sealed class ChatbotService : IChatbotService
             throw new ForbiddenAccessException("Chatbot hiện đang tắt.");
         }
 
-        var message = ValidateMessage(request.Message);
+        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
+        var media = ChatbotMediaValidation.Decode(request.Attachments);
+        var message = ValidateMessage(string.IsNullOrWhiteSpace(request.Message) && media.Count > 0
+            ? "Hãy xem hoặc nghe nội dung đính kèm và hỗ trợ mình." : request.Message);
         var foodRefinement = request.PreviousFoodCriteria is not null && FoodSearchIntent.IsRefinement(message);
         var foodTopic = FoodSearchIntent.IsFoodTopic(message) || foodRefinement;
         var foodQuery = foodRefinement || FoodSearchIntent.IsDiscovery(message);
@@ -112,7 +115,6 @@ public sealed class ChatbotService : IChatbotService
             throw new ForbiddenAccessException("Lưu lịch sử đang tắt. Bạn vẫn có thể dùng chatbot trong phiên hiện tại.");
         if (!request.SaveHistory && request.ConversationId.HasValue)
             throw new RequestValidationException(new Dictionary<string, string[]> { ["conversationId"] = ["Chỉ gửi mã hội thoại khi đã đồng ý lưu lịch sử."] });
-        var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
         var userId = profile.Id;
         var now = _timeProvider.GetUtcNow();
 
@@ -125,7 +127,9 @@ public sealed class ChatbotService : IChatbotService
             await _conversations.AddAsync(conversation, cancellationToken);
         }
 
-        var userMessage = conversation.AddUserMessage(message, now);
+        var storedMessage = media.Count > 0
+            ? message + $"\n[Đã gửi {media.Count} tệp; ảnh và âm thanh không được lưu trong lịch sử.]" : message;
+        var userMessage = conversation.AddUserMessage(storedMessage, now);
         var history = conversation.Messages
             .OrderBy(messageItem => messageItem.CreatedAt)
             .TakeLast(Math.Clamp(_options.MaxHistoryMessages, 2, 30))
@@ -137,7 +141,13 @@ public sealed class ChatbotService : IChatbotService
         RentalDecisionResponseDto? rentalDecision = null;
         ChatbotFoodResponseDto? foodDiscovery = null;
         string assistantReply;
-        if (foodQuery)
+        if (media.Count > 0)
+        {
+            // Media is untrusted input, never a source of verified catalog/account data.
+            // Provider errors propagate so the sender can retry the actual attachment.
+            assistantReply = await _aiClient.GenerateMediaReplyAsync(history, message, media, cancellationToken);
+        }
+        else if (foodQuery)
         {
             foodDiscovery = await _food.SearchAsync(message, request.FoodContext, request.PreviousFoodCriteria, cancellationToken);
             assistantReply = foodDiscovery.Summary;
@@ -176,6 +186,16 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
             actions) { RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery };
+    }
+
+    public async Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled) throw new ForbiddenAccessException("Chatbot hiện đang tắt.");
+        await _userContext.GetRequiredProfileAsync(cancellationToken);
+        if (request.Audio is null) throw ChatbotMediaValidation.Invalid();
+        var media = ChatbotMediaValidation.Decode([request.Audio]);
+        if (media[0].MimeType != "audio/wav") throw ChatbotMediaValidation.Invalid();
+        return ValidateMessage(await _aiClient.TranscribeAsync(media[0], cancellationToken));
     }
 
     private async Task<string> GenerateReplyAsync(

@@ -19,6 +19,22 @@ namespace Homeji.Api.IntegrationTests;
 public sealed class ChatbotContextApiTests
 {
     [Fact]
+    public async Task AttachmentsAndTranscriptionSurviveHttpBinding()
+    {
+        var service = new CapturingChatbot();
+        using var factory = CreateFactory(service);
+        using var client = factory.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+        using var message = await client.PostAsJsonAsync(new Uri("/api/chatbot/messages", UriKind.Relative),
+            new { message = "Xem ảnh", attachments = new[] { new { mimeType = "image/png", data = "AA==" } } });
+        Assert.Equal(HttpStatusCode.OK, message.StatusCode);
+        Assert.Equal(new ChatbotAttachmentDto("image/png", "AA=="), Assert.Single(service.LastRequest!.Attachments!));
+        using var transcription = await client.PostAsJsonAsync(new Uri("/api/chatbot/transcriptions", UriKind.Relative),
+            new { audio = new { mimeType = "audio/wav", data = "AQID" } });
+        Assert.Equal(HttpStatusCode.OK, transcription.StatusCode);
+        Assert.Equal(new ChatbotAttachmentDto("audio/wav", "AQID"), service.LastTranscription!.Audio);
+    }
+
+    [Fact]
     public async Task FoodOriginSurvivesHttpBindingAndFoodResponseIsAdditive()
     {
         var service = new CapturingChatbot();
@@ -129,6 +145,12 @@ public sealed class ChatbotContextApiTests
 
     private sealed class CapturingChatbot : IChatbotService
     {
+        public ChatbotTranscriptionDto? LastTranscription { get; private set; }
+        public Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default)
+        {
+            LastTranscription = request;
+            return Task.FromResult("Bản chép lời kiểm thử.");
+        }
         public SendChatbotMessageDto? LastRequest { get; private set; }
         public Task<ChatbotReplyDto> SendMessageAsync(SendChatbotMessageDto request, CancellationToken cancellationToken = default)
         {
