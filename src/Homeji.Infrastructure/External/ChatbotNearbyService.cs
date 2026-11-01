@@ -14,6 +14,7 @@ public sealed class ChatbotNearbyService(ApplicationDbContext db, TimeProvider c
     {
         if (location is null) return new("locationRequired", "Chọn Dùng vị trí của tôi hoặc một địa chỉ bên dưới, rồi gửi lại yêu cầu để mình tìm phòng quanh đúng vị trí đó.", []);
         location.Validate(clock.GetUtcNow());
+        if (location.AccuracyMeters > 1000) return new("locationRequired", "Vị trí thiết bị có sai số quá lớn. Chọn một địa chỉ cụ thể để mình tìm quanh đúng khu vực.", []);
         if (!HomejiServiceArea.Contains(location.Latitude, location.Longitude)) return new("outOfArea", "Vị trí này nằm ngoài khu vực dữ liệu Thủ Đức / Quận 9 hiện có. Chọn địa chỉ trong khu vực để tìm phòng.", []);
         var criteria = RentalSearchIntent.Apply(message);
         if (criteria.Unknown.Count > 0) return new("clarificationRequired", "Mình cần bạn làm rõ ngân sách, diện tích hoặc điều kiện chưa xác nhận trước khi tìm quanh vị trí đã chọn.", []);

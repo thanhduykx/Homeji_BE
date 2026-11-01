@@ -20,6 +20,30 @@ namespace Homeji.Api.IntegrationTests;
 
 public sealed class AgentPostingDatabaseTests
 {
+    [Homeji.Api.IntegrationTests.Infrastructure.LiveAgentProviderFact]
+    public async Task Reported_request_with_real_provider_creates_a_located_approval_draft_not_instructions()
+    {
+        await using var db = Open(); var user = await Seed(db, true);
+        var root = Environment.GetEnvironmentVariable("HOMEJI_AGENT_LIVE_ROOT")!;
+        using var settings = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "src/Homeji.Api/appsettings.Local.json")));
+        var config = settings.RootElement.GetProperty("Ai").GetProperty("Gemini");
+        var options = new GeminiOptions { ApiKey = config.GetProperty("ApiKey").GetString(), MaxRetryAttempts = 0 };
+        if (config.TryGetProperty("Endpoint", out var endpoint)) options.Endpoint = endpoint.GetString()!;
+        var processor = new ConversationImageProcessor(); using var http = new HttpClient();
+        var provider = new GeminiChatbotClient(http, Options.Create(options), Microsoft.Extensions.Logging.Abstractions.NullLogger<GeminiChatbotClient>.Instance, processor);
+        var context = new UserContext(new CurrentUser(user), new UserProfileRepository(db));
+        var chatbot = new Homeji.Application.Services.Chatbot.ChatbotService(context, new ChatConversationRepository(db), provider,
+            null!, null!, null!, Options.Create(new Homeji.Application.Services.Chatbot.ChatbotOptions { Enabled = true, HistoryStorageEnabled = true }), TimeProvider.System,
+            Service(db, user, provider, processor));
+        var png = await File.ReadAllBytesAsync(Environment.GetEnvironmentVariable("HOMEJI_AGENT_LIVE_IMAGE")!);
+        var response = await chatbot.SendMessageAsync(new(null, "đăng pass lại cái ghế này 500k.", SaveHistory: true,
+            Attachments: [new("image/png", Convert.ToBase64String(png))], Location: new(10.84m, 106.8m, "Lê Văn Việt, Thủ Đức", DateTimeOffset.UtcNow, 15)));
+        Assert.NotNull(response.AgentDraft); Assert.True(response.AgentRequested);
+        Assert.Equal(500000, response.AgentDraft.Details.Price); Assert.Equal("Lê Văn Việt, Thủ Đức", response.AgentDraft.Details.Address);
+        Assert.Equal(2, (await chatbot.GetMessagesAsync(response.ConversationId)).Count);
+        Assert.False(await db.MarketplacePosts.AnyAsync(row => row.SellerId == user));
+        await File.WriteAllTextAsync(Path.Combine(root, "output/verification/agent-real-full-flow.json"), System.Text.Json.JsonSerializer.Serialize(new { verified = true, exactUserRequest = true, realProvider = true, price = 500000, locationFilled = true, optedInHistoryKept = true, approvalRequired = true, published = false, isolatedDatabase = true }));
+    }
     [LocalMarketplaceDatabaseFact]
     public async Task Preparing_a_draft_does_not_detach_the_enclosing_opted_in_chat_history()
     {
@@ -133,13 +157,13 @@ public sealed class AgentPostingDatabaseTests
         if (premium) db.UserSubscriptions.Add(UserSubscription.CreatePremium(user, "PREMIUM_MONTHLY", "Fixture Premium", null, now, 30, now));
         await db.SaveChangesAsync(); return user;
     }
-    private static ChatbotPostingAgent Service(ApplicationDbContext db, Guid user)
+    private static ChatbotPostingAgent Service(ApplicationDbContext db, Guid user, IChatbotAiClient? provider = null, IConversationImageProcessor? processor = null)
     {
         var profiles = new UserProfileRepository(db); var context = new UserContext(new CurrentUser(user), profiles);
         var marketplace = new MarketplacePostService(context, new MarketplacePostRepository(db), new RentalPostRepository(db),
             profiles, new ContentModerationService(new BadWordRepository(db)), TimeProvider.System,
             new WalletRepository(db), Options.Create(new MarketplaceFinanceOptions()));
-        return new(db, context, new UserSubscriptionRepository(db), new Provider(), new Processor(), new Upload(), marketplace, TimeProvider.System);
+        return new(db, context, new UserSubscriptionRepository(db), provider ?? new Provider(), processor ?? new Processor(), new Upload(), marketplace, TimeProvider.System);
     }
     private sealed record CurrentUser(Guid? UserId) : ICurrentUser;
     private sealed class Provider : IChatbotAiClient
