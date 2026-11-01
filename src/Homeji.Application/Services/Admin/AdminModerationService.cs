@@ -43,6 +43,7 @@ public sealed class AdminModerationService : IAdminModerationService
     private readonly IRentalWantedPostRepository _wantedPosts;
     private readonly IUserSessionRevocationService _sessionRevocations;
     private readonly IUserSessionRealtimePublisher _sessionRealtimePublisher;
+    private readonly IMaintenanceAnnouncements _maintenanceAnnouncements;
 
     public AdminModerationService(
         UserContext userContext,
@@ -59,7 +60,8 @@ public sealed class AdminModerationService : IAdminModerationService
         IUserSessionRevocationService sessionRevocations,
         IUserSessionRealtimePublisher sessionRealtimePublisher,
         TimeProvider timeProvider,
-        INotificationRealtimePublisher realtimePublisher)
+        INotificationRealtimePublisher realtimePublisher,
+        IMaintenanceAnnouncements maintenanceAnnouncements)
     {
         _userContext = userContext;
         _posts = posts;
@@ -76,6 +78,7 @@ public sealed class AdminModerationService : IAdminModerationService
         _sessionRealtimePublisher = sessionRealtimePublisher;
         _timeProvider = timeProvider;
         _realtimePublisher = realtimePublisher;
+        _maintenanceAnnouncements = maintenanceAnnouncements;
     }
 
     public async Task<IReadOnlyList<AdminActiveUserDto>> GetActiveUsersAsync(
@@ -179,6 +182,11 @@ public sealed class AdminModerationService : IAdminModerationService
             errors["scheduledStartAt"] = ["Cần chọn thời điểm bắt đầu trước khi chọn thời điểm kết thúc."];
         }
 
+        if (request.ScheduledEndAt <= _timeProvider.GetUtcNow())
+        {
+            errors["scheduledEndAt"] = ["Thời điểm kết thúc bảo trì đã qua."];
+        }
+
         var scheduleSuffix = BuildMaintenanceScheduleSuffix(request);
         var deliveryMessage = string.IsNullOrEmpty(scheduleSuffix)
             ? message
@@ -195,6 +203,15 @@ public sealed class AdminModerationService : IAdminModerationService
 
         var recipientIds = await _profiles.GetAllUserIdsAsync(cancellationToken);
         var sentAt = _timeProvider.GetUtcNow();
+        await _maintenanceAnnouncements.PublishAsync(new MaintenanceAnnouncement
+        {
+            Title = title,
+            Message = message,
+            ScheduledStartAt = request.ScheduledStartAt,
+            ScheduledEndAt = request.ScheduledEndAt,
+            CreatedAt = sentAt,
+            ExpiresAt = request.ScheduledEndAt ?? (request.ScheduledStartAt > sentAt ? request.ScheduledStartAt.Value : sentAt).AddDays(1)
+        }, cancellationToken);
         var onlineIds = _onlineUsers.GetOnlineUsers().Keys.ToHashSet();
         const int batchSize = 500;
         for (var offset = 0; offset < recipientIds.Count; offset += batchSize)

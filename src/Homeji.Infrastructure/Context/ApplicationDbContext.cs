@@ -26,6 +26,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<RoommateMessage> RoommateMessages => Set<RoommateMessage>();
     public DbSet<Report> Reports => Set<Report>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<MaintenanceAnnouncement> MaintenanceAnnouncements => Set<MaintenanceAnnouncement>();
     public DbSet<BadWord> BadWords => Set<BadWord>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<UserSubscription> UserSubscriptions => Set<UserSubscription>();

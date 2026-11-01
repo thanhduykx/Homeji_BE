@@ -503,6 +503,41 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("landlord_verification_requests", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.MaintenanceAnnouncement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ScheduledEndAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ScheduledStartAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt", "Id");
+
+                    b.ToTable("maintenance_announcements", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.MarketplaceOrder", b =>
                 {
                     b.Property<Guid>("Id")
