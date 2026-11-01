@@ -42,12 +42,14 @@ public sealed class RentalSourceListing
         {
             "phongtro123" => IsHttpsUrl(sourceUrl, "phongtro123.com", "www.phongtro123.com"),
             "mogi" => IsHttpsUrl(sourceUrl, "mogi.vn", "www.mogi.vn"),
+            "phongtrovn" => IsHttpsUrl(sourceUrl, "phongtro.vn", "www.phongtro.vn"),
             _ => false,
         };
         var validImageHosts = source switch
         {
             "phongtro123" => new[] { "pt123.cdn.static123.com" },
             "mogi" => new[] { "cloud.mogi.vn" },
+            "phongtrovn" => new[] { "file.phongtro.vn" },
             _ => [],
         };
         if (string.IsNullOrWhiteSpace(sourceId) || sourceId.Length > 80

@@ -5,6 +5,24 @@ namespace Homeji.Application.UnitTests.RentalPosts;
 
 public sealed class RentalSourceListingTests
 {
+    [Theory]
+    [InlineData("https://file.phongtro.vn/2/photo.jpg", true)]
+    [InlineData("http://file.phongtro.vn/2/photo.jpg", false)]
+    [InlineData("https://file.phongtro.vn.evil.invalid/photo.jpg", false)]
+    [InlineData("https://user@file.phongtro.vn/photo.jpg", false)]
+    public void PhongtroVn_UsesOnlyItsOwnHttpsGallery(string image, bool valid)
+    {
+        RentalSourceListing Create() => RentalSourceListing.Create("330425",
+            "https://phongtro.vn/cho-thue-phong-tro-phuong-long-phuoc-tp-ho-chi-minh/330425",
+            "Phòng trọ", "Phường Long Phước", "quan-9", 3_500_000, 40, [image], null,
+            DateTimeOffset.UtcNow, "phongtrovn");
+        if (!valid) { Assert.Throws<DomainException>(Create); return; }
+        var listing = Create();
+        Assert.Equal("phongtrovn", listing.Source);
+        Assert.Null(listing.Latitude);
+        Assert.Null(listing.Longitude);
+    }
+
     [Fact]
     public void SourceExpiry_DoesNotChangeSnapshotOrClaimRoomAvailability()
     {

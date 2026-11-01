@@ -1,0 +1,13 @@
+{
+  "status": "verified",
+  "live_quan9_records": 126,
+  "expected_batch_records": 126,
+  "missing_ids": [],
+  "mismatch_ids": [],
+  "sources": {
+    "phongtrovn": 5,
+    "mogi": 111,
+    "phongtro123": 10
+  },
+  "live_gallery_urls": 589
+}
