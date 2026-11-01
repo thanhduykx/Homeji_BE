@@ -79,6 +79,7 @@ public static class DependencyInjection
         services.TryAddSingleton<INotificationRealtimePublisher, NoOpNotificationRealtimePublisher>();
         services.AddScoped<IAdminModerationService, AdminModerationService>();
         services.AddScoped<IAdminAnalyticsService, AdminAnalyticsService>();
+        services.AddScoped<IAdminReportingService, AdminReportingService>();
         services.AddScoped<IWebsiteTrafficService, WebsiteTrafficService>();
         services.AddScoped<ISubscriptionService, SubscriptionService>();
         services.AddScoped<IAiSearchService, AiSearchService>();

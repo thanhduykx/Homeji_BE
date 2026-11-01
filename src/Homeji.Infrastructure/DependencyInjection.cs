@@ -104,6 +104,11 @@ public static class DependencyInjection
         services.AddScoped<IWalletRepository, WalletRepository>();
         services.AddScoped<IWalletWithdrawalRepository, WalletWithdrawalRepository>();
         services.AddScoped<IAdminAnalyticsRepository, AdminAnalyticsRepository>();
+        services.AddScoped<IAdminReportingRepository, AdminReportingRepository>();
+        services.AddScoped<IAdminReportWorkbookWriter, AdminReportWorkbookWriter>();
+        services.AddScoped<Homeji.Application.IServices.Admin.IAdminReportEmailDispatcher, AdminReportEmailDispatcher>();
+        services.AddOptions<Homeji.Application.Services.Admin.AdminReportOptions>().Bind(configuration.GetSection("AdminReports"))
+            .Validate(options => System.Net.Mail.MailAddress.TryCreate(options.Recipient, out var address) && address.Address == options.Recipient, "Admin report recipient must be a valid email address.").ValidateOnStart();
         services.AddScoped<Homeji.Application.IRepositories.Admin.IAdminWorkQueueRepository, AdminWorkQueueRepository>();
         services.AddScoped<IWebsiteTrafficRepository, WebsiteTrafficRepository>();
 
