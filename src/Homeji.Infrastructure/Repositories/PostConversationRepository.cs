@@ -3,7 +3,9 @@ using Homeji.Application.IRepositories.Conversations;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
 using Homeji.Infrastructure.Context;
+using Homeji.Application.Common.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Homeji.Infrastructure.Repositories;
 
@@ -47,16 +49,42 @@ public sealed class PostConversationRepository : IPostConversationRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<PostMessage>> GetMessagesAsync(
+    public async Task<IReadOnlyList<PostMessageDto>> GetMessagesAsync(
         Guid conversationId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.PostMessages
+        return await MessageHistoryQuery(conversationId).ToListAsync(cancellationToken);
+    }
+
+    internal IQueryable<PostMessageDto> MessageHistoryQuery(Guid conversationId) => _dbContext.PostMessages
             .AsNoTracking()
-            .Include(message => message.Attachments)
             .Where(message => message.ConversationId == conversationId)
-            .OrderBy(message => message.SentAt)
-            .ToListAsync(cancellationToken);
+            .OrderBy(message => message.SentAt).ThenBy(message => message.Id)
+            .Select(message => new PostMessageDto(message.Id, message.ConversationId, message.SenderId,
+                message.Body, message.SentAt, message.Attachments.OrderBy(attachment => attachment.CreatedAt)
+                .Select(attachment => new PostMessageAttachmentDto(attachment.Id, attachment.UploaderId,
+                    attachment.Context, attachment.Status, attachment.MimeType, attachment.Bytes,
+                    attachment.Width, attachment.Height,
+                    "/api/conversations/" + message.ConversationId + "/messages/" + message.Id + "/attachments/" + attachment.Id + "/content",
+                    attachment.CreatedAt, attachment.DeletedAt)).ToArray()));
+
+    public async Task<IReadOnlyList<UserMessageBlock>> GetUserBlocksAsync(Guid userId, CancellationToken cancellationToken = default) =>
+        await _dbContext.UserMessageBlocks.AsNoTracking().Where(block => block.BlockerId == userId || block.BlockedId == userId).ToListAsync(cancellationToken);
+
+    public Task<bool> IsMessagingBlockedAsync(Guid userId, Guid otherId, CancellationToken cancellationToken = default) =>
+        _dbContext.UserMessageBlocks.AnyAsync(block => (block.BlockerId == userId && block.BlockedId == otherId)
+            || (block.BlockerId == otherId && block.BlockedId == userId), cancellationToken);
+
+    public async Task SetUserBlockAsync(Guid userId, Guid otherId, bool blocked, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        // Serialize a block change with message inserts for this pair across every thread.
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended(LEAST({userId}::text,{otherId}::text) || ':' || GREATEST({userId}::text,{otherId}::text), 724431))", cancellationToken);
+        if (blocked)
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync($"INSERT INTO homeji.user_message_blocks (\"BlockerId\",\"BlockedId\",\"CreatedAt\") VALUES ({userId},{otherId},{now}) ON CONFLICT (\"BlockerId\",\"BlockedId\") DO NOTHING", cancellationToken);
+        else
+            await _dbContext.UserMessageBlocks.Where(block => block.BlockerId == userId && block.BlockedId == otherId).ExecuteDeleteAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     public Task<PostMessageAttachment?> GetAttachmentAsync(
@@ -120,28 +148,18 @@ public sealed class PostConversationRepository : IPostConversationRepository
         }
 
         var conversationIds = conversations.Select(conversation => conversation.Id).ToArray();
-        var incoming = await _dbContext.PostMessages
-            .AsNoTracking()
-            .Where(message =>
-                conversationIds.Contains(message.ConversationId)
-                && message.SenderId != userId)
-            .Select(message => new { message.ConversationId, message.SentAt })
-            .ToListAsync(cancellationToken);
-
-        var lastReadByConversation = conversations.ToDictionary(
-            conversation => conversation.Id,
-            conversation => conversation.GetLastReadAt(userId) ?? DateTimeOffset.MinValue);
-
-        return incoming
-            .GroupBy(message => message.ConversationId)
-            .ToDictionary(
-                group => group.Key,
-                group =>
-                {
-                    var cutoff = lastReadByConversation.GetValueOrDefault(group.Key, DateTimeOffset.MinValue);
-                    return group.Count(message => message.SentAt > cutoff);
-                });
+        return await UnreadCountsQuery(userId, conversationIds).ToDictionaryAsync(row => row.ConversationId, row => row.Count, cancellationToken);
     }
+
+    internal sealed record UnreadCount(Guid ConversationId, int Count);
+    internal IQueryable<UnreadCount> UnreadCountsQuery(Guid userId, Guid[] conversationIds) =>
+        from message in _dbContext.PostMessages.AsNoTracking()
+        join conversation in _dbContext.PostConversations on message.ConversationId equals conversation.Id
+        where conversationIds.Contains(message.ConversationId) && message.SenderId != userId
+            && ((conversation.ParticipantAId == userId && (conversation.ParticipantALastReadAt == null || message.SentAt > conversation.ParticipantALastReadAt))
+                || (conversation.ParticipantBId == userId && (conversation.ParticipantBLastReadAt == null || message.SentAt > conversation.ParticipantBLastReadAt)))
+        group message by message.ConversationId into messages
+        select new UnreadCount(messages.Key, messages.Count());
 
     public async Task<IReadOnlyDictionary<Guid, int>> CountBySubjectsAsync(
         ConversationSubjectType subjectType,
@@ -165,8 +183,12 @@ public sealed class PostConversationRepository : IPostConversationRepository
         await _dbContext.PostMessages.AddAsync(message, cancellationToken);
     }
 
-    public Task SaveChangesAsync(CancellationToken cancellationToken = default)
+    public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
-        return _dbContext.SaveChangesAsync(cancellationToken);
+        try { await _dbContext.SaveChangesAsync(cancellationToken); }
+        catch (DbUpdateException error) when (error.InnerException is PostgresException { ConstraintName: "user_message_block" })
+        {
+            throw new ForbiddenAccessException("Không thể gửi tin nhắn vì một trong hai người đã chặn liên hệ.");
+        }
     }
 }

@@ -124,6 +124,9 @@ public sealed class PostConversationService : IPostConversationService
         var conversationIds = conversations.Select(conversation => conversation.Id).ToArray();
         var lastMessages = await _conversations.GetLatestByConversationIdsAsync(conversationIds, cancellationToken);
         var unreadCounts = await _conversations.CountUnreadByConversationIdsAsync(userId, conversations, cancellationToken);
+        var blocks = await _conversations.GetUserBlocksAsync(userId, cancellationToken);
+        var blockedByMe = blocks.Where(block => block.BlockerId == userId).Select(block => block.BlockedId).ToHashSet();
+        var blockedByOther = blocks.Where(block => block.BlockedId == userId).Select(block => block.BlockerId).ToHashSet();
         return conversations.Select(conversation =>
         {
             lastMessages.TryGetValue(conversation.Id, out var lastMessage);
@@ -132,7 +135,11 @@ public sealed class PostConversationService : IPostConversationService
                 userId,
                 profileMap.GetValueOrDefault(conversation.GetOtherParticipantId(userId)),
                 lastMessage,
-                unreadCounts.GetValueOrDefault(conversation.Id));
+                unreadCounts.GetValueOrDefault(conversation.Id)) with
+                {
+                    IsBlockedByMe = blockedByMe.Contains(conversation.GetOtherParticipantId(userId)),
+                    IsBlockedByOther = blockedByOther.Contains(conversation.GetOtherParticipantId(userId)),
+                };
         }).ToArray();
     }
 
@@ -147,8 +154,25 @@ public sealed class PostConversationService : IPostConversationService
         await _notifications.MarkDirectMessagesReadAsync(userId, conversation.Id, now, cancellationToken);
         await _conversations.SaveChangesAsync(cancellationToken);
 
-        var messages = await _conversations.GetMessagesAsync(conversation.Id, cancellationToken);
-        return messages.Select(ToDto).ToArray();
+        return await _conversations.GetMessagesAsync(conversation.Id, cancellationToken);
+    }
+
+    public async Task<ConversationBlockStateDto> SetUserBlockAsync(Guid conversationId, bool blocked, CancellationToken cancellationToken = default)
+    {
+        var userId = _userContext.GetRequiredUserId();
+        var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        var otherId = conversation.GetOtherParticipantId(userId);
+        await _conversations.SetUserBlockAsync(userId, otherId, blocked, _timeProvider.GetUtcNow(), cancellationToken);
+        var blocks = await _conversations.GetUserBlocksAsync(userId, cancellationToken);
+        return new ConversationBlockStateDto(otherId,
+            blocks.Any(block => block.BlockerId == userId && block.BlockedId == otherId),
+            blocks.Any(block => block.BlockerId == otherId && block.BlockedId == userId));
+    }
+
+    private async Task EnsureCanMessageAsync(Guid userId, Guid otherId, CancellationToken cancellationToken)
+    {
+        if (await _conversations.IsMessagingBlockedAsync(userId, otherId, cancellationToken))
+            throw new ForbiddenAccessException("Không thể gửi tin nhắn vì một trong hai người đã chặn liên hệ.");
     }
 
     public async Task<PostMessageDto> SendMessageAsync(
@@ -159,6 +183,7 @@ public sealed class PostConversationService : IPostConversationService
         ValidateBody(request.Body);
         var senderId = _userContext.GetRequiredUserId();
         var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        await EnsureCanMessageAsync(senderId, conversation.GetOtherParticipantId(senderId), cancellationToken);
         var now = _timeProvider.GetUtcNow();
         var message = new PostMessage(conversation.Id, senderId, request.Body!, now);
         conversation.Touch(now);
@@ -200,6 +225,7 @@ public sealed class PostConversationService : IPostConversationService
 
         var senderId = _userContext.GetRequiredUserId();
         var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        await EnsureCanMessageAsync(senderId, conversation.GetOtherParticipantId(senderId), cancellationToken);
         var now = _timeProvider.GetUtcNow();
         var recentCount = await _conversations.CountAttachmentsByUploaderSinceAsync(
             senderId,
@@ -268,6 +294,7 @@ public sealed class PostConversationService : IPostConversationService
     {
         var senderId = _userContext.GetRequiredUserId();
         var conversation = await GetAuthorizedAsync(conversationId, cancellationToken);
+        await EnsureCanMessageAsync(senderId, conversation.GetOtherParticipantId(senderId), cancellationToken);
         ConversationVoiceFormat.Validate(content);
         var now = _timeProvider.GetUtcNow();
         var recentCount = await _conversations.CountAttachmentsByUploaderSinceAsync(senderId, now.AddHours(-24), cancellationToken);
@@ -350,6 +377,7 @@ public sealed class PostConversationService : IPostConversationService
             throw new ForbiddenAccessException("Bạn không thể tự nhắn tin với chính mình.");
         }
 
+        await EnsureCanMessageAsync(requesterId, ownerId, cancellationToken);
         var conversation = await _conversations.FindAsync(subjectType, subjectId, requesterId, ownerId, cancellationToken);
         if (conversation is null)
         {

@@ -14,7 +14,11 @@ public sealed record PostConversationDto(
     string? LastMessage = null,
     Guid? LastMessageSenderId = null,
     int UnreadCount = 0,
-    bool OtherParticipantIsPremium = false);
+    bool OtherParticipantIsPremium = false,
+    bool IsBlockedByMe = false,
+    bool IsBlockedByOther = false);
+
+public sealed record ConversationBlockStateDto(Guid OtherParticipantId, bool IsBlockedByMe, bool IsBlockedByOther);
 
 public sealed record PostMessageDto(
     Guid Id,

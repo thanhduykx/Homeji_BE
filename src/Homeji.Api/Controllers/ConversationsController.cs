@@ -63,6 +63,14 @@ public sealed class ConversationsController : ControllerBase
         return Ok(await _conversations.GetMessagesAsync(conversationId, cancellationToken));
     }
 
+    [HttpPut("{conversationId:guid}/block")]
+    public async Task<ActionResult<ConversationBlockStateDto>> BlockUser(Guid conversationId, CancellationToken cancellationToken) =>
+        Ok(await _conversations.SetUserBlockAsync(conversationId, true, cancellationToken));
+
+    [HttpDelete("{conversationId:guid}/block")]
+    public async Task<ActionResult<ConversationBlockStateDto>> UnblockUser(Guid conversationId, CancellationToken cancellationToken) =>
+        Ok(await _conversations.SetUserBlockAsync(conversationId, false, cancellationToken));
+
     [HttpPost("{conversationId:guid}/messages")]
     public async Task<ActionResult<PostMessageDto>> SendMessage(
         Guid conversationId,

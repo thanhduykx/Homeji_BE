@@ -2002,6 +2002,27 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("user_activities", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Domain.Entities.UserMessageBlock", b =>
+                {
+                    b.Property<Guid>("BlockerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BlockedId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("BlockerId", "BlockedId");
+
+                    b.HasIndex("BlockedId", "BlockerId");
+
+                    b.ToTable("user_message_blocks", "homeji", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserMessageBlock_DifferentUsers", "\"BlockerId\" <> \"BlockedId\"");
+                        });
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.UserProfile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2679,6 +2700,21 @@ namespace Homeji.Infrastructure.Migrations
                     b.HasOne("Homeji.Domain.Entities.UserProfile", null)
                         .WithMany()
                         .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Homeji.Domain.Entities.UserMessageBlock", b =>
+                {
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("BlockedId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Homeji.Domain.Entities.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("BlockerId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -97,6 +97,66 @@ public sealed class PostConversationServiceTests
         await Assert.ThrowsAsync<RequestValidationException>(() => service.SendVoiceAsync(conversation.Id, ConversationVoiceFormatTests.Wav()));
     }
 
+    [Fact]
+    public async Task UserBlockAppliesToAllSendFormatsAndNewThreads()
+    {
+        var sender = Guid.NewGuid(); var recipient = Guid.NewGuid();
+        var post = CreateWantedPost(recipient);
+        var profiles = new StubUserProfileRepository(CreateProfile(sender, UserRole.Renter), CreateProfile(recipient, UserRole.Renter));
+        var repository = new StubPostConversationRepository();
+        var conversation = new PostConversation(ConversationSubjectType.WantedPost, post.Id, sender, recipient, UtcNow);
+        await repository.AddConversationAsync(conversation);
+        var service = CreateService(sender, post, profiles, repository);
+        var state = await service.SetUserBlockAsync(conversation.Id, true);
+        Assert.True(state.IsBlockedByMe);
+        Assert.False(state.IsBlockedByOther);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.SendMessageAsync(conversation.Id, new SendPostMessageDto("Hello")));
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.SendVoiceAsync(conversation.Id, []));
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.SendImagesAsync(conversation.Id, null,
+            [new ConversationImageUpload("test.jpg", "image/jpeg", [1], MessageAttachmentContext.Other)]));
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.StartWantedPostConversationAsync(post.Id));
+        Assert.Same(conversation, repository.AddedConversation);
+    }
+
+    [Fact]
+    public async Task UnblockOnlyRemovesOwnBlockAndRepeatedRequestsAreIdempotent()
+    {
+        var first = Guid.NewGuid(); var second = Guid.NewGuid();
+        var post = CreateWantedPost(second);
+        var profiles = new StubUserProfileRepository(CreateProfile(first, UserRole.Renter), CreateProfile(second, UserRole.Renter));
+        var repository = new StubPostConversationRepository();
+        var conversation = new PostConversation(ConversationSubjectType.WantedPost, post.Id, first, second, UtcNow);
+        await repository.AddConversationAsync(conversation);
+        var a = CreateService(first, post, profiles, repository);
+        var b = CreateService(second, post, profiles, repository);
+        await a.SetUserBlockAsync(conversation.Id, true);
+        await a.SetUserBlockAsync(conversation.Id, true);
+        Assert.Single(repository.Blocks);
+        var state = await b.SetUserBlockAsync(conversation.Id, false);
+        Assert.False(state.IsBlockedByMe);
+        Assert.True(state.IsBlockedByOther);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => b.SendMessageAsync(conversation.Id, new SendPostMessageDto("blocked")));
+        await b.SetUserBlockAsync(conversation.Id, true);
+        var after = await a.SetUserBlockAsync(conversation.Id, false);
+        Assert.False(after.IsBlockedByMe);
+        Assert.True(after.IsBlockedByOther);
+        await b.SetUserBlockAsync(conversation.Id, false);
+        Assert.False(await repository.IsMessagingBlockedAsync(first, second));
+    }
+
+    [Fact]
+    public async Task NonParticipantCannotChangeUserBlocks()
+    {
+        var owner = Guid.NewGuid(); var outsider = Guid.NewGuid();
+        var post = CreateWantedPost(owner);
+        var repository = new StubPostConversationRepository();
+        var conversation = new PostConversation(ConversationSubjectType.WantedPost, post.Id, owner, Guid.NewGuid(), UtcNow);
+        await repository.AddConversationAsync(conversation);
+        var service = CreateService(outsider, post, new StubUserProfileRepository(CreateProfile(outsider, UserRole.Renter)), repository);
+        await Assert.ThrowsAsync<ForbiddenAccessException>(() => service.SetUserBlockAsync(conversation.Id, true));
+        Assert.Empty(repository.Blocks);
+    }
+
     private static PostConversationService CreateService(
         Guid? currentUserId,
         RentalWantedPost wantedPost,
@@ -224,7 +284,7 @@ public sealed class PostConversationServiceTests
             throw new NotSupportedException();
         }
 
-        public Task<IReadOnlyList<PostMessage>> GetMessagesAsync(
+        public Task<IReadOnlyList<PostMessageDto>> GetMessagesAsync(
             Guid conversationId,
             CancellationToken cancellationToken = default)
         {
@@ -274,6 +334,19 @@ public sealed class PostConversationServiceTests
         public Task AddMessageAsync(PostMessage message, CancellationToken cancellationToken = default)
         {
             throw new NotSupportedException();
+        }
+
+        public bool MessagingBlocked { get; set; }
+        public List<UserMessageBlock> Blocks { get; } = [];
+        public Task<bool> IsMessagingBlockedAsync(Guid userId, Guid otherId, CancellationToken cancellationToken = default) => Task.FromResult(MessagingBlocked || Blocks.Any(block =>
+            (block.BlockerId == userId && block.BlockedId == otherId) || (block.BlockerId == otherId && block.BlockedId == userId)));
+        public Task<IReadOnlyList<UserMessageBlock>> GetUserBlocksAsync(Guid userId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<UserMessageBlock>>(Blocks.Where(block => block.BlockerId == userId || block.BlockedId == userId).ToArray());
+        public Task SetUserBlockAsync(Guid userId, Guid otherId, bool blocked, DateTimeOffset now, CancellationToken cancellationToken = default)
+        {
+            if (blocked && !Blocks.Any(block => block.BlockerId == userId && block.BlockedId == otherId)) Blocks.Add(new UserMessageBlock(userId, otherId, now));
+            if (!blocked) Blocks.RemoveAll(block => block.BlockerId == userId && block.BlockedId == otherId);
+            return Task.CompletedTask;
         }
     }
 

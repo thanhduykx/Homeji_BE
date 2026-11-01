@@ -4,6 +4,7 @@ param(
     [int]$DatabasePort = 55439,
     [int]$ApiPort = 5189,
     [string]$SourceImportSql,
+    [string]$TestFilter,
     [switch]$SkipLoadTest,
     [switch]$IncludePostingPersistence
 )
@@ -50,7 +51,9 @@ try {
             & (Join-Path $PostgresBin 'psql.exe') -h 127.0.0.1 -p $DatabasePort -U homeji_quality -d homeji_quality -v ON_ERROR_STOP=1 -f $sourceSqlPath
             if ($LASTEXITCODE -ne 0) { throw 'Repeated source import failed.' }
         }
-        dotnet test Homeji.sln --no-restore --logger 'trx;LogFilePrefix=local' --results-directory (Join-Path $runPath 'tests') --collect 'XPlat Code Coverage' -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+        $testArguments = @('test', 'Homeji.sln', '--no-restore', '--logger', 'trx;LogFilePrefix=local', '--results-directory', (Join-Path $runPath 'tests'), '--collect', 'XPlat Code Coverage')
+        if ($TestFilter) { $testArguments += @('--filter', $TestFilter) }
+        & dotnet @testArguments -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
         if ($LASTEXITCODE -ne 0) { throw 'Local regression/database tests failed.' }
         if ($IncludePostingPersistence) {
             & (Join-Path $PostgresBin 'psql.exe') -h 127.0.0.1 -p $DatabasePort -U homeji_quality -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE homeji_ui_qa;'

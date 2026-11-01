@@ -4,6 +4,7 @@ namespace Homeji.Application.IServices.Conversations;
 
 public interface IPostConversationService
 {
+    Task<ConversationBlockStateDto> SetUserBlockAsync(Guid conversationId, bool blocked, CancellationToken cancellationToken = default);
     Task<PostConversationDto> StartRentalConversationAsync(Guid rentalPostId, CancellationToken cancellationToken = default);
     Task<PostConversationDto> StartMarketplaceConversationAsync(Guid marketplacePostId, CancellationToken cancellationToken = default);
     Task<PostConversationDto> StartMarketplaceOrderConversationAsync(Guid orderId, CancellationToken cancellationToken = default);

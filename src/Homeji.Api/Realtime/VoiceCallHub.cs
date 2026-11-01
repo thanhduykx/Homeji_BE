@@ -17,6 +17,8 @@ public sealed class VoiceCallHub(VoiceCallRegistry calls, IPostConversationRepos
         var conversation = await conversations.GetByIdAsync(conversationId, Context.ConnectionAborted);
         if (conversation is null || !conversation.Includes(UserId)) throw new HubException("Không có quyền gọi trong cuộc trò chuyện này.");
         var recipient = conversation.GetOtherParticipantId(UserId);
+        if (await conversations.IsMessagingBlockedAsync(UserId, recipient, Context.ConnectionAborted))
+            throw new HubException("Không thể gọi vì một trong hai người đã chặn liên hệ.");
         var profile = await profiles.GetByIdAsync(UserId, Context.ConnectionAborted);
         var call = calls.Create(conversationId, UserId, recipient, Context.ConnectionId)
             ?? throw new HubException("Bạn hoặc người nhận đang có cuộc gọi khác.");
@@ -28,6 +30,13 @@ public sealed class VoiceCallHub(VoiceCallRegistry calls, IPostConversationRepos
 
     public async Task AcceptCall(Guid callId)
     {
+        var pending = calls.Get(callId, UserId) ?? throw new HubException("Cuộc gọi đã kết thúc.");
+        if (await conversations.IsMessagingBlockedAsync(pending.Caller, pending.Recipient, Context.ConnectionAborted))
+        {
+            calls.Remove(callId, UserId);
+            await NotifyEnded(pending);
+            throw new HubException("Không thể nhận cuộc gọi vì đã chặn liên hệ.");
+        }
         var call = calls.Accept(callId, UserId, Context.ConnectionId)
             ?? throw new HubException("Cuộc gọi đã kết thúc hoặc được trả lời ở thiết bị khác.");
         await Clients.Client(call.CallerConnectionId).SendAsync("callAccepted", callId);
