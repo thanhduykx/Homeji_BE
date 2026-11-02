@@ -51,7 +51,7 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         {
             Latitude = listing.Latitude,
             PublisherName = listing.PublisherName,
-            Description = details ? listing.Description : null,
+            Description = details ? RentalSourceFacts.RemovePublicContactNumbers(listing.Description) : null,
             ContactPhone = null,
             DetailsCollectedAt = listing.DetailsCollectedAt,
             Longitude = listing.Longitude,

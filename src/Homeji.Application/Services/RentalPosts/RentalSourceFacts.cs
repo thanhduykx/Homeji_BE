@@ -8,6 +8,10 @@ internal sealed record RentalSourceFactsResult(string? DepositLabel, IReadOnlyLi
 
 internal static class RentalSourceFacts
 {
+    private static readonly Regex ContactPhonePattern = new(
+        @"(?<!\d)(?:0(?:[\s().-]*\d){9,10}|\+?84(?:[\s().-]*\d){9})(?!\d)",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
     private static readonly Regex DepositPattern = new(
         @"(?:tiền\s*)?(?:đặt\s*)?cọc\s*(?:là\s*)?[:\-]?\s*(?<value>\d+(?:[.,]\d+)?\s*(?:tỷ|tỉ|triệu|tr|tháng|đồng|đ|vnd)?)",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
@@ -41,6 +45,11 @@ internal static class RentalSourceFacts
 
         return new(deposit, amenities);
     }
+
+    public static string? RemovePublicContactNumbers(string? description) =>
+        string.IsNullOrWhiteSpace(description)
+            ? description
+            : ContactPhonePattern.Replace(description, "[số liên hệ ẩn]");
 
     private static string Normalize(string value)
     {
