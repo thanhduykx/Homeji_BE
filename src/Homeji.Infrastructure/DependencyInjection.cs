@@ -56,7 +56,19 @@ public static class DependencyInjection
 
         try
         {
-            _ = new NpgsqlConnectionStringBuilder(connectionString);
+            var databaseOptions = new NpgsqlConnectionStringBuilder(connectionString);
+            // Supabase session mode has a small shared client limit. Leave room
+            // for the old and new instances during a rolling deployment, plus
+            // migration/admin connections; the Npgsql default is 100 per process.
+            if (databaseOptions.Host?.EndsWith(".pooler.supabase.com", StringComparison.OrdinalIgnoreCase) == true
+                && databaseOptions.Port == 5432)
+            {
+                databaseOptions.MaxPoolSize = Math.Min(databaseOptions.MaxPoolSize, 5);
+                databaseOptions.MinPoolSize = 0;
+                databaseOptions.ConnectionIdleLifetime = Math.Min(databaseOptions.ConnectionIdleLifetime, 60);
+                databaseOptions.ConnectionPruningInterval = Math.Min(databaseOptions.ConnectionPruningInterval, 10);
+                connectionString = databaseOptions.ConnectionString;
+            }
         }
         catch (ArgumentException exception)
         {
