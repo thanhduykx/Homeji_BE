@@ -15,6 +15,7 @@ public sealed class RentalSourceListing
     public string? PublisherName { get; private set; }
     public string? Description { get; private set; }
     public string? ContactPhone { get; private set; }
+    public string[] ContactPhones { get; private set; } = [];
     public DateTimeOffset? DetailsCollectedAt { get; private set; }
     public string SourceUrl { get; private set; } = string.Empty;
     public string Title { get; private set; } = string.Empty;
@@ -37,12 +38,18 @@ public sealed class RentalSourceListing
     }
 
     public void RecordDetails(string? description, string? contactPhone, DateTimeOffset checkedAt)
+        => RecordDetails(description, contactPhone is null ? [] : [contactPhone], checkedAt);
+
+    public void RecordDetails(string? description, IEnumerable<string>? contactPhones, DateTimeOffset checkedAt)
     {
+        var phones = (contactPhones ?? []).Select(value => value.Trim()).Where(value => value.Length > 0)
+            .Distinct(StringComparer.Ordinal).ToArray();
         if (description?.Length > 16000 || description?.Any(value => char.IsControl(value) && value is not ('\n' or '\r' or '\t')) == true
-            || contactPhone is not null && (contactPhone.Length is < 10 or > 11 || contactPhone[0] != '0' || contactPhone.Any(value => !char.IsAsciiDigit(value))))
+            || phones.Length > 5 || phones.Any(phone => phone.Length is < 10 or > 11 || phone[0] != '0' || phone.Any(value => !char.IsAsciiDigit(value))))
             throw new DomainException("Thông tin nguồn không hợp lệ.");
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
-        ContactPhone = contactPhone;
+        ContactPhones = phones;
+        ContactPhone = phones.FirstOrDefault();
         DetailsCollectedAt = checkedAt.ToUniversalTime();
     }
 

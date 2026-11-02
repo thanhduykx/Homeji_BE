@@ -1,6 +1,7 @@
 using Homeji.Api.Mappers;
 using Homeji.Api.Views.Profiles;
 using Homeji.Application.IServices.Profiles;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Homeji.Api.Controllers;
@@ -9,6 +10,7 @@ namespace Homeji.Api.Controllers;
 [Route("api/profile")]
 public sealed class ProfileController : ControllerBase
 {
+    [Authorize]
     [HttpGet("{userId:guid}")]
     public async Task<ActionResult<Homeji.Application.DTOs.Profiles.PublicProfileDto>> GetPublicProfile(
         Guid userId, CancellationToken cancellationToken)

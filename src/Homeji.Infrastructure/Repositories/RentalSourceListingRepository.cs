@@ -32,7 +32,11 @@ public sealed class RentalSourceListingRepository(ApplicationDbContext context, 
                 || EF.Functions.ILike(listing.Title, "%apartment%")
                 || EF.Functions.ILike(listing.Title, "%penthouse%")
                 || EF.Functions.ILike(listing.Title, "%condotel%")
-                || EF.Functions.ILike(listing.Title, "%duplex%"));
+                || EF.Functions.ILike(listing.Title, "%duplex%"))
+                .Where(listing => !EF.Functions.ILike(listing.Title, "%phòng%trong căn hộ%")
+                    && !EF.Functions.ILike(listing.Title, "%phong%trong can ho%")
+                    && !EF.Functions.ILike(listing.Title, "%phòng%trong chung cư%")
+                    && !EF.Functions.ILike(listing.Title, "%phong%trong chung cu%"));
             listings = query.PropertyCategory == "apartment"
                 ? listings.Where(listing => apartments.Any(apartment => apartment.Id == listing.Id))
                 : listings.Where(listing => !apartments.Any(apartment => apartment.Id == listing.Id));

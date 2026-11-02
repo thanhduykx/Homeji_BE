@@ -1698,6 +1698,11 @@ namespace Homeji.Infrastructure.Migrations
                         .HasColumnType("character varying(11)")
                         .HasColumnName("contact_phone");
 
+                    b.Property<string>("ContactPhones")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("contact_phones");
+
                     b.Property<string>("Description")
                         .HasMaxLength(16000)
                         .HasColumnType("character varying(16000)")

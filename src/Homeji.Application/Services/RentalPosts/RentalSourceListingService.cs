@@ -38,7 +38,10 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
     {
         var listing = await repository.GetByIdAsync(id, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalSourceListing), id);
-        return new(listing.ContactPhone);
+        var phones = listing.ContactPhones.Length > 0
+            ? listing.ContactPhones
+            : listing.ContactPhone is { Length: > 0 } phone ? [phone] : [];
+        return new(listing.ContactPhone) { Phones = phones };
     }
 
     private static RentalSourceListingDto ToDto(RentalSourceListing listing, bool details = false)

@@ -17,7 +17,10 @@ public sealed record RentalSourceListingDto(
     public IReadOnlyList<string> AmenityHighlights { get; init; } = [];
 }
 
-public sealed record RentalSourceContactDto(string? Phone);
+public sealed record RentalSourceContactDto(string? Phone)
+{
+    public IReadOnlyList<string> Phones { get; init; } = [];
+}
 
 public sealed record RentalSourceSearchDto(
     string? Keyword, string? District, decimal? MinPrice, decimal? MaxPrice, int Page = 1, int PageSize = 20,

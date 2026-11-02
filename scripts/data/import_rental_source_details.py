@@ -23,7 +23,10 @@ def validate(records):
         if not re.fullmatch(r'\d{1,80}',row['source_id']):raise ValueError('Invalid source identity')
         if row['publisher_name'] is not None and publisher(row['publisher_name'])!=row['publisher_name']:raise ValueError('Invalid publisher name')
         if row.get('description') is not None and (not isinstance(row['description'],str) or len(row['description'])>16000 or any(ord(c)<32 and c not in '\n\r\t' for c in row['description'])):raise ValueError('Invalid description')
-        if row.get('contact_phone') is not None and not re.fullmatch(r'0\d{9,10}',row['contact_phone']):raise ValueError('Invalid public phone')
+        phones=row.get('contact_phones')
+        if phones is None:phones=[row['contact_phone']] if row.get('contact_phone') else []
+        if not isinstance(phones,list) or len(phones)>5 or any(not isinstance(phone,str) or not re.fullmatch(r'0\d{9,10}',phone) for phone in phones) or len(set(phones))!=len(phones):raise ValueError('Invalid public phone list')
+        if row.get('contact_phone') is not None and (not re.fullmatch(r'0\d{9,10}',row['contact_phone']) or phones and row['contact_phone']!=phones[0]):raise ValueError('Invalid primary public phone')
         lat,lng=row['latitude'],row['longitude']
         if (lat is None)!=(lng is None):raise ValueError('Incomplete coordinates')
         if lat is not None:
@@ -50,7 +53,7 @@ def main():
     args.output.mkdir(parents=True,exist_ok=True)
     with psycopg.connect(host=config['host'],port=config.get('port',5432),dbname=config['database'],user=config['username'],password=config['password'],sslmode='require',connect_timeout=15) as db:
         db.execute("SET LOCAL lock_timeout='5s'");db.execute("SET LOCAL statement_timeout='30s'")
-        columns='id,source,source_id,source_url,publisher_name,latitude,longitude'+(',image_urls,description,contact_phone,details_collected_at' if args.full_details else '')
+        columns='id,source,source_id,source_url,publisher_name,latitude,longitude'+(',image_urls,description,contact_phone,contact_phones,details_collected_at' if args.full_details else '')
         backup=db.execute('SELECT '+columns+' FROM homeji.rental_source_listings WHERE id=ANY(%s::uuid[]) FOR UPDATE',[[row['id'] for row in rows]]).fetchall()
         indexed={str(row[0]):row for row in backup}
         for row in rows:
@@ -73,8 +76,9 @@ def main():
                     [row['publisher_name'],row['latitude'],row['longitude'],row['id'],row['source'],row['source_id'],row['source_url']]).fetchone()
                 if not result:raise ValueError('An existing source row disappeared')
                 if args.full_details:
-                    db.execute('UPDATE homeji.rental_source_listings SET description=%s,contact_phone=%s,details_collected_at=%s WHERE id=%s',
-                        [row.get('description'),row.get('contact_phone'),row['checked_at'],row['id']])
+                    phones=row.get('contact_phones') or ([row['contact_phone']] if row.get('contact_phone') else [])
+                    db.execute('UPDATE homeji.rental_source_listings SET description=%s,contact_phone=%s,contact_phones=%s::jsonb,details_collected_at=%s WHERE id=%s',
+                        [row.get('description'),row.get('contact_phone'),json.dumps(phones),row['checked_at'],row['id']])
                     if row['id'] in media:db.execute('UPDATE homeji.rental_source_listings SET image_urls=%s WHERE id=%s',[Jsonb(media[row['id']]['image_urls']),row['id']])
                 affected+=1
             state=db.execute('SELECT count(*),count(publisher_name),count(latitude) FILTER (WHERE longitude IS NOT NULL) FROM homeji.rental_source_listings WHERE id=ANY(%s::uuid[])',[[row['id'] for row in rows]]).fetchone()

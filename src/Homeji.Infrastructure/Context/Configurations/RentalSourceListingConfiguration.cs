@@ -26,6 +26,15 @@ public sealed class RentalSourceListingConfiguration : IEntityTypeConfiguration<
         builder.Property(listing => listing.PublisherName).HasColumnName("publisher_name").HasMaxLength(100);
         builder.Property(listing => listing.Description).HasColumnName("description").HasMaxLength(16000);
         builder.Property(listing => listing.ContactPhone).HasColumnName("contact_phone").HasMaxLength(11);
+        builder.Property(listing => listing.ContactPhones).HasColumnName("contact_phones").HasColumnType("jsonb")
+            .HasConversion(
+                value => JsonSerializer.Serialize(value, (JsonSerializerOptions?)null),
+                value => JsonSerializer.Deserialize<string[]>(value, (JsonSerializerOptions?)null) ?? Array.Empty<string>(),
+                new ValueComparer<string[]>(
+                    (first, second) => first!.SequenceEqual(second!),
+                    value => value.Aggregate(0, (hash, item) => HashCode.Combine(hash, item.GetHashCode())),
+                    value => value.ToArray()))
+            .IsRequired();
         builder.Property(listing => listing.DetailsCollectedAt).HasColumnName("details_collected_at");
         builder.Property(listing => listing.SourceUrl).HasColumnName("source_url").HasMaxLength(1000).IsRequired();
         builder.Property(listing => listing.Title).HasColumnName("title").HasMaxLength(200).IsRequired();

@@ -68,7 +68,9 @@ public sealed class RentalPostRepository : IRentalPostRepository
                 || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%apartment%")
                 || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%penthouse%")
                 || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%condotel%")
-                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%duplex%"));
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%duplex%"))
+                .Where(post => !EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%phong%trong can ho%")
+                    && !EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%phong%trong chung cu%"));
             query = search.PropertyCategory == "apartment"
                 ? apartments
                 : query.Where(post => !apartments.Any(apartment => apartment.Id == post.Id));

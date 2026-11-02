@@ -15,6 +15,7 @@ import requests
 from collect_rental_sources import AGENT, fetch, linked_data
 
 HOSTS={'mogi':'mogi.vn','phongtro123':'phongtro123.com','phongtrovn':'phongtro.vn'}
+PHONE_PATTERN=re.compile(r'(?<!\d)(?:\+?84|0)(?:[\s().-]*\d){8,10}(?!\d)')
 
 def publisher(value):
     if not isinstance(value,str):return None
@@ -23,10 +24,29 @@ def publisher(value):
     if re.search(r'https?://|www\.|@|\d{8,}',value,re.I):return None
     return value
 
+def normalize_public_phone(value):
+    digits=re.sub(r'\D','',value)
+    if digits.startswith('84') and value.lstrip().startswith('+'):digits='0'+digits[2:]
+    return digits if re.fullmatch(r'0\d{9,10}',digits) else None
+
+def visible_contact_phones(description):
+    """Extract numbers from the listing's own description, never site chrome or footer."""
+    if not isinstance(description,str):return []
+    candidates=[]
+    for match in PHONE_PATTERN.finditer(description):
+        phone=normalize_public_phone(match.group())
+        if phone and phone not in candidates:candidates.append(phone)
+    return candidates
+
+def visible_contact_phone(soup):
+    """Backward-compatible singular helper; ambiguous numbers are not guessed."""
+    candidates=visible_contact_phones(soup)
+    return candidates[0] if len(candidates)==1 else None
+
 def extract_details(text,source,url):
     soup=BeautifulSoup(text,'html.parser')
     schemas=list(linked_data(soup))
-    name=None; phone=None; description=None
+    name=None; phone=None; description=None; phones=[]
     if source=='mogi':
         candidates=[item for item in schemas if item.get('@type')=='Person' and item.get('makesOffer')]
         if len(candidates)==1:
@@ -52,9 +72,11 @@ def extract_details(text,source,url):
     if description:
         description=BeautifulSoup(html_module.unescape(description),'html.parser').get_text('\n',strip=True)
         description='\n'.join(line.strip() for line in description.splitlines() if line.strip())[:16000]
-    digits=re.sub(r'[\s.()\-]','',phone) if isinstance(phone,str) else ''
-    if digits.startswith('+84'):digits='0'+digits[3:]
-    phone=digits if re.fullmatch(r'0\d{9,10}',digits) else None
+    phone=normalize_public_phone(phone) if isinstance(phone,str) else None
+    if phone:phones.append(phone)
+    for candidate in visible_contact_phones(description):
+        if candidate not in phones:phones.append(candidate)
+    phone=phones[0] if phones else None
     points=set()
     # Read only listing embed q=latitude,longitude. Organization.geo is an office, not the rental.
     for raw in re.findall(r'''https://(?:www\.)?google\.com/maps/embed/v1/place\?[^\s<>"']+''',text):
@@ -64,7 +86,7 @@ def extract_details(text,source,url):
             lat,lng=map(float,match.groups())
             if 10.70<=lat<=10.97 and 106.70<=lng<=106.91:points.add((lat,lng))
     coordinate=next(iter(points)) if len(points)==1 else None
-    return {'publisher_name':name,'description':description or None,'contact_phone':phone,'latitude':coordinate[0] if coordinate else None,'longitude':coordinate[1] if coordinate else None,
+    return {'publisher_name':name,'description':description or None,'contact_phone':phone,'contact_phones':phones,'latitude':coordinate[0] if coordinate else None,'longitude':coordinate[1] if coordinate else None,
         'coordinate_evidence':'listing_google_embed_query' if coordinate else None}
 
 def collect_source(source,rows,output):
