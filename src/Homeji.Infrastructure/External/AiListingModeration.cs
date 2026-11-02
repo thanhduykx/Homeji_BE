@@ -24,6 +24,11 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
         var claim = await LockedAsync<Claim?>(async () => {
             var now = clock.GetUtcNow();
             var schedule = await ScheduleAsync(cancellationToken);
+            // An idle queue is not evidence that the worker stopped. Persist a
+            // bounded heartbeat independently of provider calls and daily quotas.
+            if (!schedule.LastHeartbeatAt.HasValue || now - schedule.LastHeartbeatAt.Value >= TimeSpan.FromMinutes(1))
+                schedule.LastHeartbeatAt = now;
+            schedule.ResetDay(now);
             if (!schedule.Enabled || now < schedule.NextAllowedAt) return null;
             await DiscoverAsync(schedule, cancellationToken);
             if (await db.AiListingReviews.AnyAsync(j => j.State == "processing" && j.LeaseUntil > now, cancellationToken)) return null;
@@ -112,7 +117,7 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
                 s.NextAllowedAt, s.RequestsToday, s.TokensReservedToday, s.PauseReason,
                 await db.AiListingReviews.CountAsync(j => j.State == "pending" || j.State == "processing", cancellationToken),
                 await db.AiListingReviews.CountAsync(j => j.State == "needs_review" && j.ReviewedAt == null, cancellationToken),
-                await db.AiListingReviews.CountAsync(j => j.State == "blocked" && j.ReviewedAt == null, cancellationToken), items);
+                await db.AiListingReviews.CountAsync(j => j.State == "blocked" && j.ReviewedAt == null, cancellationToken), items) { LastHeartbeatAt = s.LastHeartbeatAt };
         }, cancellationToken);
     }
     public async Task UpdateSettingsAsync(AiReviewSettingsDto settings, CancellationToken cancellationToken)

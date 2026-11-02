@@ -66,6 +66,7 @@ public sealed class AiModerationSchedule
     public int DailyRequestLimit { get; set; } = 30;
     public int DailyTokenBudget { get; set; } = 200000;
     public DateTimeOffset StartedAt { get; set; }
+    public DateTimeOffset? LastHeartbeatAt { get; set; }
     public DateTimeOffset? BackfillBefore { get; set; }
     public DateTimeOffset NextAllowedAt { get; set; }
     public DateTimeOffset BudgetDay { get; set; }

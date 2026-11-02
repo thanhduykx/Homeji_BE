@@ -275,6 +275,9 @@ namespace Homeji.Infrastructure.Migrations
                     b.Property<int>("InBatch")
                         .HasColumnType("integer");
 
+                    b.Property<DateTimeOffset?>("LastHeartbeatAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset>("NextAllowedAt")
                         .HasColumnType("timestamp with time zone");
 

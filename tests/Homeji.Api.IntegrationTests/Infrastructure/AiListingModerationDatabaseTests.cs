@@ -70,6 +70,9 @@ public sealed class AiListingModerationDatabaseTests
         clock.Now = clock.Now.AddMinutes(2);
         await using (var unchanged = Open()) await Service(unchanged).TickAsync(default);
         Assert.Equal(1, ai.Calls);
+        await using (var heartbeat = Open()) {
+            Assert.Equal(clock.Now, (await heartbeat.AiModerationSchedules.SingleAsync()).LastHeartbeatAt);
+        }
         await using (var edit = Open()) {
             var listing = await edit.MarketplacePosts.Include(p => p.Media).SingleAsync(p => p.Id == food.Id);
             listing.Update("Món mới", "bán ma túy", listing.Price, listing.Condition, listing.Category, listing.Address, listing.Latitude, listing.Longitude, null, ["https://example.test/food.png"], clock.Now, MarketplaceListingType.Food, 10);
@@ -134,6 +137,17 @@ public sealed class AiListingModerationDatabaseTests
             Assert.Equal(2, versions.Count);
             Assert.Equal(2, versions.Select(j => j.ContentHash).Distinct().Count());
             Assert.Contains(versions, version => version.Snapshot.Contains("replaced-only-image.jpg", StringComparison.Ordinal));
+        }
+        // An idle worker must still report health and reset yesterday's budget.
+        clock.Now = clock.Now.AddDays(1);
+        var callsBeforeIdleDay = ai.Calls;
+        await using (var idle = Open()) await Service(idle).TickAsync(default);
+        await using (var verifyIdle = Open()) {
+            var schedule = await verifyIdle.AiModerationSchedules.SingleAsync();
+            Assert.Equal(clock.Now, schedule.LastHeartbeatAt);
+            Assert.Equal(0, schedule.RequestsToday);
+            Assert.Equal(0, schedule.TokensReservedToday);
+            Assert.Equal(callsBeforeIdleDay, ai.Calls);
         }
     }
     private sealed record CurrentUser(Guid? UserId) : ICurrentUser;
