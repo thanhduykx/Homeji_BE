@@ -45,6 +45,7 @@ public sealed class RentalPostsController : ControllerBase
         [FromQuery] Guid[]? ids = null,
         [FromQuery] RentalPostType? type = null,
         [FromQuery] UserRole? ownerRole = null,
+        [FromQuery] string? propertyCategory = null,
         CancellationToken cancellationToken = default)
     {
         var result = await _rentalPostService.SearchAsync(
@@ -67,7 +68,7 @@ public sealed class RentalPostsController : ControllerBase
                 excludedAmenities,
                 excludeRoommateShare,
                 ids,
-                Type: type, OwnerRole: ownerRole),
+                Type: type, OwnerRole: ownerRole, PropertyCategory: propertyCategory),
             cancellationToken);
 
         return Ok(result);
@@ -81,6 +82,7 @@ public sealed class RentalPostsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<RentalPostDto>> GetDetail(Guid postId, CancellationToken cancellationToken)
     {
+        Response.Headers.CacheControl = "private, no-store";
         return Ok(await _rentalPostService.GetDetailAsync(postId, cancellationToken));
     }
 

@@ -25,4 +25,5 @@ public sealed record RentalPostSearchDto(
     RentalPostType? Type = null,
     UserRole? OwnerRole = null,
     string? NormalizedKeyword = null,
-    string? NormalizedLocation = null);
+    string? NormalizedLocation = null,
+    string? PropertyCategory = null);

@@ -72,7 +72,7 @@ public sealed class SubscriptionService : ISubscriptionService
             RequirePositivePrice(plan.Price),
             RequirePositiveDuration(plan.DurationDays),
             "Premium",
-            PremiumBenefits) { OriginalPrice = plan.OriginalPrice, OfferEndsAt = plan.OfferEndsAt }));
+            PremiumBenefits) { OriginalPrice = plan.OriginalPrice, OfferEndsAt = plan.OfferEndsAt, OfferUsed = plan.OfferUsed }));
 
         return packages;
     }

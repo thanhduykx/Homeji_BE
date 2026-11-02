@@ -56,7 +56,9 @@ public sealed class PremiumWalletPaymentService(
             ? await (referrals ?? throw Invalid("voucher", "Voucher chưa sẵn sàng.")).QuoteAsync(request.VoucherId.Value, "vip", plan.Price, cancellationToken) : 0m;
         var amountDue = plan.Price - discount;
         if (request.ExpectedAmount != amountDue)
-            throw Invalid("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận số tiền mới.");
+            throw Invalid("expectedAmount", plan.OfferUsed
+                ? "Bạn đã dùng ưu đãi của đợt này. Bạn vẫn có thể gia hạn với giá thường; hãy tải lại bảng giá để tiếp tục."
+                : "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận số tiền mới.");
         var wallet = await db.WalletAccounts.SingleOrDefaultAsync(w => w.UserId == userId, cancellationToken);
         if (wallet is null) throw Invalid("wallet", "Ví chưa có số dư. Vui lòng nạp tiền trước.");
         await db.Entry(wallet).ReloadAsync(cancellationToken);

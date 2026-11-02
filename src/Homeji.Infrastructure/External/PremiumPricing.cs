@@ -12,12 +12,73 @@ public sealed class PremiumPricing(ApplicationDbContext db, UserContext users, I
 {
     public async Task<IReadOnlyList<PremiumPlanOptions>> GetPlansAsync(CancellationToken cancellationToken = default)
     {
+        var currentPlans = await GetCurrentPlansAsync(cancellationToken);
+
+        var userId = users.TryGetUserId();
+        if (!userId.HasValue) return currentPlans.Select(entry => entry.Plan).ToArray();
+
+        var campaigns = currentPlans.Select(plan =>
+        {
+            return (plan.Plan, startsAt: plan.CampaignStartsAt, endsAt: plan.Plan.OfferEndsAt);
+        }).Where(campaign => campaign.startsAt.HasValue).ToArray();
+
+        if (campaigns.Length == 0) return currentPlans.Select(entry => entry.Plan).ToArray();
+        var packageCodes = campaigns.Select(campaign => campaign.Plan.Code).ToArray();
+        var paidPurchases = await db.PaymentTransactions.AsNoTracking()
+            .Where(payment => payment.UserId == userId.Value
+                && payment.Purpose == Homeji.Domain.Enums.PaymentPurpose.PremiumSubscription
+                && payment.Status == Homeji.Domain.Enums.PaymentStatus.Paid
+                && payment.PaidAt.HasValue
+                && packageCodes.Contains(payment.PackageCode!))
+            .Select(payment => new { payment.PackageCode, payment.CreatedAt })
+            .ToArrayAsync(cancellationToken);
+
+        var usedCodes = campaigns.Where(campaign => paidPurchases.Any(payment =>
+                payment.PackageCode == campaign.Plan.Code
+                && payment.CreatedAt >= campaign.startsAt!.Value
+                && (!campaign.endsAt.HasValue || payment.CreatedAt < campaign.endsAt.Value)))
+            .Select(campaign => campaign.Plan.Code)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return currentPlans.Select(entry => usedCodes.Contains(entry.Plan.Code)
+            ? new PremiumPlanOptions
+            {
+                Code = entry.Plan.Code,
+                Name = entry.Plan.Name,
+                DurationDays = entry.Plan.DurationDays,
+                Price = entry.Plan.OriginalPrice!.Value,
+                OfferUsed = true,
+            }
+            : entry.Plan).ToArray();
+    }
+
+    private async Task<(PremiumPlanOptions Plan, DateTimeOffset? CampaignStartsAt)[]> GetCurrentPlansAsync(
+        CancellationToken cancellationToken)
+    {
         var changes = await db.PremiumPriceChanges.AsNoTracking()
-            .GroupBy(row => row.PackageCode).Select(group => group.OrderByDescending(row => row.CreatedAt).ThenByDescending(row => row.Id).First()).ToListAsync(cancellationToken);
+            .GroupBy(row => row.PackageCode)
+            .Select(group => group.OrderByDescending(row => row.CreatedAt).ThenByDescending(row => row.Id).First())
+            .ToListAsync(cancellationToken);
+
         return options.Value.GetPlansAt(clock.GetUtcNow()).Select(plan =>
         {
             var change = changes.Find(row => row.PackageCode == plan.Code);
-            return change is null ? plan : new PremiumPlanOptions { Code = plan.Code, Name = plan.Name, DurationDays = plan.DurationDays, Price = change.Price };
+            if (change is null)
+            {
+                var launchCampaign = plan.OriginalPrice > plan.Price;
+                return (plan, launchCampaign ? options.Value.LaunchOfferStartsAt : null);
+            }
+
+            var isDiscount = change.PreviousPrice > change.Price;
+            var currentPlan = new PremiumPlanOptions
+            {
+                Code = plan.Code,
+                Name = plan.Name,
+                DurationDays = plan.DurationDays,
+                Price = change.Price,
+                OriginalPrice = isDiscount ? change.PreviousPrice : null,
+            };
+            return (currentPlan, isDiscount ? change.CreatedAt : null);
         }).ToArray();
     }
     public async Task<IReadOnlyList<PremiumPriceAnnouncement>> GetAnnouncementsAsync(CancellationToken cancellationToken = default) =>
@@ -46,7 +107,7 @@ public sealed class PremiumPricing(ApplicationDbContext db, UserContext users, I
                 await transaction.CommitAsync(cancellationToken);
                 return ToAnnouncement(previous);
             }
-            var plan = (await GetPlansAsync(cancellationToken)).SingleOrDefault(row => row.Code == code)
+            var plan = (await GetCurrentPlansAsync(cancellationToken)).Select(entry => entry.Plan).SingleOrDefault(row => row.Code == code)
                 ?? throw Invalid("Không tìm thấy gói thành viên.");
             if (plan.Price != request.ExpectedPrice) throw Invalid("Giá vừa được cập nhật. Tải lại bảng giá trước khi sửa.");
             if (plan.Price == request.Price) throw Invalid("Giá mới phải khác giá hiện tại.");

@@ -19,7 +19,9 @@ public static class RentalPostVisibility
                     Longitude = Math.Round(dto.Longitude, 3),
                 };
         }
-        return currentUserId is null ? dto with { ModerationReason = null } : dto;
+        return currentUserId is null
+            ? dto with { ModerationReason = null, OwnerPhone = null }
+            : dto;
     }
 
     public static RentalPostSummaryDto ForPublicSearch(RentalPostSummaryDto dto) =>

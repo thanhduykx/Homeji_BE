@@ -229,6 +229,7 @@ public sealed class RentalPostService : IRentalPostService
             OwnerRole = owner?.Role,
             OwnerSchool = owner?.School,
             OwnerPhone = owner?.Phone,
+            HasOwnerPhone = !string.IsNullOrWhiteSpace(owner?.Phone),
             OwnerAvatarPath = owner?.AvatarPath,
             IsOwnerVerified = owner?.LandlordVerificationStatus == LandlordVerificationStatus.Verified,
             IsOwnerPremium = ownerIsPremium,
@@ -245,6 +246,8 @@ public sealed class RentalPostService : IRentalPostService
             throw new RequestValidationException(new Dictionary<string, string[]> { ["ownerRole"] = ["Vai trò tác giả phải là người thuê hoặc chủ trọ."] });
         if (request.Type.HasValue && !Enum.IsDefined(request.Type.Value))
             throw new RequestValidationException(new Dictionary<string, string[]> { ["type"] = ["Loại tin phòng không hợp lệ."] });
+        if (request.PropertyCategory is not (null or "room" or "apartment"))
+            throw new RequestValidationException(new Dictionary<string, string[]> { ["propertyCategory"] = ["Chọn phòng trọ hoặc căn hộ."] });
         if (request.Ids?.Count > 10 || request.ExcludedAmenities?.Count > 20 || request.ExcludedAmenities?.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > RentalPost.MaxAmenityCodeLength) == true || request.MinAvailableSlots is < 1 or > 20)
             throw new RequestValidationException(new Dictionary<string, string[]> { ["filters"] = ["Bộ lọc tin phòng không hợp lệ."] });
         var search = request;
@@ -289,6 +292,9 @@ public sealed class RentalPostService : IRentalPostService
                     OwnerAvatarPath = author?.AvatarPath, OwnerSchool = author?.School,
                     AvailableSlots = post.AvailableSlots, MaxOccupants = post.MaxOccupants,
                     DescriptionExcerpt = PlainTextExcerpt(post.Description),
+                    Deposit = post.Deposit,
+                    Amenities = post.Amenities.Select(amenity => amenity.Code).OrderBy(code => code, StringComparer.Ordinal).ToArray(),
+                    UpdatedAt = post.UpdatedAt,
                     IsOwnerVerified = author?.LandlordVerificationStatus == LandlordVerificationStatus.Verified,
                 };
                 return RentalPostVisibility.ForPublicSearch(summary);

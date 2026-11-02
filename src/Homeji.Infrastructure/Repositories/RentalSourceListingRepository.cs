@@ -20,6 +20,23 @@ public sealed class RentalSourceListingRepository(ApplicationDbContext context, 
         var now = _timeProvider.GetUtcNow();
         var listings = context.RentalSourceListings.AsNoTracking()
             .Where(listing => listing.SourceExpiresAt == null || listing.SourceExpiresAt > now);
+        if (query.PropertyCategory is "room" or "apartment")
+        {
+            var apartments = context.RentalSourceListings.AsNoTracking().Where(listing =>
+                EF.Functions.ILike(listing.Title, "%căn hộ%")
+                || EF.Functions.ILike(listing.Title, "%can ho%")
+                || EF.Functions.ILike(listing.Title, "%chung cư%")
+                || EF.Functions.ILike(listing.Title, "%chung cu%")
+                || EF.Functions.ILike(listing.Title, "%studio%")
+                || EF.Functions.ILike(listing.Title, "%officetel%")
+                || EF.Functions.ILike(listing.Title, "%apartment%")
+                || EF.Functions.ILike(listing.Title, "%penthouse%")
+                || EF.Functions.ILike(listing.Title, "%condotel%")
+                || EF.Functions.ILike(listing.Title, "%duplex%"));
+            listings = query.PropertyCategory == "apartment"
+                ? listings.Where(listing => apartments.Any(apartment => apartment.Id == listing.Id))
+                : listings.Where(listing => !apartments.Any(apartment => apartment.Id == listing.Id));
+        }
         if (query.District is not null) listings = listings.Where(listing => listing.District == query.District);
         if (query.MinPrice.HasValue) listings = listings.Where(listing => listing.Price >= query.MinPrice.Value);
         if (query.MaxPrice.HasValue) listings = listings.Where(listing => listing.Price <= query.MaxPrice.Value);

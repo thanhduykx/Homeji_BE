@@ -32,4 +32,9 @@ public sealed record RentalPostSummaryDto(
     int AvailableSlots = 1,
     int MaxOccupants = 1,
     string? DescriptionExcerpt = null,
-    bool IsOwnerVerified = false);
+    bool IsOwnerVerified = false)
+{
+    public decimal? Deposit { get; init; }
+    public IReadOnlyList<string> Amenities { get; init; } = [];
+    public DateTimeOffset? UpdatedAt { get; init; }
+}

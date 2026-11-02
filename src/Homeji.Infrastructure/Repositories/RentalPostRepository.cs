@@ -58,6 +58,21 @@ public sealed class RentalPostRepository : IRentalPostRepository
             query = query.Where(post => _dbContext.UserProfiles.Any(author => author.Id == post.OwnerId && author.Role == search.OwnerRole.Value));
         if (search.Type.HasValue)
             query = query.Where(post => post.Type == search.Type.Value);
+        if (search.PropertyCategory is "room" or "apartment")
+        {
+            var apartments = query.Where(post =>
+                EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%can ho%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%chung cu%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%studio%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%officetel%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%apartment%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%penthouse%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%condotel%")
+                || EF.Functions.Like(EF.Property<string>(post, "SearchTitle"), "%duplex%"));
+            query = search.PropertyCategory == "apartment"
+                ? apartments
+                : query.Where(post => !apartments.Any(apartment => apartment.Id == post.Id));
+        }
         foreach (var code in (search.ExcludedAmenities ?? []).Select(value => value.Trim().ToUpperInvariant()).Distinct(StringComparer.Ordinal))
             query = query.Where(post => !post.Amenities.Any(amenity => amenity.Code == code));
 

@@ -15,6 +15,8 @@ using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Subscriptions;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Homeji.Infrastructure.Context;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Homeji.Infrastructure.External;
@@ -36,6 +38,7 @@ public sealed class PaymentService : IPaymentService
     private readonly TimeProvider _timeProvider;
     private readonly ITransactionReceiptService _receipts;
     private readonly Homeji.Application.IServices.Subscriptions.IPremiumPricing? _pricing;
+    private readonly ApplicationDbContext? _dbContext;
 
     public PaymentService(
         HttpClient httpClient,
@@ -47,7 +50,8 @@ public sealed class PaymentService : IPaymentService
         IOptions<PayOsOptions> payOsOptions,
         IOptions<PremiumSubscriptionOptions> premiumOptions,
         TimeProvider timeProvider,
-        ITransactionReceiptService receipts, Homeji.Application.IServices.Subscriptions.IPremiumPricing? pricing = null)
+        ITransactionReceiptService receipts, Homeji.Application.IServices.Subscriptions.IPremiumPricing? pricing = null,
+        ApplicationDbContext? dbContext = null)
     {
         _httpClient = httpClient;
         _userContext = userContext;
@@ -60,6 +64,7 @@ public sealed class PaymentService : IPaymentService
         _timeProvider = timeProvider;
         _receipts = receipts;
         _pricing = pricing;
+        _dbContext = dbContext;
     }
 
     public async Task<PaymentDto> GetPaymentByIdAsync(
@@ -122,7 +127,9 @@ public sealed class PaymentService : IPaymentService
     {
         var plan = await GetPremiumPlanAsync(packageCode, cancellationToken);
         if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
-            throw Validation("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
+            throw Validation("expectedAmount", plan.OfferUsed
+                ? "Bạn đã dùng ưu đãi của đợt này. Bạn vẫn có thể gia hạn với giá thường; hãy tải lại bảng giá để tiếp tục."
+                : "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
 
         return await CreateMomoPaymentInternalAsync(
             plan.Price,
@@ -182,8 +189,13 @@ public sealed class PaymentService : IPaymentService
         var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
         payment.AttachMomoPayment(requestId, null, null, null, null, null, now);
         await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
-        await _payments.AddAsync(payment, cancellationToken);
-        await _payments.SaveChangesAsync(cancellationToken);
+        if (purpose == PaymentPurpose.PremiumSubscription)
+            await AddPremiumPendingPaymentAsync(payment, now, cancellationToken);
+        else
+        {
+            await _payments.AddAsync(payment, cancellationToken);
+            await _payments.SaveChangesAsync(cancellationToken);
+        }
 
         using var response = await SendAsync(
             () => _httpClient.PostAsJsonAsync(_momoOptions.Endpoint, payload, JsonOptions, cancellationToken),
@@ -326,7 +338,9 @@ public sealed class PaymentService : IPaymentService
     {
         var plan = await GetPremiumPlanAsync(packageCode, cancellationToken);
         if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
-            throw Validation("expectedAmount", "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
+            throw Validation("expectedAmount", plan.OfferUsed
+                ? "Bạn đã dùng ưu đãi của đợt này. Bạn vẫn có thể gia hạn với giá thường; hãy tải lại bảng giá để tiếp tục."
+                : "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
 
         return await CreatePayOsPaymentInternalAsync(
             plan.Price,
@@ -382,8 +396,13 @@ public sealed class PaymentService : IPaymentService
         var payment = new PaymentTransaction(userId, PaymentMethod.PayOs, amount,
             orderCode.ToString(CultureInfo.InvariantCulture), description, now, purpose, packageCode);
         await EnsureWalletExistsForTopUpAsync(purpose, userId, now, cancellationToken);
-        await _payments.AddAsync(payment, cancellationToken);
-        await _payments.SaveChangesAsync(cancellationToken);
+        if (purpose == PaymentPurpose.PremiumSubscription)
+            await AddPremiumPendingPaymentAsync(payment, now, cancellationToken);
+        else
+        {
+            await _payments.AddAsync(payment, cancellationToken);
+            await _payments.SaveChangesAsync(cancellationToken);
+        }
         using var response = await SendAsync(
             () => _httpClient.SendAsync(httpRequest, cancellationToken),
             "PayOS",
@@ -599,6 +618,56 @@ public sealed class PaymentService : IPaymentService
         }
 
         await _wallets.AddAccountAsync(WalletAccount.Create(userId, createdAt), cancellationToken);
+    }
+
+    private async Task AddPremiumPendingPaymentAsync(
+        PaymentTransaction payment,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        if (_dbContext is null)
+        {
+            await _payments.AddAsync(payment, cancellationToken);
+            await _payments.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        var userId = payment.UserId;
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var lockKey = userId.ToString("N");
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+            cancellationToken);
+
+        await _payments.CancelOverdueAsync(now, userId, cancellationToken);
+
+        // Recheck personalized campaign eligibility under the same account lock. A request
+        // may have read the discounted catalog before another payment consumed the offer.
+        if (_pricing is not null)
+        {
+            var currentPlan = await GetPremiumPlanAsync(payment.PackageCode, cancellationToken);
+            if (currentPlan.Price != payment.Amount)
+            {
+                throw Validation("expectedAmount", currentPlan.OfferUsed
+                    ? "Bạn đã dùng ưu đãi của đợt này. Bạn vẫn có thể gia hạn với giá thường; hãy tải lại bảng giá để tiếp tục."
+                    : "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
+            }
+        }
+
+        var hasPending = await _dbContext.PaymentTransactions.AsNoTracking()
+            .AnyAsync(existing => existing.UserId == userId
+                && existing.Purpose == PaymentPurpose.PremiumSubscription
+                && existing.PackageCode == payment.PackageCode
+                && existing.Status == PaymentStatus.Pending,
+                cancellationToken);
+        if (hasPending)
+        {
+            throw new ConflictException("Bạn đã có một đơn Premium đang chờ thanh toán. Hoàn tất hoặc chờ đơn hết hạn rồi hãy thử lại.");
+        }
+
+        await _payments.AddAsync(payment, cancellationToken);
+        await _payments.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
     private static string BuildPayOsWebhookSignaturePayload(PayOsWebhookDataDto data)

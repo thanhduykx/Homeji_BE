@@ -13,6 +13,7 @@ public sealed record SubscriptionPackageDto(
 {
     public decimal? OriginalPrice { get; init; }
     public DateTimeOffset? OfferEndsAt { get; init; }
+    public bool OfferUsed { get; init; }
     public int MaxFollowedAreas => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(Tier == SubscriptionTier.Premium).FollowedAreas;
     public int MaxComparedPosts => Homeji.Application.Services.Subscriptions.SubscriptionUsageLimits.For(Tier == SubscriptionTier.Premium).ComparedPosts;
 }

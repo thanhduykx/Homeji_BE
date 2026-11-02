@@ -38,6 +38,7 @@ public sealed class PremiumPlanOptions
 {
     public decimal? OriginalPrice { get; set; }
     public DateTimeOffset? OfferEndsAt { get; set; }
+    public bool OfferUsed { get; set; }
     public string Code { get; set; } = "PREMIUM_MONTHLY";
     public string Name { get; set; } = "Gói Trải Nghiệm";
     public decimal Price { get; set; } = 99_000;

@@ -44,4 +44,7 @@ public sealed record RentalPostDto(
     string? OwnerBadge = null,
     bool IsSynthetic = false,
     UserRole? OwnerRole = null,
-    string? OwnerSchool = null);
+    string? OwnerSchool = null)
+{
+    public bool HasOwnerPhone { get; init; }
+}

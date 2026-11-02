@@ -14,6 +14,7 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         if (query.Page is < 1 or > 1000 || query.PageSize is < 1 or > 50
             || query.Keyword?.Length > 200
             || query.District is not (null or "quan-9" or "thu-duc")
+            || query.PropertyCategory is not (null or "room" or "apartment")
             || query.MinPrice < 0 || query.MaxPrice < 0 || query.MinPrice > query.MaxPrice)
         {
             throw new RequestValidationException(new Dictionary<string, string[]>
@@ -33,18 +34,31 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         return ToDto(listing, true);
     }
 
-    private static RentalSourceListingDto ToDto(RentalSourceListing listing, bool details = false) => new(
-        listing.Id, listing.Source, listing.SourceId, listing.SourceUrl, listing.Title,
-        listing.Address, listing.District, listing.Price, listing.Area, listing.ImageUrls.ToArray(),
-        listing.SourceUpdatedAt, listing.CollectedAt)
+    public async Task<RentalSourceContactDto> GetContactAsync(Guid id, CancellationToken cancellationToken)
     {
-        Latitude = listing.Latitude,
-        PublisherName = listing.PublisherName,
-        Description = details ? listing.Description : null,
-        ContactPhone = details ? listing.ContactPhone : null,
-        DetailsCollectedAt = listing.DetailsCollectedAt,
-        Longitude = listing.Longitude,
-        SourceExpiresAt = listing.SourceExpiresAt,
-        SourceCheckedAt = listing.SourceCheckedAt,
-    };
+        var listing = await repository.GetByIdAsync(id, cancellationToken)
+            ?? throw new NotFoundException(nameof(RentalSourceListing), id);
+        return new(listing.ContactPhone);
+    }
+
+    private static RentalSourceListingDto ToDto(RentalSourceListing listing, bool details = false)
+    {
+        var facts = RentalSourceFacts.Parse(listing.Description);
+        return new(
+            listing.Id, listing.Source, listing.SourceId, listing.SourceUrl, listing.Title,
+            listing.Address, listing.District, listing.Price, listing.Area, listing.ImageUrls.ToArray(),
+            listing.SourceUpdatedAt, listing.CollectedAt)
+        {
+            Latitude = listing.Latitude,
+            PublisherName = listing.PublisherName,
+            Description = details ? listing.Description : null,
+            ContactPhone = null,
+            DetailsCollectedAt = listing.DetailsCollectedAt,
+            Longitude = listing.Longitude,
+            SourceExpiresAt = listing.SourceExpiresAt,
+            SourceCheckedAt = listing.SourceCheckedAt,
+            DepositLabel = facts.DepositLabel,
+            AmenityHighlights = facts.Amenities,
+        };
+    }
 }
