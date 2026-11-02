@@ -19,6 +19,41 @@ namespace Homeji.Api.IntegrationTests;
 public sealed class PremiumWalletPaymentDatabaseTests
 {
     [LocalMarketplaceDatabaseFact]
+    public async Task Each_discount_campaign_can_be_used_once_even_for_concurrent_requests_and_regular_renewal_remains_available()
+    {
+        var user = await Seed(500000);
+        var code = "QA_OFFER_" + Guid.NewGuid().ToString("N").ToUpperInvariant();
+        var setup = Options.Create(new PremiumSubscriptionOptions { Plans = [new PremiumPlanOptions { Code = code, Price = 99000, DurationDays = 30 }] });
+        await using (var seed = Open())
+        {
+            seed.PremiumPriceChanges.Add(new PremiumPriceChange { AdminId = user, RequestId = Guid.NewGuid(), PackageCode = code, PackageName = "QA campaign", PreviousPrice = 99000, Price = 49000, Reason = "Isolated QA campaign", CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-1) });
+            await seed.SaveChangesAsync();
+        }
+        PremiumWalletPaymentService Purchases(ApplicationDbContext db) => new(db,
+            new UserContext(new CurrentUser(user), new UserProfileRepository(db)), setup, TimeProvider.System,
+            new TransactionReceiptService(db, Context(user)), pricing: Pricing(db));
+        PremiumPricing Pricing(ApplicationDbContext db) => new(db,
+            new UserContext(new CurrentUser(user), new UserProfileRepository(db)), setup, TimeProvider.System);
+        async Task<bool> DiscountPurchase()
+        {
+            await using var db = Open();
+            try { await Purchases(db).PurchaseAsync(code, new(Guid.NewGuid(), 49000)); return true; }
+            catch (RequestValidationException) { return false; }
+        }
+        Assert.Equal(1, (await Task.WhenAll(DiscountPurchase(), DiscountPurchase())).Count(success => success));
+        await using var verify = Open();
+        var usedPlan = Assert.Single(await Pricing(verify).GetPlansAsync());
+        Assert.True(usedPlan.OfferUsed); Assert.Equal(99000, usedPlan.Price);
+        await Purchases(verify).PurchaseAsync(code, new(Guid.NewGuid(), 99000));
+        Assert.Equal(352000, (await verify.WalletAccounts.AsNoTracking().SingleAsync(w => w.UserId == user)).Balance);
+        Assert.Equal(2, await verify.PaymentTransactions.CountAsync(p => p.UserId == user));
+        verify.PremiumPriceChanges.Add(new PremiumPriceChange { AdminId = user, RequestId = Guid.NewGuid(), PackageCode = code, PackageName = "QA campaign", PreviousPrice = 99000, Price = 40000, Reason = "Next isolated QA campaign", CreatedAt = DateTimeOffset.UtcNow });
+        await verify.SaveChangesAsync();
+        var nextPlan = Assert.Single(await Pricing(verify).GetPlansAsync());
+        Assert.False(nextPlan.OfferUsed); Assert.Equal(40000, nextPlan.Price);
+    }
+
+    [LocalMarketplaceDatabaseFact]
     public async Task Concurrent_retries_debit_once_activate_once_and_record_one_receipt()
     {
         var user = await Seed(200000);
