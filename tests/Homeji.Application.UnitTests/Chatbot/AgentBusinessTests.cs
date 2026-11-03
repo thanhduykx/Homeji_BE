@@ -19,6 +19,8 @@ public sealed class AgentBusinessTests
     [InlineData("soạn bài cho ghế trong ảnh giá 500k", "secondHand")]
     [InlineData("tạo tin tìm trọ 3 triệu", "wanted")]
     [InlineData("đăng pass lại cái ghế này 500k", "secondHand")]
+    [InlineData("đăng pas lại cái ghế giá 500k", "secondHand")]
+    [InlineData("đăng pas phòng trọ", "roomTransfer")]
     [InlineData("tìm phòng gần tôi", null)]
     [InlineData("tìm bạn ở ghép", null)]
     [InlineData("Có ai đang bán cơm không", null)]

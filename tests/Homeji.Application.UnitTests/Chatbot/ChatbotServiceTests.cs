@@ -17,12 +17,14 @@ namespace Homeji.Application.UnitTests.Chatbot;
 
 public sealed class ChatbotServiceTests
 {
-    [Fact]
-    public async Task Exact_pass_request_with_photo_routes_to_the_posting_tool_in_chat_mode()
+    [Theory]
+    [InlineData("đăng pass lại cái ghế này 500k.")]
+    [InlineData("đăng pas lại cái ghế giá 500k")]
+    public async Task Exact_pass_request_with_photo_routes_to_the_posting_tool_in_chat_mode(string requestText)
     {
         var ai = new MediaClient(); var agent = new CapturingAgent();
         var reply = await CreateService(new(), ai, posting: agent).SendMessageAsync(new(null,
-            "đăng pass lại cái ghế này 500k.", Attachments: [new("image/png", "AA==")],
+            requestText, Attachments: [new("image/png", "AA==")],
             Location: new(10.84m, 106.8m, "Lê Văn Việt", UtcNow)));
         Assert.Equal(1, agent.Calls); Assert.Equal(0, ai.MediaCalls);
         Assert.True(reply.AgentRequested); Assert.Equal("Bản nháp đã soạn", reply.AssistantMessage.Content);
@@ -58,12 +60,60 @@ public sealed class ChatbotServiceTests
         public Task<Homeji.Application.DTOs.Roommates.RoommateProfileDto> GetMineAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<Homeji.Application.DTOs.Roommates.RoommateProfileDto> UpdateMineAsync(Homeji.Application.DTOs.Roommates.RoommateProfileDto request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
+    [Theory]
+    [InlineData("1. tình trạng mới, kick thước 500mm*200mm, chất liệu da")]
+    [InlineData("1")]
+    public async Task Posting_followup_recovers_the_recent_user_task_without_trusting_assistant_prose(string message)
+    {
+        var agent = new CapturingAgent();
+        var rows = new ChatbotMessageDto[] {
+            new(Guid.NewGuid(), Guid.Empty, ChatMessageSender.User, "đăng pas lại cái ghế giá 500k", UtcNow),
+            new(Guid.NewGuid(), Guid.Empty, ChatMessageSender.Assistant, "Tin của bạn đã được gửi vào hệ thống kiểm duyệt", UtcNow),
+            new(Guid.NewGuid(), Guid.Empty, ChatMessageSender.User, "tình trạng mới, kick thước 500mm*200mm, chất liệu da", UtcNow),
+            new(Guid.NewGuid(), Guid.Empty, ChatMessageSender.Assistant, "Thông tin bổ sung đã được ghi nhận", UtcNow),
+        };
+        var reply = await CreateService(new(), new MediaClient(), posting: agent).SendMessageAsync(
+            new(null, message, SessionMessages: rows, Attachments: [new("image/png", "AA==")]));
+        Assert.Equal(1, agent.Calls); Assert.True(reply.AgentRequested);
+        Assert.Contains("500k", agent.Message); Assert.Contains("500mm*200mm", agent.Message);
+        Assert.Contains("chất liệu da", agent.Message); Assert.Equal(1, agent.ImageCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Free_form_generation_cannot_claim_a_post_was_published(bool media)
+    {
+        var response = await CreateService(new(), new ClaimingClient()).SendMessageAsync(new(null, "1",
+            Attachments: media ? [new("image/png", "AA==")] : null));
+        Assert.Contains("chưa thực hiện thao tác đăng bài", response.AssistantMessage.Content);
+        Assert.Null(response.AgentDraft); Assert.False(response.AgentRequested);
+    }
+
+    [Fact]
+    public async Task Pending_draft_does_not_capture_a_general_premium_question()
+    {
+        var agent = new CapturingAgent(); var ai = new SuccessfulClient();
+        await CreateService(new(), ai, posting: agent).SendMessageAsync(new(null, "Premium bao nhiêu tiền?", AgentDraftId: Guid.NewGuid(), PostingAgent: true));
+        Assert.Equal(0, agent.Calls); Assert.Equal(1, ai.Calls);
+    }
+
+    private sealed class ClaimingClient : IChatbotAiClient
+    {
+        private const string Claim = "Tin của bạn đã được gửi vào hệ thống kiểm duyệt.";
+        public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, CancellationToken cancellationToken = default) => Task.FromResult(Claim);
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> files, CancellationToken cancellationToken = default) => Task.FromResult(Claim);
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
     private sealed class CapturingAgent : IChatbotPostingAgent
     {
         public int Calls { get; private set; }
+        public string Message { get; private set; } = "";
+        public int ImageCount { get; private set; }
         public ChatbotLocationDto? Location { get; private set; }
         public Task<AgentPostResultDto> PrepareAsync(string message, IReadOnlyCollection<ChatbotMediaContent> media, Guid? previousDraftId, ChatbotLocationDto? location = null, CancellationToken cancellationToken = default)
-        { Calls++; Location = location; return Task.FromResult(new AgentPostResultDto(null, false, "Bản nháp đã soạn")); }
+        { Calls++; Message = message; ImageCount = media.Count; Location = location; return Task.FromResult(new AgentPostResultDto(null, false, "Bản nháp đã soạn")); }
         public Task<Guid> ConfirmAsync(Guid draftId, AgentPostDetails details, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task CancelAsync(Guid draftId, CancellationToken cancellationToken) => throw new NotSupportedException();
     }

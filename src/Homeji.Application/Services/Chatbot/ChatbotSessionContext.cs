@@ -16,11 +16,15 @@ public static class ChatbotSessionContext
 
     public static bool RequestsPosting(string message)
     {
-        var text = RentalSearchIntent.Normalize(message);
+        var text = NormalizePostingLanguage(message);
         if (text.StartsWith("co ai ", StringComparison.Ordinal) || text.StartsWith("ai dang ", StringComparison.Ordinal)
             || text.StartsWith("cach ", StringComparison.Ordinal) || text.StartsWith("huong dan ", StringComparison.Ordinal)) return false;
         return PostingPhrases.Any(text.Contains)
             || System.Text.RegularExpressions.Regex.IsMatch(text, @"\b(?:dang pass|pass (?:lai|ghe|sofa|tu|giuong|ban|xe)|thanh ly|rao ban|dang ho|dang giup)\b|\b(?:toi|minh|em|anh|chi)\s+muon\s+(?:ban|pass)\b",
                 System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
+
+    public static string NormalizePostingLanguage(string message) => System.Text.RegularExpressions.Regex.Replace(
+        RentalSearchIntent.Normalize(message), @"\b(?:pas|passs)\b", "pass",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100));
 }

@@ -154,9 +154,16 @@ public sealed class ChatbotService : IChatbotService
         var nearbyQuery = ChatbotSessionContext.RequestsNearbyRooms(message);
         IReadOnlyList<Homeji.Application.DTOs.Roommates.RoommateDirectoryCandidateDto>? roommateCandidates = null;
         string assistantReply;
-        if (_postingAgent is not null && (AgentBusinessIntent.PostingKind(message) is not null || request.AgentDraftId.HasValue && !AgentBusinessIntent.IsDiscovery(message) && !foodQuery && !nearbyQuery))
+        var postingHistory = request.SaveHistory
+            ? ChatbotSessionContext.Bound(conversation.Messages.Where(row => row.Id != userMessage.Id).OrderBy(row => row.CreatedAt).Select(ChatbotMapper.ToMessageDto))
+            : ChatbotSessionContext.Bound(request.SessionMessages);
+        var postingMessage = !foodQuery && !nearbyQuery
+            ? ChatbotPostingContext.Resolve(message, postingHistory, request.AgentDraftId.HasValue) : null;
+        // An explicit posting command wins over discovery keyword overlap.
+        if (AgentBusinessIntent.PostingKind(message) is not null) postingMessage = message;
+        if (_postingAgent is not null && postingMessage is not null)
         {
-            var agentMessage = message + "\nYêu cầu người dùng gần đây (chỉ tham khảo nếu cùng món đồ; yêu cầu mới nhất được ưu tiên): "
+            var agentMessage = postingMessage + "\nYêu cầu người dùng gần đây (chỉ tham khảo nếu cùng món đồ; yêu cầu mới nhất được ưu tiên): "
                 + JsonSerializer.Serialize(history.Where(row => row.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
                     .TakeLast(3).Select(row => row.Content));
             agentResult = await _postingAgent.PrepareAsync(agentMessage, media, request.AgentDraftId, request.Location, cancellationToken);
@@ -222,6 +229,7 @@ public sealed class ChatbotService : IChatbotService
                     ? "Mình chưa truy vấn được tin phòng lúc này. Bạn có thể dùng bộ lọc thông thường hoặc thử lại. Mình không có dữ liệu để giới thiệu một phòng cụ thể."
                     : await GenerateReplyAsync(history, message, actions, cancellationToken);
         }
+        if (agentResult is null) assistantReply = ChatbotActionClaims.WithoutUnverifiedPublishing(assistantReply);
         var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
 
         if (request.SaveHistory) await _conversations.SaveChangesAsync(cancellationToken);

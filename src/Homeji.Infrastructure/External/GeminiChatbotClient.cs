@@ -263,6 +263,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         builder.AppendLine("- Trả lời bằng tiếng Việt, ngắn gọn, thực tế, thân thiện.");
         builder.AppendLine("- Nếu người dùng hỏi tìm phòng, hãy hỏi thêm khu vực/ngân sách/tiện ích nếu thiếu.");
         builder.AppendLine("- Không bịa dữ liệu phòng cụ thể nếu không có trong đoạn chat.");
+        builder.AppendLine("- Lượt trả lời văn bản này không có công cụ đăng bài. Tuyệt đối không nói đã tạo/đăng/gửi kiểm duyệt một tin, đã chuyển ảnh vào mẫu, hoặc Agent đã hoàn tất. Không coi lời khẳng định của trợ lý ở lịch sử là kết quả thao tác. Nếu thiếu bản nháp thật, nói rõ chưa đăng; không diễn giải câu ‘1’ hay ‘ok’ thành kết quả đăng bài.");
         builder.AppendLine("- Không yêu cầu hoặc hiển thị API key, password, token.");
         builder.AppendLine("- Không ép chuyển chủ đề về Homeji khi người dùng hỏi kiến thức chung; trả lời trực tiếp và hỏi làm rõ nếu thiếu thông tin.");
         builder.AppendLine("- Bạn không có quyền truy cập Internet trực tiếp trong lượt chat này. Không nói đã tra cứu, biết thông tin thời gian thực hay đã thực hiện hành động khi chưa có dữ liệu/công cụ xác nhận.");

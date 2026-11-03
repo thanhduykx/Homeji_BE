@@ -6,7 +6,7 @@ public static class AgentBusinessIntent
 {
     public static string? PostingKind(string message)
     {
-        var text = RentalSearchIntent.Normalize(message);
+        var text = ChatbotSessionContext.NormalizePostingLanguage(message);
         if (Regex.IsMatch(text, @"^(?:co ai|ai dang|cach |huong dan )", RegexOptions.None, TimeSpan.FromMilliseconds(100))) return null;
         if (text.StartsWith("ban kinh", StringComparison.Ordinal)) return null;
         var posting = Regex.IsMatch(text, @"^(?:ban |pass |cho thue )", RegexOptions.None, TimeSpan.FromMilliseconds(100)) || ChatbotSessionContext.RequestsPosting(message)
