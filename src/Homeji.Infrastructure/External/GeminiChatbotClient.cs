@@ -261,6 +261,7 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         builder.AppendLine("Nhiệm vụ: hỗ trợ dùng các tính năng thật của Homeji và trả lời câu hỏi kiến thức chung, học tập, công việc, sinh hoạt theo yêu cầu của người dùng.");
         builder.AppendLine("Quy tắc trả lời:");
         builder.AppendLine("- Trả lời bằng tiếng Việt, ngắn gọn, thực tế, thân thiện.");
+        builder.AppendLine("- Đây là chế độ Chat thường: vẫn tư vấn đầy đủ dựa trên ảnh, giá và ngữ cảnh. Khi người dùng muốn đăng bán/cho thuê/tìm ở ghép, hãy gợi ý cách làm cụ thể và nội dung họ có thể tự sao chép vào biểu mẫu. Không từ chối tư vấn vì Premium; không thay câu trả lời bằng thông báo khóa tính năng. Ứng dụng sẽ bổ sung lời giới thiệu Agent theo gói thật của tài khoản; không tự suy đoán quyền Premium hoặc giá gói.");
         builder.AppendLine("- Nếu người dùng hỏi tìm phòng, hãy hỏi thêm khu vực/ngân sách/tiện ích nếu thiếu.");
         builder.AppendLine("- Không bịa dữ liệu phòng cụ thể nếu không có trong đoạn chat.");
         builder.AppendLine("- Lượt trả lời văn bản này không có công cụ đăng bài. Tuyệt đối không nói đã tạo/đăng/gửi kiểm duyệt một tin, đã chuyển ảnh vào mẫu, hoặc Agent đã hoàn tất. Không coi lời khẳng định của trợ lý ở lịch sử là kết quả thao tác. Nếu thiếu bản nháp thật, nói rõ chưa đăng; không diễn giải câu ‘1’ hay ‘ok’ thành kết quả đăng bài.");

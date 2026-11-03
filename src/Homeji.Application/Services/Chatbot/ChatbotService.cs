@@ -29,6 +29,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly IChatbotPostingAgent? _postingAgent;
     private readonly Homeji.Application.IServices.Roommates.IRoommateDirectoryService? _roommates;
     private readonly IChatbotNearbyService? _nearby;
+    private readonly Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? _subscriptions;
 
     public ChatbotService(
         UserContext userContext,
@@ -38,7 +39,8 @@ public sealed class ChatbotService : IChatbotService
         IRentalDecisionService rentalDecision,
         IChatbotFoodService food,
         IOptions<ChatbotOptions> options,
-        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null, IChatbotNearbyService? nearby = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null)
+        TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null, IChatbotNearbyService? nearby = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null,
+        Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? subscriptions = null)
     {
         _userContext = userContext;
         _conversations = conversations;
@@ -51,6 +53,7 @@ public sealed class ChatbotService : IChatbotService
         _postingAgent = postingAgent;
         _nearby = nearby;
         _roommates = roommates;
+        _subscriptions = subscriptions;
     }
 
     public Task<ChatbotPopupConfigDto> GetPopupConfigAsync(CancellationToken cancellationToken = default)
@@ -146,6 +149,7 @@ public sealed class ChatbotService : IChatbotService
         if (!request.SaveHistory) history = ChatbotSessionContext.Bound(request.SessionMessages).Concat(history.TakeLast(1)).ToArray();
         history = ChatbotSessionContext.Bound(history).ToArray();
         AgentPostResultDto? agentResult = null;
+        var normalChatUpgrade = false;
         IReadOnlyCollection<ChatbotNavigationActionDto> actions = [];
         AiHighlightResponseDto? searchUpdate = null;
         RentalDecisionResponseDto? rentalDecision = null;
@@ -161,7 +165,23 @@ public sealed class ChatbotService : IChatbotService
             ? ChatbotPostingContext.Resolve(message, postingHistory, request.AgentDraftId.HasValue) : null;
         // An explicit posting command wins over discovery keyword overlap.
         if (AgentBusinessIntent.PostingKind(message) is not null) postingMessage = message;
-        if (_postingAgent is not null && postingMessage is not null)
+        if (!request.PostingAgent && postingMessage is not null)
+        {
+            var premium = _subscriptions is not null
+                && await _subscriptions.GetActivePremiumAsync(profile.Id, _timeProvider.GetUtcNow(), cancellationToken) is not null;
+            actions = [ManualPostingAction(AgentBusinessIntent.PostingKind(postingMessage), profile.Role)];
+            assistantReply = media.Count > 0
+                ? await _aiClient.GenerateMediaReplyAsync(history, message, media, cancellationToken)
+                : await GenerateReplyAsync(history, message, actions, cancellationToken);
+            var checkedReply = ChatbotActionClaims.WithoutUnverifiedPublishing(assistantReply);
+            if (checkedReply != assistantReply)
+                assistantReply = "Bạn có thể tự đăng bằng biểu mẫu bên dưới:\n1. Thêm ảnh và mô tả tình trạng thực tế.\n2. Điền giá, nơi nhận hoặc thông tin phòng bạn đã chọn.\n3. Kiểm tra nội dung rồi xác nhận đăng bài.";
+            normalChatUpgrade = !premium;
+            assistantReply += premium
+                ? "\n\nBạn đã có Premium. Nếu muốn Homeji điền mẫu giúp, hãy chuyển sang Agent; bạn xem và xác nhận trước khi đăng."
+                : "\n\nNếu muốn Homeji điền mẫu giúp và đăng sau khi bạn duyệt, bạn có thể nâng cấp Premium để dùng Agent.";
+        }
+        else if (request.PostingAgent && _postingAgent is not null && postingMessage is not null)
         {
             var agentMessage = postingMessage + "\nYêu cầu người dùng gần đây (chỉ tham khảo nếu cùng món đồ; yêu cầu mới nhất được ưu tiên): "
                 + JsonSerializer.Serialize(history.Where(row => row.Sender == Homeji.Domain.Enums.ChatMessageSender.User)
@@ -170,10 +190,7 @@ public sealed class ChatbotService : IChatbotService
             assistantReply = agentResult.Message;
             if (agentResult.UpgradeRequired)
             {
-                var kind = AgentBusinessIntent.PostingKind(message);
-                var target = kind switch { "rental" or "roommate" => profile.Role == Homeji.Domain.Enums.UserRole.Landlord ? "/posts/new" : "/?section=profile",
-                    "roomTransfer" => "/posts/new?type=pass", "wanted" => "/?section=wanted", _ => "/?section=marketplace" };
-                actions = [new("manual-post", "Mở biểu mẫu phù hợp", "Tự điền thông tin và kiểm tra trước khi đăng", ChatbotNavigationActionKind.Navigate, target)];
+                actions = [ManualPostingAction(AgentBusinessIntent.PostingKind(postingMessage), profile.Role)];
             }
         }
         else if (AgentBusinessIntent.IsRoommateSearch(message))
@@ -239,7 +256,20 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions) { RoommateCandidates = roommateCandidates, RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = agentResult?.UpgradeRequired == true };
+            actions) { RoommateCandidates = roommateCandidates, RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = normalChatUpgrade || agentResult?.UpgradeRequired == true };
+    }
+
+    private static ChatbotNavigationActionDto ManualPostingAction(string? kind, Homeji.Domain.Enums.UserRole? role)
+    {
+        var target = kind switch
+        {
+            "rental" => role == Homeji.Domain.Enums.UserRole.Landlord ? "/posts/new" : "/?section=profile",
+            "roommate" => "/posts/new?type=roommate",
+            "roomTransfer" => "/posts/new?type=pass",
+            "wanted" => "/?section=wanted",
+            _ => "/?section=marketplace"
+        };
+        return new("manual-post", "Tự đăng bài", "Mở biểu mẫu để tự điền và kiểm tra thông tin", ChatbotNavigationActionKind.Navigate, target);
     }
 
     public async Task<string> TranscribeAsync(ChatbotTranscriptionDto request, CancellationToken cancellationToken = default)

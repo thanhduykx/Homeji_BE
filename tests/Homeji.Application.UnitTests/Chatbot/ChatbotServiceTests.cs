@@ -18,14 +18,58 @@ namespace Homeji.Application.UnitTests.Chatbot;
 public sealed class ChatbotServiceTests
 {
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task Normal_chat_gives_guidance_without_preparing_a_draft_and_only_upsells_basic_users(bool media, bool premium)
+    {
+        var agent = new CapturingAgent();
+        var ai = new GuidanceClient();
+        var reply = await CreateService(new(), ai, posting: agent, subscriptions: new SubscriptionStub(premium)).SendMessageAsync(
+            new(null, "tôi muốn pass lại cái ghế này với giá 500k", Attachments: media ? [new("image/png", "AA==")] : null,
+                AgentDraftId: Guid.NewGuid()));
+        Assert.Equal(0, agent.Calls);
+        Assert.Equal(1, media ? ai.MediaCalls : ai.TextCalls);
+        Assert.StartsWith("Bạn có thể đăng chiếc ghế giá 500.000đ", reply.AssistantMessage.Content);
+        Assert.Null(reply.AgentDraft); Assert.False(reply.AgentRequested);
+        Assert.Equal(!premium, reply.UpgradeRequired);
+        Assert.Single(reply.Actions);
+        if (premium) Assert.Contains("chuyển sang Agent", reply.AssistantMessage.Content);
+        else Assert.Contains("nâng cấp Premium", reply.AssistantMessage.Content);
+    }
+
+    private sealed class GuidanceClient : IChatbotAiClient
+    {
+        public int TextCalls { get; private set; }
+        public int MediaCalls { get; private set; }
+        private const string Reply = "Bạn có thể đăng chiếc ghế giá 500.000đ trên Chợ đồ. Chụp rõ ghế, ghi tình trạng, kích thước và nơi nhận; kiểm tra thông tin rồi tự đăng.";
+        public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> history, string message, CancellationToken cancellationToken = default)
+        { TextCalls++; return Task.FromResult(Reply); }
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> history, string message, IReadOnlyCollection<ChatbotMediaContent> files, CancellationToken cancellationToken = default)
+        { MediaCalls++; Assert.Single(files); return Task.FromResult(Reply); }
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+    private sealed class SubscriptionStub(bool premium) : Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository
+    {
+        public Task<UserSubscription?> GetActivePremiumAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken = default)
+            => Task.FromResult(premium ? UserSubscription.CreatePremium(id, "premium", "Premium", null, now.AddDays(-1), 30, now.AddDays(-1)) : null);
+        public Task<UserSubscription?> GetPremiumTailAsync(Guid id, DateTimeOffset now, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<IReadOnlyDictionary<Guid, UserSubscription>> GetActivePremiumByUserIdsAsync(IReadOnlyCollection<Guid> ids, DateTimeOffset now, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<UserSubscription?> GetByPaymentTransactionIdAsync(Guid id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task AddAsync(UserSubscription subscription, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
+    }
+
+    [Theory]
     [InlineData("đăng pass lại cái ghế này 500k.")]
     [InlineData("đăng pas lại cái ghế giá 500k")]
-    public async Task Exact_pass_request_with_photo_routes_to_the_posting_tool_in_chat_mode(string requestText)
+    public async Task Exact_pass_request_with_photo_routes_to_the_posting_tool_in_agent_mode(string requestText)
     {
         var ai = new MediaClient(); var agent = new CapturingAgent();
         var reply = await CreateService(new(), ai, posting: agent).SendMessageAsync(new(null,
             requestText, Attachments: [new("image/png", "AA==")],
-            Location: new(10.84m, 106.8m, "Lê Văn Việt", UtcNow)));
+            Location: new(10.84m, 106.8m, "Lê Văn Việt", UtcNow), PostingAgent: true));
         Assert.Equal(1, agent.Calls); Assert.Equal(0, ai.MediaCalls);
         Assert.True(reply.AgentRequested); Assert.Equal("Bản nháp đã soạn", reply.AssistantMessage.Content);
         Assert.Equal("Lê Văn Việt", agent.Location!.Address);
@@ -73,7 +117,7 @@ public sealed class ChatbotServiceTests
             new(Guid.NewGuid(), Guid.Empty, ChatMessageSender.Assistant, "Thông tin bổ sung đã được ghi nhận", UtcNow),
         };
         var reply = await CreateService(new(), new MediaClient(), posting: agent).SendMessageAsync(
-            new(null, message, SessionMessages: rows, Attachments: [new("image/png", "AA==")]));
+            new(null, message, SessionMessages: rows, Attachments: [new("image/png", "AA==")], PostingAgent: true));
         Assert.Equal(1, agent.Calls); Assert.True(reply.AgentRequested);
         Assert.Contains("500k", agent.Message); Assert.Contains("500mm*200mm", agent.Message);
         Assert.Contains("chất liệu da", agent.Message); Assert.Equal(1, agent.ImageCount);
@@ -288,7 +332,7 @@ public sealed class ChatbotServiceTests
         IChatbotAiClient aiClient,
         IAiSearchService? search = null,
         bool historyStorageEnabled = true,
-        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null)
+        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null, Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? subscriptions = null)
     {
         return new ChatbotService(
             new UserContext(new StubCurrentUser(UserId), new StubUserProfileRepository()),
@@ -298,7 +342,7 @@ public sealed class ChatbotServiceTests
             decision ?? new StubRentalDecisionService(),
             new StubFoodService(),
             Options.Create(new ChatbotOptions { HistoryStorageEnabled = historyStorageEnabled }),
-            new StubTimeProvider(), posting, roommates: roommates);
+            new StubTimeProvider(), posting, roommates: roommates, subscriptions: subscriptions);
     }
 
     [Theory]

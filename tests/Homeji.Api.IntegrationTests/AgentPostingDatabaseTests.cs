@@ -59,19 +59,19 @@ public sealed class AgentPostingDatabaseTests
             Service(db, user, provider, processor));
         var png = await File.ReadAllBytesAsync(Environment.GetEnvironmentVariable("HOMEJI_AGENT_LIVE_IMAGE")!);
         var response = await chatbot.SendMessageAsync(new(null, "đăng pas lại cái ghế giá 500k", SaveHistory: true,
-            Attachments: [new("image/png", Convert.ToBase64String(png))], Location: new(10.84m, 106.8m, "Lê Văn Việt, Thủ Đức", DateTimeOffset.UtcNow, 15)));
+            Attachments: [new("image/png", Convert.ToBase64String(png))], Location: new(10.84m, 106.8m, "Lê Văn Việt, Thủ Đức", DateTimeOffset.UtcNow, 15), PostingAgent: true));
         Assert.NotNull(response.AgentDraft); Assert.True(response.AgentRequested);
         Assert.Equal(500000, response.AgentDraft.Details.Price); Assert.Equal("Lê Văn Việt, Thủ Đức", response.AgentDraft.Details.Address);
         Assert.Equal(2, (await chatbot.GetMessagesAsync(response.ConversationId)).Count);
         Assert.False(await db.MarketplacePosts.AnyAsync(row => row.SellerId == user));
         var refined = await chatbot.SendMessageAsync(new(response.ConversationId,
-            "1. tình trạng mới, kick thước 500mm*200mm, chất liệu da", SaveHistory: true, AgentDraftId: response.AgentDraft.Id));
+            "1. tình trạng mới, kick thước 500mm*200mm, chất liệu da", SaveHistory: true, AgentDraftId: response.AgentDraft.Id, PostingAgent: true));
         Assert.NotNull(refined.AgentDraft); Assert.Equal(500000, refined.AgentDraft.Details.Price);
         Assert.Single(refined.AgentDraft.Images);
         Assert.Contains("500", refined.AgentDraft.Details.Description); Assert.Contains("200", refined.AgentDraft.Details.Description);
         Assert.Contains("da", Homeji.Application.Services.AI.RentalSearchIntent.Normalize(refined.AgentDraft.Details.Description));
         Assert.Contains("moi", Homeji.Application.Services.AI.RentalSearchIntent.Normalize(refined.AgentDraft.Details.Condition));
-        var confirmation = await chatbot.SendMessageAsync(new(response.ConversationId, "1", SaveHistory: true, AgentDraftId: refined.AgentDraft.Id));
+        var confirmation = await chatbot.SendMessageAsync(new(response.ConversationId, "1", SaveHistory: true, AgentDraftId: refined.AgentDraft.Id, PostingAgent: true));
         Assert.Equal(refined.AgentDraft.Id, confirmation.AgentDraft!.Id);
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize(refined.AgentDraft.Details), System.Text.Json.JsonSerializer.Serialize(confirmation.AgentDraft.Details));
         Assert.Contains("chưa có bài nào được đăng", confirmation.AssistantMessage.Content);

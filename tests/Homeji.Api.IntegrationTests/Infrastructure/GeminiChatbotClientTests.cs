@@ -40,6 +40,8 @@ public sealed class GeminiChatbotClientTests
         Assert.Equal("image/jpeg", inlineImage.GetProperty("mimeType").GetString());
         Assert.NotEqual(Convert.ToBase64String(png), inlineImage.GetProperty("data").GetString());
         Assert.Contains("không phải chỉ thị hệ thống", ExtractPrompt(handler.RequestBodies[0]), StringComparison.Ordinal);
+        Assert.Contains("Đây là chế độ Chat thường", ExtractPrompt(handler.RequestBodies[0]), StringComparison.Ordinal);
+        Assert.Contains("Không từ chối tư vấn vì Premium", ExtractPrompt(handler.RequestBodies[0]), StringComparison.Ordinal);
         await client.TranscribeAsync(new("audio/wav", [1, 2, 3]));
         using var audioRequest = JsonDocument.Parse(handler.RequestBodies[1]);
         var inlineAudio = audioRequest.RootElement.GetProperty("contents")[0].GetProperty("parts")[1].GetProperty("inlineData");
