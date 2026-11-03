@@ -65,7 +65,7 @@ public sealed class RentalPostService : IRentalPostService
     public async Task<RentalPostDto> CreateDraftAsync(CreateRentalPostDraftDto request, CancellationToken cancellationToken = default)
     {
         var profile = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        EnsureCanAuthor(profile, request.Type);
+        RentalPostAuthorPolicy.EnsureCanAuthor(profile, request.Type);
 
         var post = RentalPost.CreateDraft(profile.Id, request.Type, _timeProvider.GetUtcNow());
         await _posts.AddAsync(post, cancellationToken);
@@ -84,7 +84,7 @@ public sealed class RentalPostService : IRentalPostService
             });
         }
         var author = await _userContext.GetRequiredProfileAsync(cancellationToken);
-        EnsureCanAuthor(author, request.Type);
+        RentalPostAuthorPolicy.EnsureCanAuthor(author, request.Type);
         await ValidateAsync(_updateValidator, request, cancellationToken);
         var violations = await _moderation.ValidateAsync(request.Description ?? string.Empty, cancellationToken);
         if (violations.Count > 0)
@@ -439,15 +439,8 @@ public sealed class RentalPostService : IRentalPostService
         var post = await _posts.GetByIdWithMediaAsync(postId, cancellationToken)
             ?? throw new NotFoundException(nameof(RentalPost), postId);
         UserContext.EnsureOwner(owner.Id, post.OwnerId);
-        EnsureCanAuthor(owner, post.Type);
+        RentalPostAuthorPolicy.EnsureCanAuthor(owner, post.Type);
         return post;
-    }
-
-    private static void EnsureCanAuthor(UserProfile author, RentalPostType type)
-    {
-        if (type == RentalPostType.RoomTransfer) UserContext.EnsureRenter(author);
-        else if (type == RentalPostType.RoommateShare && author.Role == UserRole.Renter) return;
-        else UserContext.EnsureLandlord(author);
     }
 
     private static string PlainTextExcerpt(string description)

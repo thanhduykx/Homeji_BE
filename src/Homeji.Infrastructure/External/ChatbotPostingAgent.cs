@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Homeji.Application.Services.Chatbot;
+using Homeji.Application.Services.RentalPosts;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.DTOs.WantedPosts;
 using Homeji.Application.IServices.RentalPosts;
@@ -47,8 +48,8 @@ public sealed class ChatbotPostingAgent(ApplicationDbContext db, UserContext use
         kind ??= stored?.Details.Kind;
         if (kind is null) return new(null, false, "Bạn muốn đăng tin cho thuê, pass phòng, tìm trọ, tìm người ở ghép, bán món ăn hay đồ cũ? Nêu loại tin để mình dùng đúng mẫu.");
         if (stored is not null && stored.Details.Kind != kind) stored = null;
-        if (kind is "rental" or "roommate") UserContext.EnsureLandlord(profile);
-        if (kind is "roomTransfer" or "wanted") UserContext.EnsureRenter(profile);
+        if (kind is "rental" or "roommate" or "roomTransfer") RentalPostAuthorPolicy.EnsureCanAuthor(profile, RentalType(kind));
+        if (kind == "wanted") UserContext.EnsureRenter(profile);
         var prepared = new List<ChatbotAttachmentDto>();
         foreach (var file in media.Where(row => row.MimeType.StartsWith("image/", StringComparison.Ordinal)))
         {
@@ -161,7 +162,7 @@ public sealed class ChatbotPostingAgent(ApplicationDbContext db, UserContext use
             if (details.Kind is "rental" or "roommate" or "roomTransfer")
             {
                 var author = await users.GetRequiredProfileAsync(cancellationToken);
-                if (details.Kind == "roomTransfer") UserContext.EnsureRenter(author); else UserContext.EnsureLandlord(author);
+                RentalPostAuthorPolicy.EnsureCanAuthor(author, RentalType(details.Kind));
             }
             if (details.Kind == "wanted")
             {
@@ -173,7 +174,7 @@ public sealed class ChatbotPostingAgent(ApplicationDbContext db, UserContext use
             var isRoom = details.Kind is "rental" or "roommate" or "roomTransfer";
             if (isRoom && stored.Images.Count < RentalPost.MinimumImageCountForSubmit)
                 throw Invalid($"Tin phòng cần ít nhất {RentalPost.MinimumImageCountForSubmit} ảnh thật. Gửi bổ sung ảnh để tạo bản nháp mới.");
-            var rentalType = details.Kind == "rental" ? RentalPostType.VacantRoom : details.Kind == "roommate" ? RentalPostType.RoommateShare : RentalPostType.RoomTransfer;
+            var rentalType = isRoom ? RentalType(details.Kind) : RentalPostType.VacantRoom;
             var roomDraft = isRoom ? await (rentals ?? throw Invalid("Luồng đăng phòng chưa sẵn sàng.")).CreateDraftAsync(new(rentalType), cancellationToken) : null;
             if (!isRoom && stored.Images.Count == 0) throw Invalid("Cần ít nhất 1 ảnh thật để đăng đồ ăn hoặc đồ cũ.");
             var mediaUrls = new List<string>();
@@ -214,6 +215,14 @@ public sealed class ChatbotPostingAgent(ApplicationDbContext db, UserContext use
             return post.Id;
         });
     }
+
+    private static RentalPostType RentalType(string kind) => kind switch
+    {
+        "rental" => RentalPostType.VacantRoom,
+        "roommate" => RentalPostType.RoommateShare,
+        "roomTransfer" => RentalPostType.RoomTransfer,
+        _ => throw Invalid("Loại tin phòng chưa hợp lệ.")
+    };
 
     public async Task CancelAsync(Guid draftId, CancellationToken cancellationToken)
     {

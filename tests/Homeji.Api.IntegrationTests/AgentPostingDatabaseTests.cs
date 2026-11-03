@@ -102,6 +102,48 @@ public sealed class AgentPostingDatabaseTests
         await File.WriteAllTextAsync(Path.Combine(root, "output/verification/agent-real-rental-flow.json"), "{\"verified\":true,\"kind\":\"rental\",\"rent\":8000000,\"deposit\":16000000,\"minimumLeaseMonths\":12,\"unknownAreaLeftBlank\":true,\"published\":false}");
     }
 
+    [Homeji.Api.IntegrationTests.Infrastructure.LiveAgentProviderFact]
+    public async Task Remaining_business_requests_use_real_provider_to_prepare_separate_approval_drafts()
+    {
+        var root = Environment.GetEnvironmentVariable("HOMEJI_AGENT_LIVE_ROOT")!;
+        using var settings = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(root, "src/Homeji.Api/appsettings.Local.json")));
+        var config = settings.RootElement.GetProperty("Ai").GetProperty("Gemini");
+        var options = new GeminiOptions { ApiKey = config.GetProperty("ApiKey").GetString(), MaxRetryAttempts = 1 };
+        if (config.TryGetProperty("Endpoint", out var endpoint)) options.Endpoint = endpoint.GetString()!;
+        var processor = new ConversationImageProcessor(); using var http = new HttpClient();
+        var provider = new GeminiChatbotClient(http, Options.Create(options), Microsoft.Extensions.Logging.Abstractions.NullLogger<GeminiChatbotClient>.Instance, processor);
+        var cases = new[] {
+            (Kind: "roomTransfer", Price: 3000000m, Message: "đăng pass phòng đang thuê 3 triệu/tháng, cọc 3 triệu, phí sang nhượng 500k, diện tích 25m2 tại Lê Văn Việt, Thủ Đức; còn hợp đồng 6 tháng"),
+            (Kind: "roommate", Price: 1500000m, Message: "đăng tìm bạn ở ghép phòng 25m2, còn 1 chỗ, giá 1.5 triệu/người/tháng tại Lê Văn Việt, Thủ Đức"),
+            (Kind: "wanted", Price: 2000000m, Message: "đăng tin tìm phòng trọ ngân sách tối đa 2 triệu/tháng, cho 1 người ở Lê Văn Việt, Thủ Đức"),
+            (Kind: "food", Price: 35000m, Message: "đăng bán cơm gà giá 35k/phần, số lượng 10 phần, chuẩn bị 15 phút, tại Lê Văn Việt, Thủ Đức")
+        };
+        var evidence = new List<object>();
+        foreach (var item in cases)
+        {
+            await using var db = Open(); var user = await Seed(db, true);
+            AgentPostResultDto result;
+            try { result = await Service(db, user, provider, processor).PrepareAsync(item.Message, [], null); }
+            catch (ExternalServiceUnavailableException)
+            {
+                await File.WriteAllTextAsync(Path.Combine(root, "output/verification/agent-real-remaining-business-flows.json"),
+                    System.Text.Json.JsonSerializer.Serialize(new { verified = false, isolatedDatabase = true, providerUnavailable = true,
+                        failedKind = item.Kind, completedCases = evidence, published = false }));
+                throw;
+            }
+            Assert.NotNull(result.Draft);
+            Assert.Equal(item.Kind, result.Draft.Details.Kind);
+            Assert.Equal(item.Price, result.Draft.Details.Price);
+            Assert.False(string.IsNullOrWhiteSpace(result.Draft.Details.Title));
+            Assert.False(await db.MarketplacePosts.AnyAsync(row => row.SellerId == user));
+            Assert.False(await db.RentalPosts.AnyAsync(row => row.OwnerId == user));
+            if (item.Kind == "roomTransfer") Assert.False(result.Draft.Details.OwnerConsentConfirmed);
+            evidence.Add(new { kind = item.Kind, price = result.Draft.Details.Price, realProvider = true, approvalRequired = true, published = false });
+        }
+        await File.WriteAllTextAsync(Path.Combine(root, "output/verification/agent-real-remaining-business-flows.json"),
+            System.Text.Json.JsonSerializer.Serialize(new { verified = true, isolatedDatabase = true, cases = evidence }));
+    }
+
     [LocalMarketplaceDatabaseFact]
     public async Task Preparing_a_draft_does_not_detach_the_enclosing_opted_in_chat_history()
     {
@@ -205,7 +247,7 @@ public sealed class AgentPostingDatabaseTests
         foreach (var kind in new[] { "rental", "roomTransfer", "roommate", "wanted", "food" })
         {
             await using var db = Open(); var user = await Seed(db, true);
-            if (kind is "rental" or "roommate")
+            if (kind == "rental")
             {
                 var author = await db.UserProfiles.SingleAsync(row => row.Id == user);
                 author.SetRole(UserRole.Landlord, DateTimeOffset.UtcNow); await db.SaveChangesAsync();

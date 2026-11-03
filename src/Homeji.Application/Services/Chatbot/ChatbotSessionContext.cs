@@ -19,7 +19,9 @@ public static class ChatbotSessionContext
         var text = NormalizePostingLanguage(message);
         if (text.StartsWith("co ai ", StringComparison.Ordinal) || text.StartsWith("ai dang ", StringComparison.Ordinal)
             || text.StartsWith("cach ", StringComparison.Ordinal) || text.StartsWith("huong dan ", StringComparison.Ordinal)) return false;
-        return PostingPhrases.Any(text.Contains)
+        return System.Text.RegularExpressions.Regex.IsMatch(message.Normalize(), @"\bđăng\s+(?:tìm|tuyển)\b",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100))
+            || PostingPhrases.Any(text.Contains)
             || System.Text.RegularExpressions.Regex.IsMatch(text, @"\b(?:dang pass|pass (?:lai|ghe|sofa|tu|giuong|ban|xe)|thanh ly|rao ban|dang ho|dang giup)\b|\b(?:toi|minh|em|anh|chi)\s+muon\s+(?:ban|pass)\b",
                 System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(100));
     }
