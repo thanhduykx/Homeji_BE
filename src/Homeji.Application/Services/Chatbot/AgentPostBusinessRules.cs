@@ -7,6 +7,20 @@ public static class AgentPostBusinessRules
 {
     public static void Validate(AgentPostDetails details, DateTimeOffset now)
     {
+        var errors = Collect(details, now);
+        if (errors.Count > 0) throw new RequestValidationException(errors);
+    }
+
+    /// <summary>What the user still has to provide before this draft can be confirmed.</summary>
+    public static IReadOnlyList<string> Missing(AgentPostDetails details, DateTimeOffset now, int imageCount, int minimumImages)
+    {
+        var missing = Collect(details, now).Values.SelectMany(messages => messages).ToList();
+        if (details.Kind != "wanted" && imageCount < minimumImages) missing.Add($"Thêm ảnh thật: cần ít nhất {minimumImages} ảnh, hiện có {imageCount}.");
+        return missing;
+    }
+
+    private static Dictionary<string, string[]> Collect(AgentPostDetails details, DateTimeOffset now)
+    {
         var errors = new Dictionary<string, string[]>();
         void Require(bool valid, string field, string message) { if (!valid) errors[field] = [message]; }
         Require(details.Kind is "secondHand" or "food" or "rental" or "roomTransfer" or "roommate" or "wanted", "kind", "Loại tin không hợp lệ.");
@@ -43,6 +57,6 @@ public static class AgentPostBusinessRules
             Require(!string.IsNullOrWhiteSpace(details.Unit) && details.Unit.Length <= 30, "unit", "Nhập đơn vị bán: phần, ly, hộp…");
             Require(details.PreparationMinutes is >= 0 and <= 240, "preparationMinutes", "Nhập thời gian chuẩn bị từ 0 đến 240 phút.");
         }
-        if (errors.Count > 0) throw new RequestValidationException(errors);
+        return errors;
     }
 }
