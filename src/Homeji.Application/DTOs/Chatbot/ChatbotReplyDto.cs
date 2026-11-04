@@ -16,4 +16,5 @@ public sealed record ChatbotReplyDto(
     public bool UpgradeRequired { get; init; }
     public RentalDecisionResponseDto? RentalDecision { get; init; }
     public ChatbotFoodResponseDto? FoodDiscovery { get; init; }
+    public ChatbotSourceMatchDto? SourceRooms { get; init; }
 }

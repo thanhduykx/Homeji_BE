@@ -32,6 +32,9 @@ public static partial class ChatbotSupportKnowledge
         if (HasAny(text, "premium", "goi dang ky") && HasAny(text, "loi ich", "quyen loi", "gia", "bao nhieu", "nang cap"))
             return "Mở **Gói Premium** để xem quyền lợi, giá và thời hạn hiện tại của từng gói Premium. Chọn gói phù hợp rồi chọn phương thức thanh toán. Mình không tự nâng cấp hay thu tiền từ cuộc trò chuyện; chỉ hệ thống thanh toán mới xác nhận giao dịch và kích hoạt gói.";
 
+        if (text.Contains("voucher", StringComparison.Ordinal))
+            return "Voucher Homeji có hạn dùng 30 ngày kể từ lúc nhận. Đơn đồ ăn bị hủy hoặc không thành công sẽ được hoàn voucher với hạn ban đầu. Voucher chỉ giảm trực tiếp khi thanh toán, không đổi ra tiền mặt, không cộng vào số dư ví và không chuyển cho người khác. Mỗi người mời nhận thưởng tối đa 5 lượt bạn mới. Xem voucher đang có trong mục **Mời bạn & voucher**.";
+
         return null;
     }
 
