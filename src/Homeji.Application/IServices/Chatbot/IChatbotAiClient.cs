@@ -15,4 +15,12 @@ public interface IChatbotAiClient
         IReadOnlyCollection<ChatbotMessageDto> conversationMessages,
         string latestUserMessage,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Answers only from <paramref name="listingFacts"/>, which the application retrieved for this turn.</summary>
+    Task<string> GenerateGroundedReplyAsync(
+        IReadOnlyCollection<ChatbotMessageDto> conversationMessages,
+        string latestUserMessage,
+        string listingFacts,
+        CancellationToken cancellationToken = default) =>
+        GenerateReplyAsync(conversationMessages, latestUserMessage, cancellationToken);
 }
