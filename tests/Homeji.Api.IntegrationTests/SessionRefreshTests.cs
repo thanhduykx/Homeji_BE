@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Homeji.Api.Authentication;
 using Homeji.Api.Controllers;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Infrastructure.External;
@@ -99,8 +100,8 @@ public sealed class SessionRefreshTests : IDisposable
                 ValidIssuer = Issuer, ValidAudience = "authenticated", ValidateIssuer = true,
                 ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true,
                 ValidAlgorithms = [SecurityAlgorithms.EcdsaSha256] } };
-        return new SessionRefreshController(new Factory(_handler), Options.Create(new SupaBaseAuthOptions {
-            ProjectUrl = "https://auth.example.test", ApiKey = "public-test-key" }), new Monitor(options), _revocations) {
+        return new SessionRefreshController(new SessionRotator(new Factory(_handler), Options.Create(new SupaBaseAuthOptions {
+            ProjectUrl = "https://auth.example.test", ApiKey = "public-test-key" }), new Monitor(options), _revocations)) {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
     }
 
@@ -119,17 +120,17 @@ public sealed class SessionRefreshTests : IDisposable
 
     public void Dispose() { _ec.Dispose(); _handler.Dispose(); }
 
-    private sealed class Monitor(JwtBearerOptions value) : IOptionsMonitor<JwtBearerOptions>
+    internal sealed class Monitor(JwtBearerOptions value) : IOptionsMonitor<JwtBearerOptions>
     {
         public JwtBearerOptions CurrentValue => value;
         public JwtBearerOptions Get(string? name) => value;
         public IDisposable? OnChange(Action<JwtBearerOptions, string?> listener) => null;
     }
-    private sealed class Factory(Handler handler) : IHttpClientFactory
+    internal sealed class Factory(Handler handler) : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
     }
-    private sealed class Handler : HttpMessageHandler
+    internal sealed class Handler : HttpMessageHandler
     {
         public int Calls { get; private set; }
         public string Url { get; private set; } = "";
@@ -137,7 +138,7 @@ public sealed class SessionRefreshTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         { Calls++; Url = request.RequestUri!.ToString(); return Task.FromResult(Response); }
     }
-    private sealed class Revocations : IUserSessionRevocationService
+    internal sealed class Revocations : IUserSessionRevocationService
     {
         public DateTimeOffset? Before { get; set; }
         public Task<DateTimeOffset?> GetRevokedBeforeAsync(Guid userId, CancellationToken cancellationToken = default) => Task.FromResult(Before);

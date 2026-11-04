@@ -73,6 +73,9 @@ if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSupabaseAuthentication(builder.Configuration);
+builder.Services.AddOptions<AuthCookieOptions>().BindConfiguration(AuthCookieOptions.SectionName);
+builder.Services.AddSingleton<SessionCookies>();
+builder.Services.AddScoped<Homeji.Application.IServices.Accounts.ISessionRotator, SessionRotator>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<VoiceCallRegistry>();
 builder.Services.AddHttpClient<VoiceIceService>(client => client.Timeout = TimeSpan.FromSeconds(10))

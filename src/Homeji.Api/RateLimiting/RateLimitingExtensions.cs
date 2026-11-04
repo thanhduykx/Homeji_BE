@@ -15,6 +15,8 @@ public static class RateLimitingPolicyNames
 
     /// <summary>Login / register / email checks — stricter.</summary>
     public const string PublicAuth = "public-auth";
+    /// <summary>Cookie session restore; runs on page loads, and shared networks share one address.</summary>
+    public const string SessionCookie = "session-cookie";
     public const string WebsiteTraffic = "website-traffic";
     public const string CostlyOperations = "costly-operations";
 
@@ -29,6 +31,7 @@ public sealed class RateLimitingOptions
     public RateLimitWindowOptions PublicSearch { get; set; } = new() { PermitLimit = 60, WindowSeconds = 60 };
     public RateLimitWindowOptions PublicRead { get; set; } = new() { PermitLimit = 120, WindowSeconds = 60 };
     public RateLimitWindowOptions PublicAuth { get; set; } = new() { PermitLimit = 20, WindowSeconds = 60 };
+    public RateLimitWindowOptions SessionCookie { get; set; } = new() { PermitLimit = 120, WindowSeconds = 60 };
     public RateLimitWindowOptions CostlyOperations { get; set; } = new() { PermitLimit = 10, WindowSeconds = 60 };
 }
 
@@ -84,6 +87,8 @@ public static class RateLimitingExtensions
             options.AddPolicy(
                 RateLimitingPolicyNames.PublicAuth,
                 httpContext => CreateIpPartition(httpContext, settings.PublicAuth));
+            options.AddPolicy(RateLimitingPolicyNames.SessionCookie,
+                httpContext => CreateIpPartition(httpContext, settings.SessionCookie));
             options.AddPolicy(RateLimitingPolicyNames.WebsiteTraffic,
                 httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 30, WindowSeconds = 60 }));
             options.AddPolicy(RateLimitingPolicyNames.CostlyOperations,
