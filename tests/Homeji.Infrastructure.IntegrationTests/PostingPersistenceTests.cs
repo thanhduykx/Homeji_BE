@@ -22,7 +22,7 @@ namespace Homeji.Infrastructure.IntegrationTests;
 // Explicit opt-in: this project never uses the application's production configuration.
 public sealed class PostingPersistenceTests
 {
-    [Fact]
+    [LocalPostingDatabaseFact]
     public async Task RentalDraft_ValidatesPersistsMediaAndSubmitsLatestDetails()
     {
         await using var db = await OpenTestDatabaseAsync();
@@ -73,7 +73,7 @@ public sealed class PostingPersistenceTests
         // Transaction disposal rolls back only these test rows, not the schema.
     }
 
-    [Fact]
+    [LocalPostingDatabaseFact]
     public async Task OwnInventory_IncludesAllStatusesAndNeverIncludesAnotherSeller()
     {
         await using var db = await OpenTestDatabaseAsync();

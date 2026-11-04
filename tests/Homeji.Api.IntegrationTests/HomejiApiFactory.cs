@@ -7,6 +7,8 @@ public sealed class HomejiApiFactory : WebApplicationFactory<Program>
 {
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // Development would load appsettings.Local.json, which holds real database and provider secrets.
+        builder.UseEnvironment("Testing");
         builder.UseSetting(
             "ConnectionStrings:DefaultConnection",
             "Host=localhost;Port=5432;Database=postgres;Username=postgres");

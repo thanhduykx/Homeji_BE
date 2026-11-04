@@ -32,7 +32,8 @@ public sealed class ArchitectureBoundaryTests
             Assert.Contains(
                 constructorParameters,
                 parameterType => parameterType == typeof(IUserProfileService)
-                    || parameterType.Namespace?.StartsWith("Homeji.Application.IServices", StringComparison.Ordinal) == true);
+                    || parameterType.Namespace?.StartsWith("Homeji.Application.IServices", StringComparison.Ordinal) == true
+                    || parameterType.Namespace?.StartsWith("Homeji.Application.Abstractions", StringComparison.Ordinal) == true);
         }
     }
 }

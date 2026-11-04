@@ -21,7 +21,7 @@ namespace Homeji.Infrastructure.IntegrationTests;
 
 public sealed class RentalPostingHttpTests
 {
-    [Theory]
+    [LocalPostingDatabaseTheory]
     [InlineData(RentalPostType.VacantRoom)]
     [InlineData(RentalPostType.RoommateShare)]
     [InlineData(RentalPostType.RoomTransfer)]

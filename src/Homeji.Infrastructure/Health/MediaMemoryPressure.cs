@@ -6,9 +6,12 @@ namespace Homeji.Infrastructure.Health;
 /// <summary>Uses the container's charged memory, rather than double-counting shared RSS pages.</summary>
 public static class MediaMemoryPressure
 {
+    /// <summary>Tests raise this: a shared test host outgrows the container budget without any real pressure.</summary>
+    internal static long ThresholdBytes { get; set; } = 350L * 1024 * 1024;
+
     public static bool IsHigh()
     {
-        const long defaultThreshold = 350L * 1024 * 1024;
+        var defaultThreshold = ThresholdBytes;
         if (OperatingSystem.IsLinux())
         {
             var current = ReadCounter("/sys/fs/cgroup/memory.current")

@@ -39,6 +39,6 @@ public sealed class ChatMediaControllerTests
         Assert.False(Assert.IsType<VoiceIceConfiguration>(result.Value).Available);
         Assert.Equal("private, no-store", controller.Response.Headers.CacheControl);
     }
-    private static ChatMediaController CreateController(IConfiguration configuration) => new(configuration)
+    private static ChatMediaController CreateController(IConfiguration configuration) => new(configuration, null!)
     { ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
 }

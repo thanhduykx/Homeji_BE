@@ -13,7 +13,7 @@ namespace Homeji.Api.Controllers;
 [ApiController]
 [Route("api/chat")]
 [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
-public sealed class ChatMediaController(IConfiguration configuration) : ControllerBase
+public sealed class ChatMediaController(IConfiguration configuration, IPostConversationService conversations) : ControllerBase
 {
     [HttpGet("voice-config")]
     public async Task<IActionResult> VoiceConfig([FromServices] VoiceIceService iceService, CancellationToken cancellationToken)
@@ -36,7 +36,6 @@ public sealed class ChatMediaController(IConfiguration configuration) : Controll
 
     [HttpPost("conversations/{conversationId:guid}/gifs/{gifId}")]
     public async Task<IActionResult> SendGif(Guid conversationId, string gifId,
-        [FromServices] IPostConversationService conversations,
         [FromServices] IPostConversationRepository repository,
         [FromServices] ICurrentUser currentUser, CancellationToken cancellationToken)
     {
