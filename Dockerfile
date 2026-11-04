@@ -10,6 +10,7 @@ COPY src/Homeji.Infrastructure/Homeji.Infrastructure.csproj src/Homeji.Infrastru
 COPY src/Homeji.Api/Homeji.Api.csproj src/Homeji.Api/
 COPY tests/Homeji.Application.UnitTests/Homeji.Application.UnitTests.csproj tests/Homeji.Application.UnitTests/
 COPY tests/Homeji.Api.IntegrationTests/Homeji.Api.IntegrationTests.csproj tests/Homeji.Api.IntegrationTests/
+COPY tests/Homeji.Infrastructure.IntegrationTests/Homeji.Infrastructure.IntegrationTests.csproj tests/Homeji.Infrastructure.IntegrationTests/
 
 RUN dotnet restore Homeji.sln
 
