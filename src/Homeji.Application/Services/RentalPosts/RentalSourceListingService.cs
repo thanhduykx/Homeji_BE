@@ -44,6 +44,22 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
         return new(listing.ContactPhone) { Phones = phones };
     }
 
+    public async Task<Homeji.Application.DTOs.Chatbot.ChatbotSourceMatchDto> MatchAsync(
+        Homeji.Application.DTOs.AI.AiParsedSearchCriteriaDto criteria, int limit, CancellationToken cancellationToken)
+    {
+        const int pageSize = 50, maxPages = 20;
+        var listings = new List<RentalSourceListing>();
+        // Description-based amenity and accent-insensitive matching cannot run in SQL, so filter price there and the rest here.
+        var minPrice = criteria.BudgetBasis == "total" ? null : criteria.PriceMin;
+        for (var page = 1; page <= maxPages; page++)
+        {
+            var rows = await repository.SearchAsync(new RentalSourceSearchDto(null, null, minPrice, criteria.PriceMax, page, pageSize), cancellationToken);
+            listings.AddRange(rows);
+            if (rows.Count < pageSize) break;
+        }
+        return RentalSourceMatcher.Match(listings, criteria, limit);
+    }
+
     private static RentalSourceListingDto ToDto(RentalSourceListing listing, bool details = false)
     {
         var facts = RentalSourceFacts.Parse(listing.Description);
