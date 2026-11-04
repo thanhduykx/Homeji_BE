@@ -17,8 +17,8 @@ public static class ChatbotNavigationCatalog
         - Tìm bạn ở ghép, gửi/nhận lời mời và nhắn tin sau khi kết nối.
         - Đặt và quản lý lịch xem phòng.
         - Pass phòng: người thuê đăng tin chuyển hợp đồng/cho thuê lại và gửi kiểm duyệt.
-        - Chợ đồ: mua đồ ăn, mua/bán đồ dùng, giỏ hàng, đơn mua, đơn bán và ví Chợ đồ.
-        - Gói đăng ký/Premium và thanh toán MoMo hoặc PayOS.
+        - Chợ Homeji: mua đồ ăn, mua/bán đồ dùng, giỏ hàng, đơn mua, đơn bán và Ví Homeji.
+        - Gói Premium và thanh toán MoMo hoặc PayOS.
         - Hồ sơ, thông báo và nhật ký hoạt động.
         - Chủ phòng có thể đăng phòng trống hoặc tin tìm người ở ghép; quản trị viên có khu vực kiểm duyệt.
 
@@ -39,11 +39,11 @@ public static class ChatbotNavigationCatalog
 
     private static readonly CatalogEntry[] CommonEntries =
     [
-        Entry("marketplace-food", "Mở Chợ đồ ăn", "Chọn món và thêm vào giỏ; chatbot không tự tạo đơn.", ChatbotNavigationActionKind.OpenSection, "marketplace:food",
+        Entry("marketplace-food", "Mở mục Đồ ăn", "Chọn món và thêm vào giỏ; chatbot không tự tạo đơn.", ChatbotNavigationActionKind.OpenSection, "marketplace:food",
             "mua đồ ăn", "đặt đồ ăn", "đặt món", "mua thức ăn", "đồ ăn"),
-        Entry("marketplace-sell", "Mở Chợ đồ để đăng bán", "Đăng món ăn hoặc đồ dùng cho sinh viên.", ChatbotNavigationActionKind.OpenSection, "marketplace",
+        Entry("marketplace-sell", "Mở Chợ Homeji để đăng bán", "Đăng món ăn hoặc đồ dùng cho sinh viên.", ChatbotNavigationActionKind.OpenSection, "marketplace",
             "đăng bán", "bán đồ", "bán thức ăn", "bán món"),
-        Entry("marketplace", "Mở Chợ đồ", "Mua bán đồ dùng, đồ ăn và quản lý đơn hàng.", ChatbotNavigationActionKind.OpenSection, "marketplace",
+        Entry("marketplace", "Mở Chợ Homeji", "Mua bán đồ dùng, đồ ăn và quản lý đơn hàng.", ChatbotNavigationActionKind.OpenSection, "marketplace",
             "chợ đồ", "mua đồ", "giỏ hàng", "đơn hàng", "đơn mua", "đơn bán", "ví chợ"),
         Entry("listings", "Tìm phòng trên bản đồ", "Mở danh sách và bộ lọc phòng.", ChatbotNavigationActionKind.OpenSection, "listings",
             "tìm phòng", "tìm trọ", "phòng gần", "lọc phòng", "bản đồ phòng"),
@@ -57,7 +57,7 @@ public static class ChatbotNavigationCatalog
             "tin nhắn", "nhắn tin", "hội thoại", "chat"),
         Entry("appointments", "Mở lịch xem phòng", "Xem và quản lý các lịch hẹn.", ChatbotNavigationActionKind.OpenSection, "appointments",
             "lịch xem phòng", "đặt lịch", "lịch hẹn", "xem phòng"),
-        Entry("payments", "Mở Gói đăng ký", "Xem Premium và trạng thái thanh toán.", ChatbotNavigationActionKind.OpenSection, "payments",
+        Entry("payments", "Mở Gói Premium", "Xem Premium và trạng thái thanh toán.", ChatbotNavigationActionKind.OpenSection, "payments",
             "premium", "gói đăng ký", "momo", "payos", "thanh toán", "nâng cấp"),
         Entry("profile", "Mở hồ sơ", "Cập nhật thông tin và xác minh tài khoản.", ChatbotNavigationActionKind.OpenSection, "profile",
             "hồ sơ", "profile", "tài khoản", "xác minh", "đổi thông tin"),

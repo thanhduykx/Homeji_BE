@@ -221,7 +221,7 @@ public sealed class ChatbotService : IChatbotService
         {
             foodDiscovery = await _food.SearchAsync(message, request.FoodContext ?? (request.Location is null ? null : new ChatbotFoodContextDto(request.Location.Latitude, request.Location.Longitude)), request.PreviousFoodCriteria, cancellationToken);
             assistantReply = foodDiscovery.Summary;
-            actions = [new ChatbotNavigationActionDto("food-menu", "Mở Chợ đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
+            actions = [new ChatbotNavigationActionDto("food-menu", "Mở mục Đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
         }
         else if (selectionTask is not null)
         {
