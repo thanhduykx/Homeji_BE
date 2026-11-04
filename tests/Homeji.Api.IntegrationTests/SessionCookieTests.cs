@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -258,7 +259,7 @@ public sealed class SessionCookieTests : IDisposable
     }
 
     [Fact]
-    public async Task LoginWithoutCookieModeKeepsBodyTokensForOpenTabs()
+    public async Task LoginWithoutCookieModeNeverReturnsRefreshToken()
     {
         using var factory = ApiFactory();
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost"), HandleCookies = false });
@@ -266,8 +267,23 @@ public sealed class SessionCookieTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("refresh-token", body.GetProperty("refreshToken").GetString());
+        Assert.Equal("access-token", body.GetProperty("accessToken").GetString());
+        Assert.Equal(JsonValueKind.Null, body.GetProperty("refreshToken").ValueKind);
         Assert.False(response.Headers.Contains("Set-Cookie"));
+    }
+
+    [Fact]
+    public void LegacyRefreshRouteIsGoneWhileAdoptRemains()
+    {
+        using var factory = ApiFactory();
+        // Read the route table: the authenticated fallback policy answers 401 to anonymous calls on unknown routes.
+        var routes = factory.Services.GetRequiredService<EndpointDataSource>().Endpoints
+            .OfType<RouteEndpoint>()
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToArray();
+
+        Assert.DoesNotContain("api/account/refresh", routes, StringComparer.OrdinalIgnoreCase);
+        Assert.Contains("api/account/session/adopt", routes, StringComparer.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -5,8 +5,9 @@ using Microsoft.AspNetCore.Mvc.Filters;
 namespace Homeji.Api.Authentication;
 
 /// <summary>
-/// Moves a freshly issued session into cookies when the client asks for cookie mode. Clients
-/// that do not send the mode header keep receiving tokens in the body until they are retired.
+/// Moves a freshly issued session into cookies when the client asks for cookie mode. The refresh
+/// token never appears in the body: clients without the mode header get only the short-lived
+/// access token and no cookies.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class IssueSessionCookiesAttribute : TypeFilterAttribute
@@ -20,14 +21,10 @@ public sealed class IssueSessionCookiesAttribute : TypeFilterAttribute
         public async Task OnActionExecutionAsync(ActionExecutingContext context, ActionExecutionDelegate next)
         {
             var request = context.HttpContext.Request;
-            if (!SessionCookies.RequestsCookieMode(request))
-            {
-                await next();
-                return;
-            }
+            var cookieMode = SessionCookies.RequestsCookieMode(request);
 
             // Also stops login CSRF: a foreign page cannot sign the victim into another account.
-            if (!cookies.IsTrustedRequest(request))
+            if (cookieMode && !cookies.IsTrustedRequest(request))
             {
                 context.Result = new StatusCodeResult(StatusCodes.Status403Forbidden);
                 return;
@@ -35,12 +32,13 @@ public sealed class IssueSessionCookiesAttribute : TypeFilterAttribute
 
             var executed = await next();
             if (executed.Exception is not null
-                || executed.Result is not ObjectResult { Value: AuthSessionDto { AccessToken: { } accessToken } session } result)
+                || executed.Result is not ObjectResult { Value: AuthSessionDto session } result)
             {
                 return;
             }
 
-            if (!cookies.TryWrite(context.HttpContext.Response, accessToken, accessToken, session.RefreshToken))
+            if (cookieMode && session.AccessToken is { } accessToken
+                && !cookies.TryWrite(context.HttpContext.Response, accessToken, accessToken, session.RefreshToken))
             {
                 SessionCookieLog.TokensTooLarge(logger, session.UserId);
                 executed.Result = new StatusCodeResult(StatusCodes.Status503ServiceUnavailable);
