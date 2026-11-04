@@ -382,7 +382,6 @@ public sealed class MarketplacePostService : IMarketplacePostService
             post.Id,
             post.SellerId,
             seller?.DisplayName ?? "Homeji user",
-            seller?.Phone,
             post.Status,
             post.Title,
             post.Description,

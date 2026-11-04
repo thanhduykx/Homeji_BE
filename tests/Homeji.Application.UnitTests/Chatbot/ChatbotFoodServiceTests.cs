@@ -160,7 +160,7 @@ public sealed class ChatbotFoodServiceTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => service.SearchAsync("Có gì ăn", null, cancellationToken: cancellation.Token));
     }
 
-    private static MarketplacePostDto Food() => new(Guid.NewGuid(), Guid.NewGuid(), "Bếp A", "private phone",
+    private static MarketplacePostDto Food() => new(Guid.NewGuid(), Guid.NewGuid(), "Bếp A",
         MarketplacePostStatus.Active, "Cơm gà", "private description", 35_000, "", "", "private address",
         10.84m, 106.8m, null, [], 0.5m, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
         MarketplaceListingType.Food, 2, 1, "phần", 15);

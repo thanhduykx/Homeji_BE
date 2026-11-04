@@ -6,7 +6,6 @@ public sealed record MarketplacePostDto(
     Guid Id,
     Guid SellerId,
     string SellerDisplayName,
-    string? SellerPhone,
     MarketplacePostStatus Status,
     string Title,
     string Description,

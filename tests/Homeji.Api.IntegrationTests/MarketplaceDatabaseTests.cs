@@ -296,6 +296,35 @@ public sealed class MarketplaceDatabaseTests
         Assert.NotEqual(saved.Single(order => order.Id == first.Id).CheckoutId, saved.Single(order => order.Id == other.Id).CheckoutId);
     }
 
+    [LocalMarketplaceDatabaseFact]
+    public async Task Anonymous_marketplace_reads_never_expose_the_seller_phone()
+    {
+        const string phone = "0909999111";
+        await using var db = await OpenAsync();
+        var seller = await AddSellerAsync(db);
+        var now = DateTimeOffset.UtcNow;
+        var profile = await db.UserProfiles.SingleAsync(item => item.Id == seller);
+        profile.UpdateProfile("Tiệm thử nghiệm", phone, null, null, null, null, null, now);
+        var post = Post(seller, 10.85m, 106.77m, now);
+        db.MarketplacePosts.Add(post);
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var profiles = new UserProfileRepository(db);
+        var service = new MarketplacePostService(new UserContext(new AnonymousUser(), profiles), new MarketplacePostRepository(db),
+            new RentalPostRepository(db), profiles, new Homeji.Application.Services.Moderation.ContentModerationService(new BadWordRepository(db)),
+            TimeProvider.System, new WalletRepository(db), Options.Create(new MarketplaceFinanceOptions()));
+        var found = await service.SearchAsync(new Homeji.Application.DTOs.Marketplace.MarketplaceSearchDto(
+            null, null, null, null, null, null, null, null, null, 1, 20, seller));
+        var detail = await service.GetDetailAsync(post.Id);
+
+        Assert.Equal(post.Id, Assert.Single(found).Id);
+        Assert.DoesNotContain(phone, System.Text.Json.JsonSerializer.Serialize(found), StringComparison.Ordinal);
+        Assert.DoesNotContain(phone, System.Text.Json.JsonSerializer.Serialize(detail), StringComparison.Ordinal);
+    }
+
+    private sealed class AnonymousUser : ICurrentUser { public Guid? UserId => null; }
+
     private static async Task<ApplicationDbContext> OpenAsync()
     {
         var connection = Environment.GetEnvironmentVariable("HOMEJI_TEST_DATABASE")
