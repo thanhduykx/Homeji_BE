@@ -1,9 +1,11 @@
 using Homeji.Api.Mappers;
+using Homeji.Api.RateLimiting;
 using Homeji.Api.Views.Payments;
 using Homeji.Application.DTOs.Payments;
 using Homeji.Application.IServices.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Homeji.Domain.Enums;
@@ -65,6 +67,7 @@ public sealed class PaymentsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PaymentWebhook)]
     [HttpPost("momo/ipn")]
     [ProducesResponseType<PaymentDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<PaymentDto>> HandleMomoIpn(
@@ -101,6 +104,7 @@ public sealed class PaymentsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitingPolicyNames.PaymentWebhook)]
     [HttpPost("payos/webhook")]
     [ProducesResponseType<PaymentDto>(StatusCodes.Status200OK)]
     public async Task<IActionResult> HandlePayOsWebhook(

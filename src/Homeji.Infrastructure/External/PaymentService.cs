@@ -248,12 +248,14 @@ public sealed class PaymentService : IPaymentService
             payment.ProviderMessage);
     }
 
-    public Task<PaymentDto> HandleMomoIpnAsync(MomoIpnDto request, CancellationToken cancellationToken = default) =>
-        _payments.ExecuteForOrderAsync(request.OrderId ?? string.Empty, () => HandleMomoIpnCoreAsync(request, cancellationToken), cancellationToken);
+    public async Task<PaymentDto> HandleMomoIpnAsync(MomoIpnDto request, CancellationToken cancellationToken = default)
+    {
+        // Unauthenticated callers must not reach the database or take an order lock.
+        VerifyMomoIpn(request);
+        return await _payments.ExecuteForOrderAsync(request.OrderId!, () => HandleMomoIpnCoreAsync(request, cancellationToken), cancellationToken);
+    }
 
-    private async Task<PaymentDto> HandleMomoIpnCoreAsync(
-        MomoIpnDto request,
-        CancellationToken cancellationToken = default)
+    private void VerifyMomoIpn(MomoIpnDto request)
     {
         EnsureMomoConfigured();
         if (string.IsNullOrWhiteSpace(request.OrderId) || string.IsNullOrWhiteSpace(request.RequestId))
@@ -278,9 +280,14 @@ public sealed class PaymentService : IPaymentService
             $"transId={request.TransId}");
 
         EnsureSignature(rawSignature, _momoOptions.SecretKey, request.Signature, "signature");
+    }
 
-        var payment = await _payments.GetByOrderCodeAsync(request.OrderId, cancellationToken)
-            ?? throw new NotFoundException(nameof(PaymentTransaction), request.OrderId);
+    private async Task<PaymentDto> HandleMomoIpnCoreAsync(
+        MomoIpnDto request,
+        CancellationToken cancellationToken = default)
+    {
+        var payment = await _payments.GetByOrderCodeAsync(request.OrderId!, cancellationToken)
+            ?? throw new NotFoundException(nameof(PaymentTransaction), request.OrderId!);
         if (payment.Method != PaymentMethod.Momo)
         {
             throw Validation("orderId", "Giao dịch tương ứng không phải thanh toán MoMo.");
@@ -471,14 +478,9 @@ public sealed class PaymentService : IPaymentService
             payment.ProviderMessage);
     }
 
-    public Task<PaymentDto?> HandlePayOsWebhookAsync(PayOsWebhookDto request, CancellationToken cancellationToken = default) =>
-        _payments.ExecuteForOrderAsync(request.Data?.OrderCode.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
-            () => HandlePayOsWebhookCoreAsync(request, cancellationToken), cancellationToken);
-
-    private async Task<PaymentDto?> HandlePayOsWebhookCoreAsync(
-        PayOsWebhookDto request,
-        CancellationToken cancellationToken = default)
+    public async Task<PaymentDto?> HandlePayOsWebhookAsync(PayOsWebhookDto request, CancellationToken cancellationToken = default)
     {
+        // Unauthenticated callers must not reach the database or take an order lock.
         EnsurePayOsConfigured();
         if (request.Data is null)
         {
@@ -488,7 +490,16 @@ public sealed class PaymentService : IPaymentService
         var rawSignature = BuildPayOsWebhookSignaturePayload(request.Data);
         EnsureSignature(rawSignature, _payOsOptions.ChecksumKey, request.Signature, "signature");
 
-        var orderCode = request.Data.OrderCode.ToString(CultureInfo.InvariantCulture);
+        return await _payments.ExecuteForOrderAsync(request.Data.OrderCode.ToString(CultureInfo.InvariantCulture),
+            () => HandlePayOsWebhookCoreAsync(request, request.Data, cancellationToken), cancellationToken);
+    }
+
+    private async Task<PaymentDto?> HandlePayOsWebhookCoreAsync(
+        PayOsWebhookDto request,
+        PayOsWebhookDataDto data,
+        CancellationToken cancellationToken = default)
+    {
+        var orderCode = data.OrderCode.ToString(CultureInfo.InvariantCulture);
         var payment = await _payments.GetByOrderCodeAsync(orderCode, cancellationToken);
         if (payment is null)
         {
@@ -500,12 +511,12 @@ public sealed class PaymentService : IPaymentService
             throw Validation("orderCode", "Giao dịch tương ứng không phải thanh toán PayOS.");
         }
 
-        if (request.Data.Amount != payment.Amount)
+        if (data.Amount != payment.Amount)
         {
             throw Validation("amount", "Số tiền webhook PayOS không khớp giao dịch.");
         }
 
-        if (!string.Equals(request.Data.Currency, "VND", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(data.Currency, "VND", StringComparison.OrdinalIgnoreCase))
         {
             throw Validation("currency", "Tiền tệ webhook PayOS phải là VND.");
         }
@@ -517,16 +528,16 @@ public sealed class PaymentService : IPaymentService
 
         var rawPayload = JsonSerializer.Serialize(request, JsonOptions);
         var now = _timeProvider.GetUtcNow();
-        if (request.Success && request.Code == "00" && request.Data.Code == "00")
+        if (request.Success && request.Code == "00" && data.Code == "00")
         {
-            payment.MarkPaid(request.Data.Reference, request.Data.Desc ?? request.Desc, rawPayload, now);
+            payment.MarkPaid(data.Reference, data.Desc ?? request.Desc, rawPayload, now);
             await ActivatePremiumSubscriptionIfNeededAsync(payment, now, cancellationToken);
             await CreditWalletTopUpIfNeededAsync(payment, now, cancellationToken);
             await _receipts.RecordPaymentAsync(payment, cancellationToken);
         }
         else
         {
-            payment.MarkFailed(request.Data.Desc ?? request.Desc, rawPayload, now);
+            payment.MarkFailed(data.Desc ?? request.Desc, rawPayload, now);
         }
 
         await _payments.SaveChangesAsync(cancellationToken);

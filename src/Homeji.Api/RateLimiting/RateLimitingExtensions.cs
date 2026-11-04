@@ -17,6 +17,9 @@ public static class RateLimitingPolicyNames
     public const string PublicAuth = "public-auth";
     public const string WebsiteTraffic = "website-traffic";
     public const string CostlyOperations = "costly-operations";
+
+    /// <summary>Anonymous MoMo and PayOS callbacks; generous so provider retries still get through.</summary>
+    public const string PaymentWebhook = "payment-webhook";
 }
 
 public sealed class RateLimitingOptions
@@ -85,6 +88,8 @@ public static class RateLimitingExtensions
                 httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 30, WindowSeconds = 60 }));
             options.AddPolicy(RateLimitingPolicyNames.CostlyOperations,
                 httpContext => CreateIpPartition(httpContext, settings.CostlyOperations));
+            options.AddPolicy(RateLimitingPolicyNames.PaymentWebhook,
+                httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 300, WindowSeconds = 60 }));
         });
 
         return services;
