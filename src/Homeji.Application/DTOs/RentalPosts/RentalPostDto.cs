@@ -47,4 +47,5 @@ public sealed record RentalPostDto(
     string? OwnerSchool = null)
 {
     public bool HasOwnerPhone { get; init; }
+    public bool IsImportedSource { get; init; }
 }

@@ -16,6 +16,21 @@ namespace Homeji.Application.UnitTests.AI;
 
 public sealed class RentalDecisionPriceBasisTests
 {
+    [Fact]
+    public void Imported_listing_does_not_invent_room_price_units_from_the_placeholder_account_role()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var post = RentalPost.CreateDraft(Guid.NewGuid(), RentalPostType.VacantRoom, now);
+        post.UpdateDetails(RentalPostType.VacantRoom, "Ký túc xá", "Giá cần xác nhận đơn vị", 1_400_000,
+            0, 50, "Thủ Đức", 10.84m, 106.81m, [], now);
+        post.AddMedia(MediaType.Image, RentalPostMedia.ImportedSourceBucket, "https://example.invalid/room.jpg", true, 0, now);
+        var cost = RentalCostCalculator.Calculate(post, new(), UserRole.Landlord);
+        Assert.True(post.IsImportedSource);
+        Assert.Equal("unknown", cost.PriceBasis);
+        Assert.Null(cost.EstimatedMonthlyTotal);
+        Assert.True(Homeji.Application.Mappers.RentalPosts.RentalPostMapper.ToDto(post).IsImportedSource);
+        Assert.True(Homeji.Application.Mappers.RentalPosts.RentalPostMapper.ToSummaryDto(post).IsImportedSource);
+    }
     [Theory]
     [InlineData(false, 3, true)]
     [InlineData(false, 4, false)]

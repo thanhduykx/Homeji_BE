@@ -35,6 +35,7 @@ public sealed record RentalPostSummaryDto(
     bool IsOwnerVerified = false)
 {
     public decimal? Deposit { get; init; }
+    public bool IsImportedSource { get; init; }
     public IReadOnlyList<string> Amenities { get; init; } = [];
     public DateTimeOffset? UpdatedAt { get; init; }
 }

@@ -10,6 +10,7 @@ public sealed class RentalPostConfiguration : IEntityTypeConfiguration<RentalPos
     {
         builder.ToTable("rental_posts", "homeji");
         builder.HasKey(post => post.Id).HasName("pk_rental_posts");
+        builder.Ignore(post => post.IsImportedSource);
 
         builder.Property(post => post.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(post => post.OwnerId).HasColumnName("owner_id").IsRequired();
