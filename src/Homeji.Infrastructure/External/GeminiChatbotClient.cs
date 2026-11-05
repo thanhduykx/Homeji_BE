@@ -214,6 +214,14 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
             var responseText = await response.Content.ReadAsStringAsync(providerToken);
             if (response.IsSuccessStatusCode)
             {
+                // Gemini can answer 200 with no content; repeating the same request normally succeeds.
+                if (attempt < maxAttempts && IsTransientEmptyReply(responseText))
+                {
+                    LogGeminiChatFailed(_logger, (int)response.StatusCode, attempt, maxAttempts, null);
+                    await Task.Delay(GetRetryDelay(response, responseText, attempt), providerToken);
+                    continue;
+                }
+
                 try
                 {
                     return NormalizeReply(ExtractModelText(responseText));
@@ -266,6 +274,25 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
         var maximumDelay = TimeSpan.FromSeconds(Math.Clamp(_options.MaxRetryDelaySeconds, 0, 30));
 
         return requestedDelay <= maximumDelay ? requestedDelay : maximumDelay;
+    }
+
+    private static bool IsTransientEmptyReply(string responseText)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(responseText);
+            return document.RootElement.TryGetProperty("candidates", out var candidates)
+                && candidates.ValueKind == JsonValueKind.Array && candidates.GetArrayLength() > 0
+                // The real response can carry a content object that has no parts.
+                && !(candidates[0].TryGetProperty("content", out var content) && content.TryGetProperty("parts", out _))
+                // Safety and recitation blocks are deliberate and would only repeat.
+                && candidates[0].TryGetProperty("finishReason", out var reason)
+                && reason.GetString() is "MALFORMED_RESPONSE" or "OTHER";
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static TimeSpan? ParseRetryDelay(string responseText)

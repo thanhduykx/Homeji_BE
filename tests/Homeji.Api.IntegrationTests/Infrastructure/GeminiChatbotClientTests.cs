@@ -338,6 +338,38 @@ public sealed class GeminiChatbotClientTests
         Assert.Equal(2, handler.RequestCount);
     }
 
+    [Theory]
+    [InlineData("""{"candidates":[{"finishReason":"MALFORMED_RESPONSE"}]}""")]
+    [InlineData("""{"candidates":[{"content":{"role":"model"},"finishReason":"MALFORMED_RESPONSE"}]}""")]
+    [InlineData("""{"candidates":[{"content":{},"finishReason":"OTHER"}]}""")]
+    public async Task Malformed_empty_reply_is_retried(string empty)
+    {
+        var handler = new SequenceHttpMessageHandler(Reply(empty), Success());
+        var client = new GeminiChatbotClient(new HttpClient(handler), Options.Create(new GeminiOptions { ApiKey = "fixture", RetryBaseDelayMilliseconds = 0 }),
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
+        Assert.Equal("Đã nhận tệp.", await client.GenerateReplyAsync([], "Xin chào"));
+        Assert.Equal(2, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Malformed_reply_gives_up_after_the_retry_budget()
+    {
+        const string malformed = """{"candidates":[{"finishReason":"MALFORMED_RESPONSE"}]}""";
+        var handler = new SequenceHttpMessageHandler(Reply(malformed), Reply(malformed), Reply(malformed));
+        var client = new GeminiChatbotClient(new HttpClient(handler), Options.Create(new GeminiOptions { ApiKey = "fixture", RetryBaseDelayMilliseconds = 0 }),
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
+        await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => client.GenerateReplyAsync([], "Xin chào"));
+        Assert.Equal(3, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Safety_block_is_not_retried()
+    {
+        var handler = new SequenceHttpMessageHandler(Reply("""{"candidates":[{"finishReason":"SAFETY"}]}"""));
+        await Assert.ThrowsAsync<ExternalServiceUnavailableException>(() => Client(handler).GenerateReplyAsync([], "Xin chào"));
+        Assert.Equal(1, handler.RequestCount);
+    }
+
     [Fact]
     public async Task Reply_joins_all_text_parts_and_skips_reasoning()
     {
