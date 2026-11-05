@@ -405,6 +405,7 @@ public sealed class ChatbotService : IChatbotService
         IReadOnlyCollection<ChatbotNavigationActionDto> actions,
         CancellationToken cancellationToken)
     {
+        if (ChatbotResultFollowUp.AsksForContact(message)) return ChatbotResultFollowUp.ContactReply;
         AiHighlightResponseDto? native;
         try
         {

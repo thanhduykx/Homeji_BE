@@ -436,6 +436,20 @@ public sealed class ChatbotServiceTests
     }
 
     [Theory]
+    [InlineData("Cho mình số điện thoại chủ phòng 1")]
+    [InlineData("Phòng 2 có sđt không?")]
+    public async Task Contact_question_points_to_the_listing_without_calling_the_model(string message)
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message, PreviousCriteria: ListedCriteria));
+
+        Assert.Contains("xem số", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Null(ai.Facts);
+        Assert.Equal(0, ai.PlainCalls);
+    }
+
+    [Theory]
     [InlineData("Mình tên là Minh và đang học ở UIT, bạn ghi nhớ nhé")]
     [InlineData("Giá xăng hôm nay tăng vì sao?")]
     [InlineData("Ai là người phát minh ra điện thoại?")]
@@ -499,7 +513,8 @@ public sealed class ChatbotServiceTests
         var missing = AgentPostBusinessRules.Missing(details, UtcNow, 0, 1);
 
         Assert.Contains(missing, item => item.Contains("giá", StringComparison.Ordinal));
-        Assert.Contains(missing, item => item.Contains("địa chỉ", StringComparison.Ordinal));
+        Assert.Contains(missing, item => item.Contains("nơi nhận", StringComparison.Ordinal));
+        Assert.DoesNotContain(missing, item => item.Contains("tìm trọ", StringComparison.Ordinal));
         Assert.Contains(missing, item => item.Contains("ảnh", StringComparison.Ordinal));
     }
 

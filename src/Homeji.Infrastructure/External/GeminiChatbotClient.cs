@@ -312,7 +312,10 @@ public sealed class GeminiChatbotClient : IChatbotAiClient
     private static bool IsRetryable(HttpStatusCode statusCode)
     {
         return statusCode is HttpStatusCode.TooManyRequests
-            or HttpStatusCode.ServiceUnavailable;
+            or HttpStatusCode.InternalServerError
+            or HttpStatusCode.BadGateway
+            or HttpStatusCode.ServiceUnavailable
+            or HttpStatusCode.GatewayTimeout;
     }
 
     private static string BuildSystemInstruction(string latestUserMessage)

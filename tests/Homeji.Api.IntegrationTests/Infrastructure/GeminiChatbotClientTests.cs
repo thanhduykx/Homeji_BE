@@ -325,6 +325,19 @@ public sealed class GeminiChatbotClientTests
         Assert.Contains("Chỉ dùng thông tin trong danh sách", prompt, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    [InlineData(HttpStatusCode.BadGateway)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    public async Task Transient_provider_errors_are_retried(HttpStatusCode status)
+    {
+        var handler = new SequenceHttpMessageHandler(new HttpResponseMessage(status) { Content = new StringContent("{}") }, Success());
+        var client = new GeminiChatbotClient(new HttpClient(handler), Options.Create(new GeminiOptions { ApiKey = "fixture", RetryBaseDelayMilliseconds = 0 }),
+            NullLogger<GeminiChatbotClient>.Instance, new ConversationImageProcessor());
+        Assert.Equal("Đã nhận tệp.", await client.GenerateReplyAsync([], "Xin chào"));
+        Assert.Equal(2, handler.RequestCount);
+    }
+
     [Fact]
     public async Task Reply_joins_all_text_parts_and_skips_reasoning()
     {

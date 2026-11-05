@@ -21,6 +21,10 @@ internal static partial class ChatbotResultFollowUp
         return AsksAboutList().IsMatch(text) && SameConstraints(RentalSearchIntent.Apply(message, previous), previous);
     }
 
+    public const string ContactReply = "Mình không gửi số liên hệ trong chat. Bạn mở thẻ phòng trong danh sách rồi chọn xem số ở trang chi tiết.";
+
+    public static bool AsksForContact(string message) => AsksContact().IsMatch(RentalSearchIntent.Normalize(message));
+
     public static string BuildFacts(AiHighlightResponseDto? native, ChatbotSourceMatchDto? source)
     {
         var builder = new StringBuilder();
@@ -52,6 +56,9 @@ internal static partial class ChatbotResultFollowUp
     // "phòng 2" points at a listed room; "phòng 2 người" and "phòng 3 triệu" are new constraints.
     [GeneratedRegex(@"\b(?:phong|tin|can)\s+(?:(?:thu|so)\s+)?\d{1,2}\b(?!\s*(?:nguoi|trieu|tr|m2|m²|k|ngan|nghin)\b)|\b(?:phong|tin|can)\s+(?:thu|so)\s+(?:nhat|hai|ba|bon|tu|nam)\b|\b(?:phong|tin|can)\s+(?:dau tien|cuoi cung)\b|\b\d{1,2}\s+(?:phong|tin|can)\s+dau\b|\b(?:cac|nhung|may)\s+(?:phong|tin|can)\s+(?:do|tren|nay|vua roi)\b", RegexOptions.CultureInvariant)]
     private static partial Regex PointsAtListedRoom();
+
+    [GeneratedRegex(@"\b(?:so dien thoai|sdt|so lien he|so chu|zalo)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex AsksContact();
 
     [GeneratedRegex(@"\b(?:re nhat|dat nhat|rong nhat|nho nhat|so sanh|nen chon|phong nao|tin nao|can nao)\b", RegexOptions.CultureInvariant)]
     private static partial Regex AsksAboutList();
