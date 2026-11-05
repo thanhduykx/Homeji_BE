@@ -8,7 +8,7 @@ public sealed class AuthCookieOptions
 
     /// <summary>
     /// Browser origins allowed to use cookie sessions. Kept apart from Cors:AllowedOrigins,
-    /// which also lists local development hosts.
+    /// which also lists local development hosts in the Development environment.
     /// </summary>
     public string[] AllowedOrigins { get; set; } = [];
 

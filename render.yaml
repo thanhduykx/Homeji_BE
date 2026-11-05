@@ -41,5 +41,3 @@ services:
         value: https://homeji.onrender.com/auth/callback
       - key: Payments__Redirects__FrontendPaymentUrl
         value: https://homeji.onrender.com/payments
-      - key: Cors__AllowedOrigins__3
-        value: https://homeji.onrender.com
