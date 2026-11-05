@@ -26,8 +26,8 @@ public static class AgentPostBusinessRules
         Require(details.Kind is "secondHand" or "food" or "rental" or "roomTransfer" or "roommate" or "wanted", "kind", "Loại tin không hợp lệ.");
         Require(!string.IsNullOrWhiteSpace(details.Title) && details.Title.Length <= 200, "title", "Nhập tiêu đề tối đa 200 ký tự.");
         Require(!string.IsNullOrWhiteSpace(details.Description) && details.Description.Length <= 3000, "description", "Nhập mô tả tối đa 3000 ký tự.");
-        Require(details.Price > 0 && details.Price <= 1_000_000_000 && decimal.Truncate(details.Price) == details.Price, "price", "Nhập giá hoặc ngân sách bằng số nguyên dương.");
-        Require(!string.IsNullOrWhiteSpace(details.Address) && details.Address.Length <= 500, "address", "Bổ sung địa chỉ hoặc khu vực tìm trọ.");
+        Require(details.Price > 0 && details.Price <= 1_000_000_000 && decimal.Truncate(details.Price) == details.Price, "price", details.Kind == "wanted" ? "Nhập ngân sách bằng số nguyên dương." : "Nhập giá bằng số nguyên dương.");
+        Require(!string.IsNullOrWhiteSpace(details.Address) && details.Address.Length <= 500, "address", details.Kind == "wanted" ? "Bổ sung khu vực tìm trọ." : details.Kind is "food" or "secondHand" ? "Bổ sung nơi nhận hàng." : "Bổ sung địa chỉ phòng.");
         Require(details.Amenities is not null && details.Amenities.Length <= 30, "amenities", "Danh sách tiện ích không hợp lệ.");
         if (details.Kind != "wanted") Require(HomejiServiceArea.Contains(details.Latitude, details.Longitude), "location", "Chọn vị trí thật trong Thủ Đức và Quận 9 cũ.");
         if (details.Kind is "rental" or "roomTransfer" or "roommate")

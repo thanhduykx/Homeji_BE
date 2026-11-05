@@ -435,6 +435,40 @@ public sealed class ChatbotServiceTests
         Assert.NotNull(reply.SearchUpdate);
     }
 
+    [Theory]
+    [InlineData("Mình tên là Minh và đang học ở UIT, bạn ghi nhớ nhé")]
+    [InlineData("Giá xăng hôm nay tăng vì sao?")]
+    [InlineData("Ai là người phát minh ra điện thoại?")]
+    public async Task One_shared_word_does_not_start_a_room_search(string message)
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message));
+
+        Assert.Null(reply.SearchUpdate);
+        Assert.Equal(1, ai.PlainCalls);
+    }
+
+    [Theory]
+    [InlineData("Tìm trọ dưới 3 triệu")]
+    [InlineData("Gần UIT có gì giá ổn không?")]
+    public async Task Housing_requests_still_start_a_search(string message)
+    {
+        var reply = await CreateService(new(), new FactsClient(), new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message));
+
+        Assert.NotNull(reply.SearchUpdate);
+    }
+
+    [Fact]
+    public async Task One_word_can_refine_an_active_search()
+    {
+        var reply = await CreateService(new(), new FactsClient(), new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, "Thêm máy lạnh", PreviousCriteria: ListedCriteria));
+
+        Assert.Contains("AIR_CONDITIONER", reply.SearchUpdate!.Criteria.RequiredAmenities);
+    }
+
     [Fact]
     public async Task First_message_without_a_list_is_not_a_follow_up()
     {

@@ -257,7 +257,7 @@ public sealed class ChatbotService : IChatbotService
                     if (sourceRooms is { } matched && matched.Total > matched.Rooms.Count)
                         actions = [.. actions, new("all-rooms", "Xem toàn bộ danh sách phòng", "Mở danh sách và tự lọc thêm", ChatbotNavigationActionKind.Navigate, "/?section=listings&view=list")];
                 }
-                var rentalQuery = RentalSearchIntent.IsRentalQuery(message);
+                var rentalQuery = IsRoomSearch(message, previousCriteria);
                 assistantReply = searchUpdate is not null
                     ? BuildGroundedReply(searchUpdate, sourceRooms, search!.Degraded)
                     : rentalQuery
@@ -350,7 +350,7 @@ public sealed class ChatbotService : IChatbotService
         AiParsedSearchCriteriaDto? previous,
         CancellationToken cancellationToken)
     {
-        if (!RentalSearchIntent.IsRentalQuery(latestMessage))
+        if (!IsRoomSearch(latestMessage, previous))
         {
             return null;
         }
@@ -382,6 +382,9 @@ public sealed class ChatbotService : IChatbotService
             return null;
         }
     }
+
+    private static bool IsRoomSearch(string message, AiParsedSearchCriteriaDto? previous) =>
+        previous is null ? RentalSearchIntent.StartsRentalSearch(message) : RentalSearchIntent.IsRentalQuery(message);
 
     private static bool IsProviderFailure(Exception error, CancellationToken cancellationToken) =>
         error is ExternalDependencyException or ExternalServiceUnavailableException or HttpRequestException or JsonException
