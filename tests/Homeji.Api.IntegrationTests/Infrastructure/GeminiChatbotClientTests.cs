@@ -202,7 +202,7 @@ public sealed class GeminiChatbotClientTests
             new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
-                    """{"candidates":[{"content":{"parts":[{"text":"Mở Chợ đồ để chọn món."}]}}]}"""),
+                    """{"candidates":[{"content":{"parts":[{"text":"Mở Chợ Homeji để chọn món."}]}}]}"""),
             });
         var client = new GeminiChatbotClient(
             new HttpClient(handler),
@@ -216,7 +216,7 @@ public sealed class GeminiChatbotClientTests
         await client.GenerateReplyAsync([], "Mua đồ ăn như nào?");
 
         var prompt = ExtractPrompt(handler.RequestBodies.Single());
-        Assert.Contains("Chợ đồ: mua đồ ăn", prompt, StringComparison.Ordinal);
+        Assert.Contains("Chợ Homeji: mua đồ ăn", prompt, StringComparison.Ordinal);
         Assert.Contains("Không tự viết URL", prompt, StringComparison.Ordinal);
         Assert.Contains("nút điều hướng phù hợp", prompt, StringComparison.Ordinal);
         Assert.Contains("không được tự đặt đơn", prompt, StringComparison.OrdinalIgnoreCase);

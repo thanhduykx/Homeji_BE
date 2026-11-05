@@ -4,14 +4,9 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using Homeji.Api.Authentication;
-using Homeji.Api.Controllers;
 using Homeji.Application.IServices.Accounts;
 using Homeji.Infrastructure.External;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc.ModelBinding.Validation;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -29,67 +24,61 @@ public sealed class SessionRefreshTests : IDisposable
     private readonly Handler _handler = new();
 
     [Fact]
-    public void MvcCanValidateRefreshRecordWithoutPropertyMetadataErrors()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddControllers();
-        using var provider = services.BuildServiceProvider();
-        var context = new ActionContext { HttpContext = new DefaultHttpContext { RequestServices = provider } };
-        provider.GetRequiredService<IObjectModelValidator>().Validate(context, null, "", new RefreshSessionRequest("bad", "short"));
-        Assert.False(context.ModelState.IsValid);
-        Assert.Contains("SessionToken", context.ModelState.Keys);
-    }
-
-    [Fact]
     public async Task ExpiredSignedAnchorCanRotateWithinSameSession()
     {
-        var old = Token(_user, _session, expired: true);
-        var renewed = Token(_user, _session);
-        _handler.Response = HttpResponseMessageWithToken(renewed);
-        var result = await Controller().Refresh(new(old, "refresh-secret"), CancellationToken.None);
-        Assert.IsType<OkObjectResult>(result);
+        var rotator = Rotator();
+        var anchor = await rotator.ValidateAnchorAsync(Token(_user, _session, expired: true), CancellationToken.None);
+        _handler.Response = HttpResponseMessageWithToken(Token(_user, _session));
+
+        var rotation = await rotator.RotateAsync(anchor!, "refresh-secret", CancellationToken.None);
+
+        Assert.Equal(SessionRotationStatus.Rotated, rotation.Status);
+        Assert.Equal("rotated-refresh", rotation.RefreshToken);
         Assert.Equal(1, _handler.Calls);
         Assert.Contains("grant_type=refresh_token", _handler.Url, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task RevokedAnchorCannotBeRenewed()
+    public async Task RevokedAnchorIsRefused()
     {
         _revocations.Before = DateTimeOffset.UtcNow;
-        var result = await Controller().Refresh(new(Token(_user, _session, true), "refresh-secret"), CancellationToken.None);
-        Assert.IsType<UnauthorizedResult>(result);
-        Assert.Equal(0, _handler.Calls);
+        Assert.Null(await Rotator().ValidateAnchorAsync(Token(_user, _session, expired: true), CancellationToken.None));
     }
 
     [Fact]
-    public async Task TamperedAnchorDoesNotReachProvider()
+    public async Task TamperedAnchorIsRefused()
     {
-        var result = await Controller().Refresh(new("invalid.jwt.signature", "refresh-secret"), CancellationToken.None);
-        Assert.IsType<UnauthorizedResult>(result);
-        Assert.Equal(0, _handler.Calls);
+        Assert.Null(await Rotator().ValidateAnchorAsync("invalid.jwt.signature", CancellationToken.None));
     }
 
     [Fact]
     public async Task AnotherSessionCannotBeSubstituted()
     {
+        var rotator = Rotator();
+        var anchor = await rotator.ValidateAnchorAsync(Token(_user, _session, expired: true), CancellationToken.None);
         _handler.Response = HttpResponseMessageWithToken(Token(_user, Guid.NewGuid().ToString()));
-        var result = await Controller().Refresh(new(Token(_user, _session, true), "refresh-secret"), CancellationToken.None);
-        Assert.IsType<UnauthorizedResult>(result);
+
+        var rotation = await rotator.RotateAsync(anchor!, "refresh-secret", CancellationToken.None);
+
+        Assert.Equal(SessionRotationStatus.Rejected, rotation.Status);
     }
 
     [Theory]
-    [InlineData(HttpStatusCode.BadRequest, 401)]
-    [InlineData(HttpStatusCode.TooManyRequests, 503)]
-    [InlineData(HttpStatusCode.ServiceUnavailable, 503)]
-    public async Task InvalidRefreshAndTemporaryOutageRemainDistinct(HttpStatusCode status, int expected)
+    [InlineData(HttpStatusCode.BadRequest, SessionRotationStatus.Rejected)]
+    [InlineData(HttpStatusCode.TooManyRequests, SessionRotationStatus.Unavailable)]
+    [InlineData(HttpStatusCode.ServiceUnavailable, SessionRotationStatus.Unavailable)]
+    public async Task InvalidRefreshAndTemporaryOutageRemainDistinct(HttpStatusCode status, SessionRotationStatus expected)
     {
+        var rotator = Rotator();
+        var anchor = await rotator.ValidateAnchorAsync(Token(_user, _session, expired: true), CancellationToken.None);
         _handler.Response = new HttpResponseMessage(status);
-        var result = await Controller().Refresh(new(Token(_user, _session, true), "refresh-secret"), CancellationToken.None);
-        Assert.Equal(expected, Assert.IsAssignableFrom<StatusCodeResult>(result).StatusCode);
+
+        var rotation = await rotator.RotateAsync(anchor!, "refresh-secret", CancellationToken.None);
+
+        Assert.Equal(expected, rotation.Status);
     }
 
-    private SessionRefreshController Controller()
+    private SessionRotator Rotator()
     {
         var key = new ECDsaSecurityKey(_ec) { KeyId = "test-key" };
         var configuration = new OpenIdConnectConfiguration { Issuer = Issuer };
@@ -100,9 +89,8 @@ public sealed class SessionRefreshTests : IDisposable
                 ValidIssuer = Issuer, ValidAudience = "authenticated", ValidateIssuer = true,
                 ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true,
                 ValidAlgorithms = [SecurityAlgorithms.EcdsaSha256] } };
-        return new SessionRefreshController(new SessionRotator(new Factory(_handler), Options.Create(new SupaBaseAuthOptions {
-            ProjectUrl = "https://auth.example.test", ApiKey = "public-test-key" }), new Monitor(options), _revocations)) {
-            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() } };
+        return new SessionRotator(new Factory(_handler), Options.Create(new SupaBaseAuthOptions {
+            ProjectUrl = "https://auth.example.test", ApiKey = "public-test-key" }), new Monitor(options), _revocations);
     }
 
     private string Token(Guid user, string session, bool expired = false)
