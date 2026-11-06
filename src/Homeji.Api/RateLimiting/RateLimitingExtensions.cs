@@ -25,6 +25,9 @@ public static class RateLimitingPolicyNames
 
     /// <summary>Anonymous MoMo and PayOS callbacks; generous so provider retries still get through.</summary>
     public const string PaymentWebhook = "payment-webhook";
+
+    /// <summary>Anonymous browser CSP violation reports.</summary>
+    public const string CspReports = "csp-reports";
 }
 
 public sealed class RateLimitingOptions
@@ -102,6 +105,8 @@ public static class RateLimitingExtensions
                 httpContext => CreateIpPartition(httpContext, settings.CostlyOperations));
             options.AddPolicy(RateLimitingPolicyNames.PaymentWebhook,
                 httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 300, WindowSeconds = 60 }));
+            options.AddPolicy(RateLimitingPolicyNames.CspReports,
+                httpContext => CreateIpPartition(httpContext, new RateLimitWindowOptions { PermitLimit = 60, WindowSeconds = 60 }));
         });
 
         return services;

@@ -86,6 +86,7 @@ builder.Services.AddSingleton<IOnlineUserTracker, OnlineUserTracker>();
 builder.Services.AddSingleton<IUserSessionRevocationCache, MemoryUserSessionRevocationCache>();
 builder.Services.AddSingleton<IUserSessionRealtimePublisher, SignalRUserSessionPublisher>();
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
+builder.Services.AddSingleton<Homeji.Application.Abstractions.Security.ICspReportLog, CspReportLog>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
 builder.Services.AddPublicResponseCache();
 
