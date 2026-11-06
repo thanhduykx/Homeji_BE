@@ -1,8 +1,10 @@
+using Homeji.Api.Caching;
 using Homeji.Api.RateLimiting;
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IServices.RentalPosts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Homeji.Api.Controllers;
@@ -13,6 +15,7 @@ public sealed class RentalSourceListingsController(IRentalSourceListingService s
 {
     [AllowAnonymous]
     [HttpGet]
+    [OutputCache(PolicyName = PublicCachePolicies.Catalog)]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicSearch)]
     [ProducesResponseType<IReadOnlyList<RentalSourceListingDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<RentalSourceListingDto>>> Search(
@@ -23,6 +26,7 @@ public sealed class RentalSourceListingsController(IRentalSourceListingService s
 
     [AllowAnonymous]
     [HttpGet("{id:guid}")]
+    [OutputCache(PolicyName = PublicCachePolicies.Catalog)]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicRead)]
     [ProducesResponseType<RentalSourceListingDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<RentalSourceListingDto>> Get(Guid id, CancellationToken cancellationToken) =>

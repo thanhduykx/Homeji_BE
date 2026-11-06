@@ -1,4 +1,7 @@
 using System.Globalization;
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -43,6 +46,10 @@ public sealed class RateLimitWindowOptions
 
 public static class RateLimitingExtensions
 {
+    private const string ProxySecretSetting = "RateLimiting:ProxySecret";
+    private const string ProxySecretHeader = "X-Homeji-Proxy-Secret";
+    private const string ClientIpHeader = "X-Homeji-Client-IP";
+
     public static IServiceCollection AddHomejiRateLimiting(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -120,8 +127,8 @@ public static class RateLimitingExtensions
     }
 
     /// <summary>
-    /// Prefer authenticated subject (higher trust), else client IP
-    /// (requires ForwardedHeaders so Render/proxy IP is the real client).
+    /// Prefer authenticated subject (higher trust), then the visitor named by our frontend proxy,
+    /// else the connection address (requires ForwardedHeaders so Render/proxy IP is the real client).
     /// </summary>
     private static string ResolveClientKey(HttpContext httpContext)
     {
@@ -135,7 +142,25 @@ public static class RateLimitingExtensions
             }
         }
 
+        if (ProxiedClientIp(httpContext) is { } proxied)
+        {
+            return $"ip:{proxied}";
+        }
+
         var ip = httpContext.Connection.RemoteIpAddress?.ToString();
         return string.IsNullOrWhiteSpace(ip) ? "ip:unknown" : $"ip:{ip}";
+    }
+
+    /// <summary>
+    /// Every browser request reaches the API through the frontend proxy, so its connection address is the
+    /// proxy's. The address is believed only with the shared secret; otherwise anyone could pick a new quota.
+    /// </summary>
+    private static IPAddress? ProxiedClientIp(HttpContext httpContext)
+    {
+        var secret = httpContext.RequestServices.GetRequiredService<IConfiguration>()[ProxySecretSetting];
+        if (string.IsNullOrEmpty(secret)) return null;
+        var sent = httpContext.Request.Headers[ProxySecretHeader].ToString();
+        if (!CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(sent), Encoding.UTF8.GetBytes(secret))) return null;
+        return IPAddress.TryParse(httpContext.Request.Headers[ClientIpHeader].ToString(), out var address) ? address : null;
     }
 }

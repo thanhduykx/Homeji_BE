@@ -13,6 +13,7 @@ using Homeji.Application.Abstractions.Presence;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Health;
+using Homeji.Api.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
@@ -86,6 +87,7 @@ builder.Services.AddSingleton<IUserSessionRevocationCache, MemoryUserSessionRevo
 builder.Services.AddSingleton<IUserSessionRealtimePublisher, SignalRUserSessionPublisher>();
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
+builder.Services.AddPublicResponseCache();
 
 builder.Services.AddTrustedProxyHeaders(builder.Configuration);
 
@@ -154,6 +156,8 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserActivityMiddleware>();
+// Before the limiter: a cached answer costs almost nothing, so it does not use up a visitor's quota.
+app.UseOutputCache();
 app.UseRateLimiter();
 app.UseMiddleware<MediaAdmissionMiddleware>();
 

@@ -1,9 +1,11 @@
+using Homeji.Api.Caching;
 using Homeji.Api.RateLimiting;
 using Homeji.Application.DTOs.Marketplace;
 using Homeji.Application.IServices.Marketplace;
 using Homeji.Domain.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Homeji.Api.Controllers;
@@ -20,6 +22,7 @@ public sealed class MarketplacePostsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [OutputCache(PolicyName = PublicCachePolicies.Stock)]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicSearch)]
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<MarketplacePostDto>>(StatusCodes.Status200OK)]
