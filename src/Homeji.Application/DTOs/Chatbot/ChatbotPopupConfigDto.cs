@@ -7,4 +7,5 @@ public sealed record ChatbotPopupConfigDto(
     IReadOnlyCollection<string> SuggestedPrompts)
 {
     public bool HistoryStorageEnabled { get; init; }
+    public string? RecaptchaSiteKey { get; init; }
 }

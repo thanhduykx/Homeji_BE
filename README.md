@@ -54,6 +54,16 @@ Docker chỉ bind port bằng command argument:
 ENTRYPOINT ["dotnet", "Homeji.Api.dll", "--urls", "http://0.0.0.0:8080"]
 ```
 
+### reCAPTCHA cho chatbot
+
+Sau khi frontend hỗ trợ reCAPTCHA v3, đặt các biến môi trường trên máy chủ API:
+
+- `Chatbot__Recaptcha__SiteKey` là khóa công khai mà API trả về trong cấu hình chatbot.
+- `Chatbot__Recaptcha__SecretKey` là khóa bí mật dùng để xác minh token với Google.
+- `Chatbot__Recaptcha__AllowedHostnames__0` là tên miền frontend đã đăng ký với Google. Thêm `__1`, `__2` cho các tên miền khác. Nhập hostname, không kèm giao thức, cổng hay đường dẫn.
+
+Để tắt xác minh, bỏ cả hai khóa. Khi bật, API yêu cầu token riêng cho mỗi lần gửi tin hoặc chuyển giọng nói thành văn bản.
+
 ## Yêu cầu
 
 - .NET SDK 9
