@@ -87,6 +87,12 @@ builder.Services.AddSingleton<IUserSessionRevocationCache, MemoryUserSessionRevo
 builder.Services.AddSingleton<IUserSessionRealtimePublisher, SignalRUserSessionPublisher>();
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
 builder.Services.AddSingleton<Homeji.Application.Abstractions.Security.ICspReportLog, CspReportLog>();
+builder.Services.AddOptions<ChatbotRecaptchaOptions>()
+    .BindConfiguration(ChatbotRecaptchaOptions.SectionName)
+    .Validate(options => options.IsValid(), "Chatbot reCAPTCHA requires both keys and at least one allowed hostname.")
+    .ValidateOnStart();
+builder.Services.AddHttpClient<ChatbotRecaptcha>(client => client.Timeout = TimeSpan.FromSeconds(5))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
 builder.Services.AddPublicResponseCache();
 
