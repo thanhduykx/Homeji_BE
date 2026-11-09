@@ -23,10 +23,10 @@ public sealed class ChatbotBurstGuard(IOptions<ChatbotRecaptchaOptions> options,
         lock (recent)
         {
             recent.DropBefore(now - _window);
+            recent.Add(now);
             // Keep at most one entry past the limit, so a client that keeps sending stays challenged
             // without its history growing.
-            if (recent.Count > _limit) recent.DropOldest();
-            recent.Add(now);
+            if (recent.Count > _limit + 1) recent.DropOldest();
             return recent.Count > _limit;
         }
     }
@@ -53,14 +53,15 @@ public sealed class ChatbotBurstGuard(IOptions<ChatbotRecaptchaOptions> options,
 
     private sealed class RecentRequests
     {
-        private readonly Queue<DateTimeOffset> _times = new();
+        // Concurrent requests can acquire the client lock in a different order than they arrived.
+        private readonly PriorityQueue<DateTimeOffset, DateTimeOffset> _times = new();
         public int Count => _times.Count;
-        public void Add(DateTimeOffset time) => _times.Enqueue(time);
+        public void Add(DateTimeOffset time) => _times.Enqueue(time, time);
         public void DropOldest() => _times.Dequeue();
 
         public void DropBefore(DateTimeOffset cutoff)
         {
-            while (_times.Count > 0 && _times.Peek() <= cutoff) _times.Dequeue();
+            while (_times.TryPeek(out var time, out _) && time <= cutoff) _times.Dequeue();
         }
     }
 }

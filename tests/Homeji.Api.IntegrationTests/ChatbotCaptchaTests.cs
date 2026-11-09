@@ -152,6 +152,24 @@ public sealed class ChatbotCaptchaTests
     }
 
     [Fact]
+    public void An_expired_request_is_forgotten_even_if_it_was_recorded_after_a_newer_request()
+    {
+        var clock = new ManualClock();
+        var guard = new ChatbotBurstGuard(Options.Create(new ChatbotRecaptchaOptions { BurstLimit = 2, BurstWindowSeconds = 30 }), clock);
+
+        clock.BeforeReadReturns = () =>
+        {
+            clock.Advance(TimeSpan.FromSeconds(20));
+            Assert.False(guard.RecordAndCheck("user:a"));
+        };
+        Assert.False(guard.RecordAndCheck("user:a"));
+
+        clock.Advance(TimeSpan.FromSeconds(11));
+        Assert.False(guard.RecordAndCheck("user:a"));
+        Assert.True(guard.RecordAndCheck("user:a"));
+    }
+
+    [Fact]
     public void Continued_spam_stays_challenged_without_growing_the_history()
     {
         var clock = new ManualClock();
@@ -238,7 +256,16 @@ public sealed class ChatbotCaptchaTests
     private sealed class ManualClock : TimeProvider
     {
         private DateTimeOffset _now = new(2026, 11, 10, 0, 0, 0, TimeSpan.Zero);
-        public override DateTimeOffset GetUtcNow() => _now;
+        public Action? BeforeReadReturns { get; set; }
+
+        public override DateTimeOffset GetUtcNow()
+        {
+            var now = _now;
+            var beforeReadReturns = BeforeReadReturns;
+            BeforeReadReturns = null;
+            beforeReadReturns?.Invoke();
+            return now;
+        }
         public void Advance(TimeSpan by) => _now += by;
     }
 
