@@ -135,7 +135,7 @@ public static class RateLimitingExtensions
     /// Prefer authenticated subject (higher trust), then the visitor named by our frontend proxy,
     /// else the connection address (requires ForwardedHeaders so Render/proxy IP is the real client).
     /// </summary>
-    private static string ResolveClientKey(HttpContext httpContext)
+    internal static string ResolveClientKey(HttpContext httpContext)
     {
         if (httpContext.User.Identity?.IsAuthenticated == true)
         {
