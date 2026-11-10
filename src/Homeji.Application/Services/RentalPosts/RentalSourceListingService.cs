@@ -11,7 +11,8 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
     public async Task<IReadOnlyList<RentalSourceListingDto>> SearchAsync(
         RentalSourceSearchDto query, CancellationToken cancellationToken)
     {
-        if (query.Page is < 1 or > 1000 || query.PageSize is < 1 or > 50
+        if (query.Page < 1 || query.PageSize is < 1 or > 50
+            || ((long)query.Page - 1) * query.PageSize > int.MaxValue
             || query.Keyword?.Length > 200
             || query.District is not (null or "quan-9" or "thu-duc")
             || query.PropertyCategory is not (null or "room" or "apartment")

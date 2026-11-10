@@ -168,12 +168,14 @@ public sealed class RentalPostRepository : IRentalPostRepository
         if (!paginate) return query.AsSplitQuery();
         var page = Math.Max(1, search.Page);
         var pageSize = Math.Clamp(search.PageSize, 1, MaxPageSize);
+        var offset = (long)(page - 1) * pageSize;
+        if (offset > int.MaxValue) return query.Where(_ => false);
 
         return query
             .AsSplitQuery()
             .OrderByDescending(post => post.UpdatedAt)
             .ThenBy(post => post.Id)
-            .Skip((page - 1) * pageSize)
+            .Skip((int)offset)
             .Take(pageSize);
     }
 
