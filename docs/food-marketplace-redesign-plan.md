@@ -221,16 +221,16 @@ Xây dựng component chuyên biệt `MarketplaceSellFoodForm` trong `src/compon
 ├──────────────────────────────────────────┬──────────────────────────────────┤
 │ [Khối 1: Thông tin & Danh mục ẩm thực]   │ [Thẻ Xem Trước Thời Gian Thực]   │
 │ • Tiêu đề món: [Cơm gà sốt teriyaki...]  │ ┌──────────────────────────────┐ │
-│ • Danh mục: [🍛 Cơm] [🍜 Bún] [🧋 Nước] │ │  [ẢNH MÓN ĂN - TỈ LỆ 4:3]   │ │
+│ • Danh mục: [Cơm] [Bún] [Nước]        │ │  [ẢNH MÓN ĂN - TỈ LỆ 4:3]   │ │
 │ • Mô tả nguyên liệu, khẩu phần           │ │  Nấu theo đơn · 20 phút      │ │
 ├──────────────────────────────────────────┤ │  Cơm gà sốt teriyaki         │ │
 │ [Khối 2: Định giá & Bộ tính lợi nhuận]   │ │  35.000 đ                    │ │
 │ • Giá bán: [35.000 đ]                    │ │  Còn 15 suất hôm nay         │ │
 │ • Chi phí vốn: [18.000 đ] (nguyên liệu) │ │  [+ Thêm vào giỏ]            │ │
 │ ┌──────────────────────────────────────┐ │ └──────────────────────────────┘ │
-│ │ 💡 BẢNG TÍNH LỢI NHUẬN RÒNG          │ │                                  │
-│ │ Phí sàn (10%): -3.500 đ              │ │ 🟢 Món của bạn hiển thị đẹp mắt │ │
-│ │ Thực nhận: 31.500 đ                  │ │    và đúng chuẩn chợ ẩm thực.   │ │
+│ │ BẢNG TÍNH LỢI NHUẬN RÒNG             │ │                                  │
+│ │ Phí sàn (10%): -3.500 đ              │ │ Món của bạn hiển thị đẹp mắt     │ │
+│ │ Thực nhận: 31.500 đ                  │ │ và đúng chuẩn chợ ẩm thực.       │ │
 │ │ Lãi ước tính: +13.500 đ (Biên 38.6%) │ │                                  │
 │ └──────────────────────────────────────┘ │                                  │
 │ • Số suất mở bán hôm nay: [- 15 +] suất │                                  │
@@ -254,18 +254,18 @@ Xây dựng component chuyên biệt `MarketplaceSellFoodForm` trong `src/compon
 Tích hợp vào tab Quản lý đơn bán (`tab === 'sales'`):
 
 1. **Thanh trạng thái Bếp (Master Kitchen Bar):**
-   - Công tắc nhận đơn: `[🟢 Bếp đang mở nhận đơn]` $\leftrightarrow$ `[🔴 Tạm ngưng nhận đơn]`.
+   - Công tắc nhận đơn: `[Bếp đang mở nhận đơn]` $\leftrightarrow$ `[Tạm ngưng nhận đơn]`.
    - Nút quản lý nhanh thực đơn: Bấm để cập nhật tức thời số suất bán còn lại hoặc báo hết món 1 chạm.
 2. **Bảng Kanban Xử Lý Đơn 3 Cột (Live Order Kanban):**
    - **Cột 1: ĐƠN MỚI ĐẾN (Chuông báo ting-ting, đếm ngược 30 phút):**
      - Hiển thị danh sách món, số lượng, phương thức nhận (Tự lấy hay Giao phòng nào), ghi chú khách.
-     - Hai nút bấm hành động lớn: `[🟢 NHẬN ĐƠN & NẤU]` / `[🔴 TỪ CHỐI ĐƠN]`.
+     - Hai nút bấm hành động lớn: `[NHẬN ĐƠN & NẤU]` / `[TỪ CHỐI ĐƠN]`.
    - **Cột 2: ĐANG NẤU (Preparing):**
      - Đếm ngược thời gian nấu theo `PreparationMinutes`.
-     - Nút bấm: `[🔔 MÓN ĐÃ SẴN SÀNG]`.
+     - Nút bấm: `[MÓN ĐÃ SẴN SÀNG]`.
    - **Cột 3: SẴN SÀNG / ĐANG GIAO (Ready / Delivering):**
      - Đơn tự lấy: Hiển thị mã 4 số chờ khách đến.
-     - Đơn bếp tự giao: Nút `[🛵 BẮT ĐẦU ĐI GIAO]` và `[✅ ĐÃ GIAO THÀNH CÔNG]`.
+     - Đơn bếp tự giao: Nút `[BẮT ĐẦU ĐI GIAO]` và `[ĐÃ GIAO THÀNH CÔNG]`.
 
 ---
 
