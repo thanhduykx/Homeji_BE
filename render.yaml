@@ -10,6 +10,9 @@ services:
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
+      # Same value as PROXY_SHARED_SECRET on the frontend; lets the API rate limit by visitor.
+      - key: RateLimiting__ProxySecret
+        sync: false
       - key: Giphy__ApiKey
         sync: false
       - key: VoiceCalls__Provider
@@ -41,5 +44,3 @@ services:
         value: https://homeji.onrender.com/auth/callback
       - key: Payments__Redirects__FrontendPaymentUrl
         value: https://homeji.onrender.com/payments
-      - key: Cors__AllowedOrigins__3
-        value: https://homeji.onrender.com

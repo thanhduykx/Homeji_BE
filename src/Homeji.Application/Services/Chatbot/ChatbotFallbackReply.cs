@@ -15,7 +15,7 @@ public static class ChatbotFallbackReply
 
         if (actions.Any(action => action.Id == "marketplace-food"))
         {
-            return unavailable + "Bạn vẫn có thể mở **Chợ đồ ăn** để chọn món và thêm vào giỏ. "
+            return unavailable + "Bạn vẫn có thể mở **mục Đồ ăn** để chọn món và thêm vào giỏ. "
                 + "Trước khi tạo đơn, Homeji sẽ cho bạn kiểm tra và xác nhận tổng tiền.";
         }
 

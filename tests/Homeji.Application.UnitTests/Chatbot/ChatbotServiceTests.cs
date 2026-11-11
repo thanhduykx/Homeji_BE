@@ -332,7 +332,8 @@ public sealed class ChatbotServiceTests
         IChatbotAiClient aiClient,
         IAiSearchService? search = null,
         bool historyStorageEnabled = true,
-        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null, Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? subscriptions = null)
+        IRentalDecisionService? decision = null, IChatbotPostingAgent? posting = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null, Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? subscriptions = null,
+        Homeji.Application.IServices.RentalPosts.IRentalSourceListingService? sourceListings = null)
     {
         return new ChatbotService(
             new UserContext(new StubCurrentUser(UserId), new StubUserProfileRepository()),
@@ -342,7 +343,179 @@ public sealed class ChatbotServiceTests
             decision ?? new StubRentalDecisionService(),
             new StubFoodService(),
             Options.Create(new ChatbotOptions { HistoryStorageEnabled = historyStorageEnabled }),
-            new StubTimeProvider(), posting, roommates: roommates, subscriptions: subscriptions);
+            new StubTimeProvider(), posting, roommates: roommates, subscriptions: subscriptions, sourceListings: sourceListings);
+    }
+
+    private static readonly AiParsedSearchCriteriaDto ListedCriteria = new("Thủ Đức", null, null, 3_000_000, null, null, []);
+
+    private sealed class StubSourceListings(int total = 12) : Homeji.Application.IServices.RentalPosts.IRentalSourceListingService
+    {
+        public int Calls { get; private set; }
+        public Task<IReadOnlyList<Homeji.Application.DTOs.RentalPosts.RentalSourceListingDto>> SearchAsync(Homeji.Application.DTOs.RentalPosts.RentalSourceSearchDto query, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Homeji.Application.DTOs.RentalPosts.RentalSourceListingDto> GetAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<Homeji.Application.DTOs.RentalPosts.RentalSourceContactDto> GetContactAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<ChatbotSourceMatchDto> MatchAsync(AiParsedSearchCriteriaDto criteria, int limit, CancellationToken cancellationToken)
+        {
+            Calls++;
+            var rooms = Enumerable.Range(1, Math.Min(limit, total)).Select(index =>
+                new ChatbotSourceRoomDto(Guid.NewGuid(), $"Phòng nguồn {index}", "Linh Trung", 2_000_000 + index, 20, ["Máy lạnh"], "Cọc 1 tháng", "Mô tả ngắn")).ToArray();
+            return Task.FromResult(new ChatbotSourceMatchDto(rooms, total));
+        }
+    }
+
+    private sealed class FactsClient : IChatbotAiClient
+    {
+        public string? Facts { get; private set; }
+        public int PlainCalls { get; private set; }
+        public Task<string> GenerateMediaReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, IReadOnlyCollection<ChatbotMediaContent> attachments, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> TranscribeAsync(ChatbotMediaContent audio, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<string> GenerateReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, CancellationToken cancellationToken = default) { PlainCalls++; return Task.FromResult("Trả lời chung"); }
+        public Task<string> GenerateGroundedReplyAsync(IReadOnlyCollection<ChatbotMessageDto> messages, string text, string listingFacts, CancellationToken cancellationToken = default) { Facts = listingFacts; return Task.FromResult("Phòng 2 có máy lạnh theo mô tả."); }
+    }
+
+    private sealed class ParserDownSearch : IAiSearchService
+    {
+        public Task<AiParsedSearchCriteriaDto> ParseSearchAsync(AiParseSearchRequestDto request, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public Task<AiHighlightResponseDto> HighlightRentalPostsAsync(AiHighlightRequestDto request, CancellationToken cancellationToken = default) =>
+            request.Criteria is null
+                ? throw new ExternalDependencyException("Gemini tạm thời không khả dụng.")
+                : Task.FromResult(new AiHighlightResponseDto(request.Criteria, [], "Test", null, null, null));
+    }
+
+    [Fact]
+    public async Task Room_search_includes_source_listings_and_offers_the_full_list()
+    {
+        var reply = await CreateService(new(), new SuccessfulClient(), new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, "Tìm phòng dưới 3 triệu"));
+
+        Assert.Equal(12, reply.SourceRooms!.Total);
+        Assert.Equal(5, reply.SourceRooms.Rooms.Count);
+        Assert.Contains("Có 12 phòng", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Contains(reply.Actions, action => action.Id == "all-rooms");
+    }
+
+    [Fact]
+    public async Task All_matches_shown_does_not_offer_the_full_list()
+    {
+        var reply = await CreateService(new(), new SuccessfulClient(), new GroundedSearchStub(), sourceListings: new StubSourceListings(2))
+            .SendMessageAsync(new(null, "Tìm phòng dưới 3 triệu"));
+
+        Assert.DoesNotContain(reply.Actions, action => action.Id == "all-rooms");
+        Assert.Contains("Có 2 phòng khớp", reply.AssistantMessage.Content, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Phòng 2 có máy lạnh không?")]
+    [InlineData("Phòng thứ hai cọc bao nhiêu?")]
+    [InlineData("Phòng nào rẻ nhất?")]
+    [InlineData("So sánh 2 phòng đầu giúp mình")]
+    public async Task Question_about_listed_rooms_answers_from_retrieved_facts(string message)
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message, PreviousCriteria: ListedCriteria));
+
+        Assert.Contains("Phòng 1: Phòng nguồn 1", ai.Facts, StringComparison.Ordinal);
+        Assert.Contains("Cọc 1 tháng", ai.Facts, StringComparison.Ordinal);
+        Assert.Equal(0, ai.PlainCalls);
+        Assert.Null(reply.SearchUpdate);
+    }
+
+    [Theory]
+    [InlineData("Phòng 2 người dưới 3 triệu")]
+    [InlineData("Phòng nào dưới 2 triệu?")]
+    [InlineData("Tìm phòng khác")]
+    public async Task New_constraints_search_again_instead_of_answering_from_the_old_list(string message)
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message, PreviousCriteria: ListedCriteria));
+
+        Assert.Null(ai.Facts);
+        Assert.NotNull(reply.SearchUpdate);
+    }
+
+    [Theory]
+    [InlineData("Cho mình số điện thoại chủ phòng 1")]
+    [InlineData("Phòng 2 có sđt không?")]
+    public async Task Contact_question_points_to_the_listing_without_calling_the_model(string message)
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message, PreviousCriteria: ListedCriteria));
+
+        Assert.Contains("xem số", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.Null(ai.Facts);
+        Assert.Equal(0, ai.PlainCalls);
+    }
+
+    [Theory]
+    [InlineData("Mình tên là Minh và đang học ở UIT, bạn ghi nhớ nhé")]
+    [InlineData("Giá xăng hôm nay tăng vì sao?")]
+    [InlineData("Ai là người phát minh ra điện thoại?")]
+    public async Task One_shared_word_does_not_start_a_room_search(string message)
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message));
+
+        Assert.Null(reply.SearchUpdate);
+        Assert.Equal(1, ai.PlainCalls);
+    }
+
+    [Theory]
+    [InlineData("Tìm trọ dưới 3 triệu")]
+    [InlineData("Gần UIT có gì giá ổn không?")]
+    public async Task Housing_requests_still_start_a_search(string message)
+    {
+        var reply = await CreateService(new(), new FactsClient(), new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, message));
+
+        Assert.NotNull(reply.SearchUpdate);
+    }
+
+    [Fact]
+    public async Task One_word_can_refine_an_active_search()
+    {
+        var reply = await CreateService(new(), new FactsClient(), new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, "Thêm máy lạnh", PreviousCriteria: ListedCriteria));
+
+        Assert.Contains("AIR_CONDITIONER", reply.SearchUpdate!.Criteria.RequiredAmenities);
+    }
+
+    [Fact]
+    public async Task First_message_without_a_list_is_not_a_follow_up()
+    {
+        var ai = new FactsClient();
+        var reply = await CreateService(new(), ai, new GroundedSearchStub(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, "Phòng nào rẻ nhất?"));
+
+        Assert.Null(ai.Facts);
+        Assert.NotNull(reply.SearchUpdate);
+    }
+
+    [Fact]
+    public async Task Search_keeps_working_with_explicit_criteria_when_the_parser_is_down()
+    {
+        var reply = await CreateService(new(), new SuccessfulClient(), new ParserDownSearch(), sourceListings: new StubSourceListings())
+            .SendMessageAsync(new(null, "Tìm phòng dưới 3 triệu ở Thủ Đức"));
+
+        Assert.Equal(3_000_000, reply.SearchUpdate!.Criteria.PriceMax);
+        Assert.Equal("Thủ Đức", reply.SearchUpdate.Criteria.Location);
+        Assert.Contains("AI đang bận", reply.AssistantMessage.Content, StringComparison.Ordinal);
+        Assert.NotNull(reply.SourceRooms);
+    }
+
+    [Fact]
+    public void Draft_reports_exactly_what_is_missing()
+    {
+        var details = new AgentPostDetails("Ghế gỗ", "Ghế còn tốt", 0, "Đã dùng", "Nội thất", "", 0, 0);
+        var missing = AgentPostBusinessRules.Missing(details, UtcNow, 0, 1);
+
+        Assert.Contains(missing, item => item.Contains("giá", StringComparison.Ordinal));
+        Assert.Contains(missing, item => item.Contains("nơi nhận", StringComparison.Ordinal));
+        Assert.DoesNotContain(missing, item => item.Contains("tìm trọ", StringComparison.Ordinal));
+        Assert.Contains(missing, item => item.Contains("ảnh", StringComparison.Ordinal));
     }
 
     [Theory]

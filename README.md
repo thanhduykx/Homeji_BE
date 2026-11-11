@@ -54,6 +54,18 @@ Docker chỉ bind port bằng command argument:
 ENTRYPOINT ["dotnet", "Homeji.Api.dll", "--urls", "http://0.0.0.0:8080"]
 ```
 
+### reCAPTCHA cho chatbot
+
+Chatbot chỉ hỏi xác minh khi một người gửi dồn dập. Đặt các biến môi trường trên máy chủ API:
+
+- `Chatbot__Recaptcha__ChallengeSiteKey` và `Chatbot__Recaptcha__ChallengeSecretKey` là cặp khóa reCAPTCHA v2 dạng hộp kiểm ("Tôi không phải người máy").
+- `Chatbot__Recaptcha__AllowedHostnames__0` là tên miền frontend đã đăng ký với Google. Thêm `__1`, `__2` cho các tên miền khác. Nhập hostname, không kèm giao thức, cổng hay đường dẫn.
+- `Chatbot__Recaptcha__BurstLimit` (mặc định `5`) và `Chatbot__Recaptcha__BurstWindowSeconds` (mặc định `30`): gửi quá 5 lần trong 30 giây thì lần tiếp theo phải qua hộp kiểm. Qua xong, bộ đếm của người đó bắt đầu lại.
+
+Gửi bình thường không cần token và trình duyệt không tải script của Google. Lượt bị chặn nhận `403` với `code: chatbot_captcha_required` và `captchaSiteKey`; frontend mở hộp kiểm rồi gửi lại đúng một lần với header `X-Homeji-Recaptcha`. Bộ đếm nằm trong bộ nhớ của tiến trình API, nên chỉ đúng khi chạy một instance. Giới hạn cứng `CostlyOperations` vẫn áp dụng.
+
+Khóa v3 cũ (`Chatbot__Recaptcha__SiteKey`, `Chatbot__Recaptcha__SecretKey`) vẫn dùng được khi chưa có khóa hộp kiểm: khi đó mọi lần gửi đều cần token v3 như trước. Khi đã đặt khóa hộp kiểm, API không trả khóa v3 cho trình duyệt nữa và có thể xóa cặp khóa v3. Để tắt hoàn toàn, bỏ tất cả khóa.
+
 ## Yêu cầu
 
 - .NET SDK 9

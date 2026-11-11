@@ -1,8 +1,10 @@
 using Homeji.Application.DTOs.RentalPosts;
 using Homeji.Application.IServices.RentalPosts;
+using Homeji.Api.Caching;
 using Homeji.Api.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 using Microsoft.AspNetCore.RateLimiting;
 using Homeji.Domain.Enums;
 
@@ -20,6 +22,7 @@ public sealed class RentalPostsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [OutputCache(PolicyName = PublicCachePolicies.Listings)]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicSearch)]
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<RentalPostSummaryDto>>(StatusCodes.Status200OK)]

@@ -11,7 +11,8 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
     public async Task<IReadOnlyList<RentalSourceListingDto>> SearchAsync(
         RentalSourceSearchDto query, CancellationToken cancellationToken)
     {
-        if (query.Page is < 1 or > 1000 || query.PageSize is < 1 or > 50
+        if (query.Page < 1 || query.PageSize is < 1 or > 50
+            || ((long)query.Page - 1) * query.PageSize > int.MaxValue
             || query.Keyword?.Length > 200
             || query.District is not (null or "quan-9" or "thu-duc")
             || query.PropertyCategory is not (null or "room" or "apartment")
@@ -42,6 +43,22 @@ public sealed class RentalSourceListingService(IRentalSourceListingRepository re
             ? listing.ContactPhones
             : listing.ContactPhone is { Length: > 0 } phone ? [phone] : [];
         return new(listing.ContactPhone) { Phones = phones };
+    }
+
+    public async Task<Homeji.Application.DTOs.Chatbot.ChatbotSourceMatchDto> MatchAsync(
+        Homeji.Application.DTOs.AI.AiParsedSearchCriteriaDto criteria, int limit, CancellationToken cancellationToken)
+    {
+        const int pageSize = 50, maxPages = 20;
+        var listings = new List<RentalSourceListing>();
+        // Description-based amenity and accent-insensitive matching cannot run in SQL, so filter price there and the rest here.
+        var minPrice = criteria.BudgetBasis == "total" ? null : criteria.PriceMin;
+        for (var page = 1; page <= maxPages; page++)
+        {
+            var rows = await repository.SearchAsync(new RentalSourceSearchDto(null, null, minPrice, criteria.PriceMax, page, pageSize), cancellationToken);
+            listings.AddRange(rows);
+            if (rows.Count < pageSize) break;
+        }
+        return RentalSourceMatcher.Match(listings, criteria, limit);
     }
 
     private static RentalSourceListingDto ToDto(RentalSourceListing listing, bool details = false)

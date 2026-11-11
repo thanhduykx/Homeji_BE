@@ -30,6 +30,7 @@ public sealed class ChatbotService : IChatbotService
     private readonly Homeji.Application.IServices.Roommates.IRoommateDirectoryService? _roommates;
     private readonly IChatbotNearbyService? _nearby;
     private readonly Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? _subscriptions;
+    private readonly Homeji.Application.IServices.RentalPosts.IRentalSourceListingService? _sourceListings;
 
     public ChatbotService(
         UserContext userContext,
@@ -40,8 +41,10 @@ public sealed class ChatbotService : IChatbotService
         IChatbotFoodService food,
         IOptions<ChatbotOptions> options,
         TimeProvider timeProvider, IChatbotPostingAgent? postingAgent = null, IChatbotNearbyService? nearby = null, Homeji.Application.IServices.Roommates.IRoommateDirectoryService? roommates = null,
-        Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? subscriptions = null)
+        Homeji.Application.IRepositories.Subscriptions.IUserSubscriptionRepository? subscriptions = null,
+        Homeji.Application.IServices.RentalPosts.IRentalSourceListingService? sourceListings = null)
     {
+        _sourceListings = sourceListings;
         _userContext = userContext;
         _conversations = conversations;
         _aiClient = aiClient;
@@ -155,6 +158,7 @@ public sealed class ChatbotService : IChatbotService
         RentalDecisionResponseDto? rentalDecision = null;
         ChatbotFoodResponseDto? foodDiscovery = null;
         ChatbotNearbyDto? nearbyRooms = null;
+        ChatbotSourceMatchDto? sourceRooms = null;
         var nearbyQuery = ChatbotSessionContext.RequestsNearbyRooms(message);
         IReadOnlyList<Homeji.Application.DTOs.Roommates.RoommateDirectoryCandidateDto>? roommateCandidates = null;
         string assistantReply;
@@ -221,7 +225,7 @@ public sealed class ChatbotService : IChatbotService
         {
             foodDiscovery = await _food.SearchAsync(message, request.FoodContext ?? (request.Location is null ? null : new ChatbotFoodContextDto(request.Location.Latitude, request.Location.Longitude)), request.PreviousFoodCriteria, cancellationToken);
             assistantReply = foodDiscovery.Summary;
-            actions = [new ChatbotNavigationActionDto("food-menu", "Mở Chợ đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
+            actions = [new ChatbotNavigationActionDto("food-menu", "Mở mục Đồ ăn", "Xem thực đơn và tự chọn món", ChatbotNavigationActionKind.OpenSection, "marketplace:food")];
         }
         else if (selectionTask is not null)
         {
@@ -238,13 +242,28 @@ public sealed class ChatbotService : IChatbotService
         else
         {
             actions = ChatbotNavigationCatalog.FindActions(message, profile.Role);
-            searchUpdate = await BuildSearchUpdateAsync(conversation, message, request.PreviousCriteria, cancellationToken);
-            var rentalQuery = RentalSearchIntent.IsRentalQuery(message);
-            assistantReply = searchUpdate is not null
-                ? BuildGroundedReply(searchUpdate)
-                : rentalQuery
-                    ? "Mình chưa truy vấn được tin phòng lúc này. Bạn có thể dùng bộ lọc thông thường hoặc thử lại. Mình không có dữ liệu để giới thiệu một phòng cụ thể."
-                    : await GenerateReplyAsync(history, message, actions, cancellationToken);
+            var previousCriteria = PreviousCriteria(conversation, request.PreviousCriteria);
+            if (previousCriteria is not null && ChatbotResultFollowUp.IsFollowUp(message, previousCriteria))
+            {
+                assistantReply = await AnswerAboutListedRoomsAsync(history, message, previousCriteria, actions, cancellationToken);
+            }
+            else
+            {
+                var search = await BuildSearchUpdateAsync(conversation, message, previousCriteria, cancellationToken);
+                searchUpdate = search?.Result;
+                if (searchUpdate is not null)
+                {
+                    sourceRooms = await MatchSourceRoomsAsync(searchUpdate.Criteria, searchUpdate.Posts.Count, cancellationToken);
+                    if (sourceRooms is { } matched && matched.Total > matched.Rooms.Count)
+                        actions = [.. actions, new("all-rooms", "Xem toàn bộ danh sách phòng", "Mở danh sách và tự lọc thêm", ChatbotNavigationActionKind.Navigate, "/?section=listings&view=list")];
+                }
+                var rentalQuery = IsRoomSearch(message, previousCriteria);
+                assistantReply = searchUpdate is not null
+                    ? BuildGroundedReply(searchUpdate, sourceRooms, search!.Degraded)
+                    : rentalQuery
+                        ? "Mình chưa truy vấn được tin phòng lúc này. Bạn có thể dùng bộ lọc thông thường hoặc thử lại. Mình không có dữ liệu để giới thiệu một phòng cụ thể."
+                        : await GenerateReplyAsync(history, message, actions, cancellationToken);
+            }
         }
         if (agentResult is null) assistantReply = ChatbotActionClaims.WithoutUnverifiedPublishing(assistantReply);
         var assistantMessage = conversation.AddAssistantMessage(assistantReply, _timeProvider.GetUtcNow());
@@ -256,7 +275,7 @@ public sealed class ChatbotService : IChatbotService
             ChatbotMapper.ToMessageDto(userMessage),
             ChatbotMapper.ToMessageDto(assistantMessage),
             searchUpdate,
-            actions) { RoommateCandidates = roommateCandidates, RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = normalChatUpgrade || agentResult?.UpgradeRequired == true };
+            actions) { RoommateCandidates = roommateCandidates, RentalDecision = rentalDecision, FoodDiscovery = foodDiscovery, NearbyRooms = nearbyRooms, SourceRooms = sourceRooms, AgentDraft = agentResult?.Draft, AgentRequested = agentResult is not null && !agentResult.UpgradeRequired, UpgradeRequired = normalChatUpgrade || agentResult?.UpgradeRequired == true };
     }
 
     private static ChatbotNavigationActionDto ManualPostingAction(string? kind, Homeji.Domain.Enums.UserRole? role)
@@ -310,39 +329,120 @@ public sealed class ChatbotService : IChatbotService
         }
     }
 
-    private async Task<AiHighlightResponseDto?> BuildSearchUpdateAsync(
+    private sealed record SearchOutcome(AiHighlightResponseDto Result, bool Degraded);
+
+    private static AiParsedSearchCriteriaDto? PreviousCriteria(ChatConversation conversation, AiParsedSearchCriteriaDto? sessionCriteria)
+    {
+        if (conversation.SearchCriteriaJson is null) return sessionCriteria;
+        try
+        {
+            return JsonSerializer.Deserialize<AiParsedSearchCriteriaDto>(conversation.SearchCriteriaJson);
+        }
+        catch (JsonException)
+        {
+            return sessionCriteria;
+        }
+    }
+
+    private async Task<SearchOutcome?> BuildSearchUpdateAsync(
         ChatConversation conversation,
         string latestMessage,
-        AiParsedSearchCriteriaDto? sessionCriteria,
+        AiParsedSearchCriteriaDto? previous,
         CancellationToken cancellationToken)
     {
-        if (!RentalSearchIntent.IsRentalQuery(latestMessage))
+        if (!IsRoomSearch(latestMessage, previous))
         {
             return null;
         }
 
         try
         {
-            AiParsedSearchCriteriaDto? previous = sessionCriteria;
-            if (conversation.SearchCriteriaJson is not null)
-                previous = JsonSerializer.Deserialize<AiParsedSearchCriteriaDto>(conversation.SearchCriteriaJson);
-            var result = await _aiSearch.HighlightRentalPostsAsync(
-                new AiHighlightRequestDto(latestMessage, _options.SearchResultLimit, PreviousCriteria: previous), cancellationToken);
-            conversation.UpdateSearchCriteria(JsonSerializer.Serialize(result.Criteria));
-            return result;
+            SearchOutcome outcome;
+            try
+            {
+                outcome = new(await _aiSearch.HighlightRentalPostsAsync(
+                    new AiHighlightRequestDto(latestMessage, _options.SearchResultLimit, PreviousCriteria: previous), cancellationToken), false);
+            }
+            catch (Exception error) when (IsProviderFailure(error, cancellationToken))
+            {
+                // Budget, area and amenity wording still parse without the model, so search keeps working.
+                outcome = new(await _aiSearch.HighlightRentalPostsAsync(new AiHighlightRequestDto(latestMessage, _options.SearchResultLimit,
+                    Criteria: RentalSearchIntent.Apply(latestMessage, previous), PreviousCriteria: previous), cancellationToken), true);
+            }
+            conversation.UpdateSearchCriteria(JsonSerializer.Serialize(outcome.Result.Criteria));
+            return outcome;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception error) when (error is ExternalDependencyException or ExternalServiceUnavailableException or HttpRequestException or JsonException || (error is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        catch (Exception error) when (IsProviderFailure(error, cancellationToken))
         {
             // The conversational answer remains usable when the optional map update fails.
             return null;
         }
     }
 
-    private static string BuildGroundedReply(AiHighlightResponseDto result)
+    private static bool IsRoomSearch(string message, AiParsedSearchCriteriaDto? previous) =>
+        previous is null ? RentalSearchIntent.StartsRentalSearch(message) : RentalSearchIntent.IsRentalQuery(message);
+
+    private static bool IsProviderFailure(Exception error, CancellationToken cancellationToken) =>
+        error is ExternalDependencyException or ExternalServiceUnavailableException or HttpRequestException or JsonException
+        || (error is TaskCanceledException && !cancellationToken.IsCancellationRequested);
+
+    private async Task<ChatbotSourceMatchDto?> MatchSourceRoomsAsync(AiParsedSearchCriteriaDto criteria, int nativeCount, CancellationToken cancellationToken)
+    {
+        if (_sourceListings is null) return null;
+        var limit = Math.Max(3, _options.SearchResultLimit - nativeCount);
+        var match = await _sourceListings.MatchAsync(criteria, limit, cancellationToken);
+        return match.Rooms.Count > 0 ? match : null;
+    }
+
+    private async Task<string> AnswerAboutListedRoomsAsync(
+        IReadOnlyCollection<ChatbotMessageDto> history,
+        string message,
+        AiParsedSearchCriteriaDto criteria,
+        IReadOnlyCollection<ChatbotNavigationActionDto> actions,
+        CancellationToken cancellationToken)
+    {
+        if (ChatbotResultFollowUp.AsksForContact(message)) return ChatbotResultFollowUp.ContactReply;
+        AiHighlightResponseDto? native;
+        try
+        {
+            native = await _aiSearch.HighlightRentalPostsAsync(
+                new AiHighlightRequestDto(message, _options.SearchResultLimit, Criteria: criteria), cancellationToken);
+        }
+        catch (Exception error) when (IsProviderFailure(error, cancellationToken))
+        {
+            native = null;
+        }
+        var source = await MatchSourceRoomsAsync(criteria, native?.Posts.Count ?? 0, cancellationToken);
+        var facts = ChatbotResultFollowUp.BuildFacts(native, source);
+        if (facts.Length == 0)
+            return "Mình không còn thấy phòng nào theo điều kiện trước đó. Bạn nhắn lại khu vực và ngân sách để mình tìm lại nhé.";
+        try
+        {
+            return await _aiClient.GenerateGroundedReplyAsync(history, message, facts, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception error) when (IsProviderFailure(error, cancellationToken))
+        {
+            return ChatbotFallbackReply.Create(actions);
+        }
+    }
+
+    private static string BuildGroundedReply(AiHighlightResponseDto result, ChatbotSourceMatchDto? source, bool degraded)
+    {
+        var reply = BuildGroundedReplyCore(result, source);
+        return degraded
+            ? reply + "\n\nAI đang bận nên mình chỉ lọc theo ngân sách, diện tích, khu vực và tiện ích ghi rõ trong tin nhắn."
+            : reply;
+    }
+
+    private static string BuildGroundedReplyCore(AiHighlightResponseDto result, ChatbotSourceMatchDto? source)
     {
         if (result.Criteria.Unknown.Contains("feeUnits", StringComparer.Ordinal))
             return "Bạn đang giới hạn tổng chi phí cả phí. Tin hiện chưa xác nhận đầy đủ đơn vị điện/nước và các khoản thu, nên mình chưa thể bảo đảm phòng nằm trong ngân sách tổng. Nhập và xác nhận kịch bản chi phí của từng tin bên dưới, hoặc đổi sang ‘chỉ tiền thuê’.";
@@ -356,9 +456,21 @@ public sealed class ChatbotService : IChatbotService
             return "Bạn muốn diện tích bao nhiêu m²? Hãy nhập một mức hoặc khoảng diện tích hợp lệ, ví dụ ‘từ 20 đến 30 m²’.";
         if (result.Criteria.Unknown.Count > 0)
             return "Mình cần bạn làm rõ mức ngân sách hoặc khoảng giá. Với ‘rẻ hơn’, hãy cho mình trần giá mới, ví dụ ‘dưới 3 triệu’, để không tự thay đổi điều kiện của bạn.";
-        if (result.Posts.Count == 0)
+        var sourceTotal = source?.Total ?? 0;
+        var total = result.Posts.Count + sourceTotal;
+        if (total == 0)
             return "Chưa có tin công khai phù hợp các điều kiện này trong phạm vi Homeji. Bạn muốn nới điều kiện nào? Mình sẽ giữ ngân sách và yêu cầu hiện tại cho tới khi bạn sửa.";
-        return $"Tìm được {result.Posts.Count} tin công khai đáp ứng bộ lọc đã hiểu. Xem tiêu chí và các tin bên dưới, rồi xác nhận để áp dụng lên bản đồ. Giá và tiện ích lấy từ dữ liệu chủ tin, chưa đồng nghĩa Homeji đã xác minh hay phòng vẫn còn trống. Điểm phù hợp được tách khỏi ưu tiên thương mại.";
+        var shown = result.Posts.Count + (source?.Rooms.Count ?? 0);
+        var lines = new List<string> { shown < total ? $"Có {total} phòng khớp điều kiện của bạn, mình hiện trước {shown} phòng." : $"Có {total} phòng khớp điều kiện của bạn." };
+        if (sourceTotal > 0)
+        {
+            lines.Add(result.Criteria.Occupants.HasValue
+                ? "Giá và tiện ích lấy từ tin đăng. Tin từ nguồn công khai không ghi số chỗ trống, nên bạn cần hỏi người đăng về số người ở và tình trạng phòng."
+                : "Giá và tiện ích lấy từ tin đăng; bạn nên hỏi người đăng để chắc phòng còn trống.");
+            lines.Add("Bạn có thể hỏi tiếp, ví dụ “phòng nào rẻ nhất” hoặc “phòng 2 có máy lạnh không”.");
+        }
+        else lines.Add("Giá và tiện ích lấy từ dữ liệu chủ tin, chưa đồng nghĩa Homeji đã xác minh hay phòng vẫn còn trống. Điểm phù hợp được tách khỏi ưu tiên thương mại.");
+        return string.Join(' ', lines);
     }
 
     private async Task<ChatConversation> GetOwnedConversationAsync(

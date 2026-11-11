@@ -1,9 +1,11 @@
+using Homeji.Api.Caching;
 using Homeji.Application.DTOs.Payments;
 using Homeji.Application.DTOs.Subscriptions;
 using Homeji.Application.IServices.Subscriptions;
 using Homeji.Application.IServices.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace Homeji.Api.Controllers;
 
@@ -19,6 +21,7 @@ public sealed class SubscriptionsController : ControllerBase
     }
 
     [AllowAnonymous]
+    [OutputCache(PolicyName = PublicCachePolicies.Pricing)]
     [HttpGet("packages")]
     [ProducesResponseType<IReadOnlyList<SubscriptionPackageDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IReadOnlyList<SubscriptionPackageDto>>> GetPackages(

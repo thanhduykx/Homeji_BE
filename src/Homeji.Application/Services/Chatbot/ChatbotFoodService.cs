@@ -64,7 +64,7 @@ public sealed partial class ChatbotFoodService(IMarketplacePostService marketpla
                     post.Title, post.Price, post.Unit, post.AvailableQuantity, post.PreparationMinutes,
                     origin is null ? null : post.DistanceKm, post.UpdatedAt)).ToArray();
             return new(items.Length == 0 ? "empty" : "results", items.Length == 0
-                ? "Chưa có món đang bán khớp bộ lọc này trên Homeji. Bạn có thể đổi mốc, tăng bán kính hoặc xem toàn bộ Chợ đồ."
+                ? "Chưa có món đang bán khớp bộ lọc này trên Homeji. Bạn có thể đổi mốc, tăng bán kính hoặc xem toàn bộ Chợ Homeji."
                 : origin is null ? "Đây là một số món đang bán trên Homeji, theo tin cập nhật gần nhất. Chọn mốc nếu bạn muốn tìm gần mình."
                 : "Đây là các món đang bán trong bán kính đã chọn, xếp theo khoảng cách đường thẳng từ mốc của bạn.",
                 items, keyword, maxPrice, origin, nearby);
@@ -72,7 +72,7 @@ public sealed partial class ChatbotFoodService(IMarketplacePostService marketpla
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
         catch (Exception error) when (error is ExternalDependencyException or ExternalServiceUnavailableException or HttpRequestException or TaskCanceledException)
         {
-            return new("unavailable", "Chưa tải được món đang bán. Hãy thử lại hoặc mở Chợ đồ để xem thực đơn.", [], keyword, maxPrice, origin, nearby);
+            return new("unavailable", "Chưa tải được món đang bán. Hãy thử lại hoặc mở Chợ Homeji để xem thực đơn.", [], keyword, maxPrice, origin, nearby);
         }
     }
 

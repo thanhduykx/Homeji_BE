@@ -109,6 +109,24 @@ public sealed class RentalPostSearchTests
         await Assert.ThrowsAsync<NotFoundException>(() => service.CompareAsync(new CompareRentalPostsDto([first.Id, second.Id])));
     }
 
+    [Fact]
+    public async Task SearchAsync_GuestCanReadLaterPagesWithPublicVisibility()
+    {
+        var ownerId = Guid.NewGuid();
+        var posts = Enumerable.Range(0, 6).Select(_ => CreateActiveTransfer(ownerId)).ToArray();
+        var service = CreateComparisonService(null, posts);
+
+        var result = await service.SearchAsync(new RentalPostSearchDto(
+            null, null, null, null, null, null, null, null, null, [], Page: 2, PageSize: 4));
+
+        Assert.Equal(posts.Skip(4).Select(post => post.Id).Order(), result.Select(post => post.Id).Order());
+        Assert.All(result, post =>
+        {
+            Assert.Null(post.OwnerConsentContact);
+            Assert.Equal(10.812m, post.Latitude);
+        });
+    }
+
     private static RentalPostService CreateComparisonService(Guid? viewerId, IReadOnlyList<RentalPost> posts, IReadOnlyList<UserProfile>? owners = null)
     {
         var profiles = new MissingProfileRepository(owners);
@@ -232,7 +250,7 @@ public sealed class RentalPostSearchTests
         public Task<IReadOnlyList<RentalPost>> SearchActiveAsync(
             RentalPostSearchDto search,
             CancellationToken cancellationToken = default) =>
-            Task.FromResult<IReadOnlyList<RentalPost>>(posts ?? []);
+            Task.FromResult<IReadOnlyList<RentalPost>>((posts ?? []).Skip((search.Page - 1) * search.PageSize).Take(search.PageSize).ToArray());
 
         public Task<RentalPost?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();

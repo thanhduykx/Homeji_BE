@@ -1,3 +1,4 @@
+using Homeji.Api.Authentication;
 using Homeji.Api.Mappers;
 using Homeji.Api.RateLimiting;
 using Homeji.Api.Views.Accounts;
@@ -25,6 +26,7 @@ public sealed class AccountController : ControllerBase
 
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [IssueSessionCookies]
     [HttpPost("verify-signup-otp")]
     public async Task<ActionResult<AuthSessionDto>> VerifySignupOtp(
         [FromBody] SignupOtpDto request, CancellationToken cancellationToken) =>
@@ -51,6 +53,7 @@ public sealed class AccountController : ControllerBase
 
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [IssueSessionCookies]
     [HttpPost("register")]
     [ProducesResponseType<AuthSessionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
@@ -64,6 +67,7 @@ public sealed class AccountController : ControllerBase
 
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [IssueSessionCookies]
     [HttpPost("login")]
     [ProducesResponseType<AuthSessionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
@@ -119,6 +123,7 @@ public sealed class AccountController : ControllerBase
 
     [AllowAnonymous]
     [EnableRateLimiting(RateLimitingPolicyNames.PublicAuth)]
+    [IssueSessionCookies]
     [HttpPost("google/id-token")]
     [ProducesResponseType<AuthSessionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]

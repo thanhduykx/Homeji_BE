@@ -41,6 +41,17 @@ public static partial class RentalSearchIntent
     public static bool IsRentalQuery(string message) => !Services.Common.FoodSearchIntent.IsFoodTopic(message)
         && RentalTerms().IsMatch(Normalize(message));
 
+    /// <summary>
+    /// Starting a search takes a housing word or two supporting words. One word such as "UIT", "giá" or "người"
+    /// also appears in ordinary conversation; once a search is active it can refine the criteria.
+    /// </summary>
+    public static bool StartsRentalSearch(string message)
+    {
+        if (!IsRentalQuery(message)) return false;
+        var text = Normalize(message);
+        return HousingTerms().IsMatch(text) || RentalTerms().Matches(text).Select(match => match.Value).Distinct(StringComparer.Ordinal).Count() >= 2;
+    }
+
     public static bool IsKeywordClearCommand(string message) => Normalize(message).Trim() == "bo tu khoa";
 
     public static AiParsedSearchCriteriaDto Apply(string message, AiParsedSearchCriteriaDto? previous = null)
@@ -185,6 +196,8 @@ public static partial class RentalSearchIntent
 
     [GeneratedRegex(@"\b(phong|tro|thue|o ghep|ngan sach|gia|gan|bep|may lanh|dieu hoa|nuoc nong|binh nong lanh|re hon|nguoi|ca phi|diem den|tien thue|wifi|internet|thu cung|giu xe|wc rieng|ve sinh rieng|fpt|khu cong nghe cao|phut|di bo|o to|xe buyt|xe may|spkt|hcmute|uit|hcmut|hcmus|uel|hutech|dai hoc|truong|dien tich)\b", RegexOptions.CultureInvariant)]
     private static partial Regex RentalTerms();
+    [GeneratedRegex(@"\b(phong|tro|thue|o ghep|ngan sach|re hon|tien thue|ca phi|diem den|dien tich)\b", RegexOptions.CultureInvariant)]
+    private static partial Regex HousingTerms();
     [GeneratedRegex(@"(?<bound>duoi|toi da|khong qua|cao nhat|tu|tren)?\s*(?<amount>\d+(?:[.,]\d+)*)\s*(?<unit>trieu|tr|vnd|dong|nghin|ngan|k|d)\b", RegexOptions.CultureInvariant)]
     private static partial Regex Money();
     [GeneratedRegex(@"(?:tu\s+)?(?<min>\d+(?:[.,]\d+)*)\s*(?<minUnit>trieu|tr|vnd|dong|nghin|ngan|k|d)?\s*(?:den|toi|-)\s*(?<max>\d+(?:[.,]\d+)*)\s*(?<unit>trieu|tr|vnd|dong|nghin|ngan|k|d)\b", RegexOptions.CultureInvariant)]

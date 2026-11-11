@@ -1,4 +1,5 @@
 using Homeji.Api.Mappers;
+using Homeji.Api.Security;
 using Homeji.Api.Views.Chatbot;
 using Homeji.Application.DTOs.Chatbot;
 using Homeji.Application.IServices.Chatbot;
@@ -15,10 +16,15 @@ public sealed class ChatbotController : ControllerBase
     private readonly IChatbotService _chatbot;
     private readonly IChatbotPostingAgent _posting;
 
-    public ChatbotController(IChatbotService chatbot, IChatbotPostingAgent posting)
+    private readonly ChatbotRecaptcha _recaptcha;
+    private readonly ChatbotAbuseGate _gate;
+
+    public ChatbotController(IChatbotService chatbot, IChatbotPostingAgent posting, ChatbotRecaptcha recaptcha, ChatbotAbuseGate gate)
     {
         _chatbot = chatbot;
         _posting = posting;
+        _recaptcha = recaptcha;
+        _gate = gate;
     }
 
     [HttpGet("popup-config")]
@@ -27,7 +33,8 @@ public sealed class ChatbotController : ControllerBase
     public async Task<ActionResult<ChatbotPopupConfigDto>> GetPopupConfig(
         CancellationToken cancellationToken)
     {
-        return Ok(await _chatbot.GetPopupConfigAsync(cancellationToken));
+        var config = await _chatbot.GetPopupConfigAsync(cancellationToken);
+        return Ok(config with { RecaptchaSiteKey = _recaptcha.ScoreSiteKey });
     }
 
     [HttpGet("conversations")]
@@ -61,6 +68,9 @@ public sealed class ChatbotController : ControllerBase
         [FromBody] SendChatbotMessageViewModel request,
         CancellationToken cancellationToken)
     {
+        var problem = await CheckRecaptchaAsync(ChatbotRecaptcha.MessageAction, cancellationToken);
+        if (problem is not null) return problem;
+
         return Ok(await _chatbot.SendMessageAsync(ChatbotViewMapper.ToDto(request), cancellationToken));
     }
 
@@ -69,7 +79,42 @@ public sealed class ChatbotController : ControllerBase
     [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
     public async Task<IActionResult> Transcribe([FromBody] ChatbotTranscriptionDto request, CancellationToken cancellationToken)
     {
+        var problem = await CheckRecaptchaAsync(ChatbotRecaptcha.TranscriptionAction, cancellationToken);
+        if (problem is not null) return problem;
+
         return Ok(new { text = await _chatbot.TranscribeAsync(request, cancellationToken) });
+    }
+
+    private async Task<ObjectResult?> CheckRecaptchaAsync(string action, CancellationToken cancellationToken)
+    {
+        var decision = await _gate.CheckAsync(
+            RateLimitingExtensions.ResolveClientKey(HttpContext),
+            Request.Headers[ChatbotRecaptcha.TokenHeader].ToString(),
+            action,
+            cancellationToken);
+        return decision switch
+        {
+            ChatbotGateDecision.Allowed => null,
+            ChatbotGateDecision.ChallengeRequired => CaptchaRequired(),
+            ChatbotGateDecision.Rejected => Problem(
+                statusCode: StatusCodes.Status403Forbidden,
+                detail: "Không thể xác minh reCAPTCHA. Vui lòng thử lại."),
+            _ => Problem(
+                statusCode: StatusCodes.Status503ServiceUnavailable,
+                detail: "Dịch vụ xác minh reCAPTCHA tạm thời không khả dụng. Vui lòng thử lại."),
+        };
+    }
+
+    /// <summary>The frontend opens the checkbox with this key and sends the request again with its token.</summary>
+    private ObjectResult CaptchaRequired()
+    {
+        var problem = ProblemDetailsFactory.CreateProblemDetails(
+            HttpContext,
+            statusCode: StatusCodes.Status403Forbidden,
+            detail: "Bạn vừa gửi nhiều yêu cầu liên tiếp. Hãy xác minh để tiếp tục.");
+        problem.Extensions["code"] = "chatbot_captcha_required";
+        problem.Extensions["captchaSiteKey"] = _gate.ChallengeSiteKey;
+        return new ObjectResult(problem) { StatusCode = StatusCodes.Status403Forbidden };
     }
 
     [HttpPost("agent-drafts/{draftId:guid}/confirm")]

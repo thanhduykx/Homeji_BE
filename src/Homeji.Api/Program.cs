@@ -13,6 +13,7 @@ using Homeji.Application.Abstractions.Presence;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Health;
+using Homeji.Api.Caching;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
@@ -73,6 +74,9 @@ if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddSupabaseAuthentication(builder.Configuration);
+builder.Services.AddOptions<AuthCookieOptions>().BindConfiguration(AuthCookieOptions.SectionName);
+builder.Services.AddSingleton<SessionCookies>();
+builder.Services.AddScoped<Homeji.Application.IServices.Accounts.ISessionRotator, SessionRotator>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<VoiceCallRegistry>();
 builder.Services.AddHttpClient<VoiceIceService>(client => client.Timeout = TimeSpan.FromSeconds(10))
@@ -82,7 +86,18 @@ builder.Services.AddSingleton<IOnlineUserTracker, OnlineUserTracker>();
 builder.Services.AddSingleton<IUserSessionRevocationCache, MemoryUserSessionRevocationCache>();
 builder.Services.AddSingleton<IUserSessionRealtimePublisher, SignalRUserSessionPublisher>();
 builder.Services.AddSingleton<INotificationRealtimePublisher, SignalRNotificationPublisher>();
+builder.Services.AddSingleton<Homeji.Application.Abstractions.Security.ICspReportLog, CspReportLog>();
+builder.Services.AddOptions<ChatbotRecaptchaOptions>()
+    .BindConfiguration(ChatbotRecaptchaOptions.SectionName)
+    .Validate(options => options.IsValid(),
+        "Chatbot reCAPTCHA needs each site key with its secret, at least one allowed hostname, and a burst limit of 1-100 within 1-3600 seconds.")
+    .ValidateOnStart();
+builder.Services.AddHttpClient<ChatbotRecaptcha>(client => client.Timeout = TimeSpan.FromSeconds(5))
+    .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+builder.Services.AddSingleton<ChatbotBurstGuard>();
+builder.Services.AddScoped<ChatbotAbuseGate>();
 builder.Services.AddHomejiRateLimiting(builder.Configuration);
+builder.Services.AddPublicResponseCache();
 
 builder.Services.AddTrustedProxyHeaders(builder.Configuration);
 
@@ -151,6 +166,8 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<UserActivityMiddleware>();
+// Before the limiter: a cached answer costs almost nothing, so it does not use up a visitor's quota.
+app.UseOutputCache();
 app.UseRateLimiter();
 app.UseMiddleware<MediaAdmissionMiddleware>();
 

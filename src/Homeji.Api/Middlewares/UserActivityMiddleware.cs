@@ -56,6 +56,11 @@ public sealed class UserActivityMiddleware
     private static bool IsSuccessfulMutation(HttpContext context)
     {
         return context.Response.StatusCode is >= 200 and < 400
-            && context.Request.Method is "POST" or "PUT" or "PATCH" or "DELETE";
+            && context.Request.Method is "POST" or "PUT" or "PATCH" or "DELETE"
+            && context.GetEndpoint()?.Metadata.GetMetadata<SkipUserActivityAttribute>() is null;
     }
 }
+
+/// <summary>Marks requests the browser sends by itself, which are not something the user did.</summary>
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class SkipUserActivityAttribute : Attribute;

@@ -128,7 +128,27 @@ public sealed class ChatbotPostingAgent(ApplicationDbContext db, UserContext use
             await transaction.CommitAsync(cancellationToken);
         });
         return new(new(draft.Id, details, prepared.Select(file => $"data:{file.MimeType};base64,{file.Data}").ToArray(),
-            draft.ExpiresAt, null), false, "Mình đã soạn bản nháp đúng loại tin. Các mục chưa cung cấp cần bổ sung trong mẫu.  Kiểm tra ảnh, sửa thông tin và chọn Xác nhận đăng bài khi bạn đồng ý. Bản nháp có hiệu lực 1 giờ.");
+            draft.ExpiresAt, null), false, DraftReply(details, prepared.Count, now));
+    }
+
+    private static string DraftReply(AgentPostDetails details, int imageCount, DateTimeOffset now)
+    {
+        var kind = details.Kind switch
+        {
+            "rental" => "tin cho thuê",
+            "roomTransfer" => "tin nhượng phòng",
+            "roommate" => "tin tìm người ở ghép",
+            "wanted" => "tin tìm trọ",
+            "food" => "tin bán món ăn",
+            _ => "tin bán đồ cũ",
+        };
+        var minimumImages = details.Kind is "rental" or "roommate" or "roomTransfer" ? RentalPost.MinimumImageCountForSubmit : 1;
+        var missing = AgentPostBusinessRules.Missing(details, now, imageCount, minimumImages);
+        var opening = $"Mình đã soạn bản nháp {kind} “{details.Title}”. Chưa có gì được đăng.";
+        return missing.Count == 0
+            ? opening + "\n\nBản nháp đã đủ thông tin. Bạn kiểm tra lại rồi chọn Xác nhận đăng bài. Bản nháp có hiệu lực 1 giờ."
+            : opening + "\n\nTrước khi đăng, bạn cần:\n" + string.Join('\n', missing.Select(item => "- " + item))
+                + "\n\nBạn sửa trong mẫu hoặc nhắn thêm cho mình. Bản nháp có hiệu lực 1 giờ.";
     }
 
     public async Task<Guid> ConfirmAsync(Guid draftId, AgentPostDetails details, CancellationToken cancellationToken)

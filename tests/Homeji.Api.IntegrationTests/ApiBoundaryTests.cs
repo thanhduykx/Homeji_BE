@@ -34,6 +34,9 @@ public sealed class ApiBoundaryTests : IClassFixture<HomejiApiFactory>
     [Theory]
     [InlineData("https://homeji.onrender.com", true)]
     [InlineData("https://untrusted.example", false)]
+    [InlineData("http://localhost:3000", false)]
+    [InlineData("http://localhost:5173", false)]
+    [InlineData("http://localhost:5174", false)]
     public async Task CorsPreflight_OnlyAllowsConfiguredOrigins(string origin, bool allowed)
     {
         using var request = new HttpRequestMessage(HttpMethod.Options, "/api/profile/me");

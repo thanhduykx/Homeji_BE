@@ -250,17 +250,7 @@ public sealed class RentalPostService : IRentalPostService
             throw new RequestValidationException(new Dictionary<string, string[]> { ["propertyCategory"] = ["Chọn phòng trọ hoặc căn hộ."] });
         if (request.Ids?.Count > 10 || request.ExcludedAmenities?.Count > 20 || request.ExcludedAmenities?.Any(value => string.IsNullOrWhiteSpace(value) || value.Length > RentalPost.MaxAmenityCodeLength) == true || request.MinAvailableSlots is < 1 or > 20)
             throw new RequestValidationException(new Dictionary<string, string[]> { ["filters"] = ["Bộ lọc tin phòng không hợp lệ."] });
-        var search = request;
-        if (_userContext.TryGetUserId() is null)
-        {
-            search = request with
-            {
-                Page = 1,
-                PageSize = Math.Min(Math.Max(1, request.PageSize), 8),
-            };
-        }
-
-        var posts = await _posts.SearchActiveAsync(search, cancellationToken);
+        var posts = await _posts.SearchActiveAsync(request, cancellationToken);
         var now = _timeProvider.GetUtcNow();
 
         // Premium boost is best-effort: search must still work if subscriptions
@@ -306,7 +296,7 @@ public sealed class RentalPostService : IRentalPostService
             .ToArray();
 
         if (_userContext.TryGetUserId() is { } userId
-            && HasSearchCriteria(search)
+            && HasSearchCriteria(request)
             && await _profiles.GetByIdAsync(userId, cancellationToken) is not null)
         {
             try
@@ -318,7 +308,7 @@ public sealed class RentalPostService : IRentalPostService
                     "GET",
                     200,
                     UserActivityType.RentalSearch,
-                    details: JsonSerializer.Serialize(search),
+                    details: JsonSerializer.Serialize(request),
                     cancellationToken: cancellationToken);
             }
             catch (Exception)
