@@ -1,7 +1,7 @@
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
-namespace Homeji.Infrastructure.Repositories;
+namespace Homeji.Infrastructure.Common;
 
 internal static class FinancialTransaction
 {

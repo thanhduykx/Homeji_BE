@@ -24,7 +24,7 @@ public static class RentalCostCalculator
             if (rate <= 0 || unit == "unknown") { unknown.Add(label + ": chưa xác nhận đơn giá/đơn vị; 0 không có nghĩa miễn phí."); return 0; }
             return rate * (unit == "person" ? scenario.Occupants : unit is "kwh" or "m3" ? usage : 1);
         }
-        var priceBasis = ResolvePriceBasis(post.Type, ownerRole);
+        var priceBasis = post.IsImportedSource ? "unknown" : ResolvePriceBasis(post.Type, ownerRole);
         var hasRent = post.Price > 0;
         if (!hasRent) unknown.Add("Giá thuê chưa xác nhận; 0 không có nghĩa miễn phí.");
         var fees = Fee("Điện", post.ElectricityPrice, scenario.ElectricityUnit, scenario.ElectricityKwh, scenario.ElectricityFreeConfirmed)

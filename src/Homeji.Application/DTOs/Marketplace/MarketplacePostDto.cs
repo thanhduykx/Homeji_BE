@@ -25,4 +25,9 @@ public sealed record MarketplacePostDto(
     int ReservedQuantity,
     string Unit,
     int? PreparationMinutes,
-    bool IsSynthetic = false);
+    bool IsSynthetic = false,
+    decimal? EstimatedCost = null,
+    int DailyQuota = 1,
+    string? FreshnessBadge = null,
+    string? AllergenAlerts = null,
+    bool IsSamplePhoto = false);

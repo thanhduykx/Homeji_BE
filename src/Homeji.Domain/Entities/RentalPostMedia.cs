@@ -5,6 +5,7 @@ namespace Homeji.Domain.Entities;
 
 public sealed class RentalPostMedia
 {
+    public const string ImportedSourceBucket = "rental-source-import";
     public const int MaxBucketLength = 100;
     public const int MaxPathLength = 500;
 

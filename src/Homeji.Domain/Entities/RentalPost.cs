@@ -51,6 +51,7 @@ public sealed class RentalPost
 
     public string Description { get; private set; }
     public bool IsSynthetic { get; private set; }
+    public bool IsImportedSource => _media.Any(media => media.Bucket == RentalPostMedia.ImportedSourceBucket);
 
     public decimal Price { get; private set; }
 

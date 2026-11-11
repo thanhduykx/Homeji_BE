@@ -256,7 +256,7 @@ public sealed class RentalPostService : IRentalPostService
             search = request with
             {
                 Page = 1,
-                PageSize = Math.Min(Math.Max(1, request.PageSize), 3),
+                PageSize = Math.Min(Math.Max(1, request.PageSize), 8),
             };
         }
 

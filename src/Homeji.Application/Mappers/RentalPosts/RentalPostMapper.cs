@@ -42,7 +42,7 @@ public static class RentalPostMapper
             post.ModerationReason,
             post.CreatedAt,
             post.UpdatedAt,
-            IsSynthetic: post.IsSynthetic);
+            IsSynthetic: post.IsSynthetic) { IsImportedSource = post.IsImportedSource };
     }
 
     public static RentalPostSummaryDto ToSummaryDto(
@@ -76,7 +76,7 @@ public static class RentalPostMapper
             post.PassFee,
             post.OwnerConsentVerifiedAt.HasValue,
             includePrivateTransferReview ? post.OwnerConsentContact : null,
-            post.IsSynthetic);
+            post.IsSynthetic) { IsImportedSource = post.IsImportedSource };
     }
 
     private static RentalPostMediaDto ToDto(RentalPostMedia media)

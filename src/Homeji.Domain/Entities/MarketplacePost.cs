@@ -13,6 +13,11 @@ public sealed class MarketplacePost
     public const int MaxMediaCount = 10;
     public const int MaxUnitLength = 30;
     public const int MaxFoodStock = 100;
+    public const decimal MinimumFoodPrice = 10_000m;
+    public const int MinFoodPreparationMinutes = 5;
+    public const int MaxFoodPreparationMinutes = 120;
+    public const int MaxFreshnessBadgeLength = 50;
+    public const int MaxAllergenAlertsLength = 200;
 
     private readonly List<MarketplacePostMedia> _media = [];
 
@@ -30,7 +35,7 @@ public sealed class MarketplacePost
         string title,
         string description,
         decimal price,
-        string condition,
+        string? condition,
         string category,
         string address,
         decimal latitude,
@@ -41,7 +46,12 @@ public sealed class MarketplacePost
         MarketplaceListingType listingType = MarketplaceListingType.SecondHand,
         int availableQuantity = 1,
         string unit = "món",
-        int? preparationMinutes = null)
+        int? preparationMinutes = null,
+        decimal? estimatedCost = null,
+        int? dailyQuota = null,
+        string? freshnessBadge = null,
+        string? allergenAlerts = null,
+        bool isSamplePhoto = false)
     {
         if (sellerId == Guid.Empty)
         {
@@ -52,7 +62,7 @@ public sealed class MarketplacePost
         SellerId = sellerId;
         Status = MarketplacePostStatus.Active;
         SetDetails(title, description, price, condition, category, address, latitude, longitude, linkedRentalPostId,
-            listingType, availableQuantity, unit, preparationMinutes);
+            listingType, availableQuantity, unit, preparationMinutes, estimatedCost, dailyQuota, freshnessBadge, allergenAlerts, isSamplePhoto);
         ReplaceMedia(mediaUrls);
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -93,6 +103,16 @@ public sealed class MarketplacePost
 
     public int? PreparationMinutes { get; private set; }
 
+    public decimal? EstimatedCost { get; private set; }
+
+    public int DailyQuota { get; private set; }
+
+    public string? FreshnessBadge { get; private set; }
+
+    public string? AllergenAlerts { get; private set; }
+
+    public bool IsSamplePhoto { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -103,7 +123,7 @@ public sealed class MarketplacePost
         string title,
         string description,
         decimal price,
-        string condition,
+        string? condition,
         string category,
         string address,
         decimal latitude,
@@ -114,7 +134,12 @@ public sealed class MarketplacePost
         MarketplaceListingType listingType = MarketplaceListingType.SecondHand,
         int availableQuantity = 1,
         string unit = "món",
-        int? preparationMinutes = null)
+        int? preparationMinutes = null,
+        decimal? estimatedCost = null,
+        int? dailyQuota = null,
+        string? freshnessBadge = null,
+        string? allergenAlerts = null,
+        bool isSamplePhoto = false)
     {
         EnsureActive();
         if (ReservedQuantity > 0)
@@ -123,7 +148,7 @@ public sealed class MarketplacePost
         }
 
         SetDetails(title, description, price, condition, category, address, latitude, longitude, linkedRentalPostId,
-            listingType, availableQuantity, unit, preparationMinutes);
+            listingType, availableQuantity, unit, preparationMinutes, estimatedCost, dailyQuota, freshnessBadge, allergenAlerts, isSamplePhoto);
         ReplaceMedia(mediaUrls);
         UpdatedAt = updatedAt;
     }
@@ -198,11 +223,23 @@ public sealed class MarketplacePost
         UpdatedAt = updatedAt;
     }
 
+    public decimal CalculateSellerNetRevenue(decimal platformFeeRate = 0.10m) =>
+        Price * (1m - platformFeeRate);
+
+    public decimal? CalculateEstimatedProfit(decimal platformFeeRate = 0.10m) =>
+        EstimatedCost.HasValue ? CalculateSellerNetRevenue(platformFeeRate) - EstimatedCost.Value : null;
+
+    public decimal? CalculateMarginPercentage(decimal platformFeeRate = 0.10m)
+    {
+        var profit = CalculateEstimatedProfit(platformFeeRate);
+        return profit.HasValue && Price > 0 ? Math.Round((profit.Value / Price) * 100m, 2) : null;
+    }
+
     private void SetDetails(
         string title,
         string description,
         decimal price,
-        string condition,
+        string? condition,
         string category,
         string address,
         decimal latitude,
@@ -211,12 +248,36 @@ public sealed class MarketplacePost
         MarketplaceListingType listingType,
         int availableQuantity,
         string unit,
-        int? preparationMinutes)
+        int? preparationMinutes,
+        decimal? estimatedCost = null,
+        int? dailyQuota = null,
+        string? freshnessBadge = null,
+        string? allergenAlerts = null,
+        bool isSamplePhoto = false)
     {
         Title = NormalizeRequired(title, MaxTitleLength, nameof(Title));
         Description = NormalizeRequired(description, MaxDescriptionLength, nameof(Description));
         Price = price > 0 ? price : throw new DomainException("Giá sản phẩm phải lớn hơn 0.");
-        Condition = NormalizeRequired(condition, MaxConditionLength, nameof(Condition));
+
+        if (listingType == MarketplaceListingType.Food)
+        {
+            if (price < MinimumFoodPrice)
+            {
+                throw new DomainException($"Giá món ăn tối thiểu là {MinimumFoodPrice:0}đ.");
+            }
+
+            var trimmedCondition = condition?.Trim() ?? string.Empty;
+            if (trimmedCondition.Length > MaxConditionLength)
+            {
+                throw new DomainException($"Condition không được vượt quá {MaxConditionLength} ký tự.");
+            }
+            Condition = trimmedCondition;
+        }
+        else
+        {
+            Condition = NormalizeRequired(condition!, MaxConditionLength, nameof(Condition));
+        }
+
         Category = NormalizeRequired(category, MaxCategoryLength, nameof(Category));
         Address = NormalizeRequired(address, MaxAddressLength, nameof(Address));
         Latitude = ValidateCoordinate(latitude, -90, 90, nameof(Latitude));
@@ -233,15 +294,50 @@ public sealed class MarketplacePost
             throw new DomainException($"Available quantity must be between 1 and {maxStock}.");
         }
 
-        if (preparationMinutes is < 0 or > 240)
+        if (listingType == MarketplaceListingType.Food)
+        {
+            if (preparationMinutes.HasValue && preparationMinutes.Value is < MinFoodPreparationMinutes or > MaxFoodPreparationMinutes)
+            {
+                throw new DomainException($"Thời gian chuẩn bị món phải từ {MinFoodPreparationMinutes} đến {MaxFoodPreparationMinutes} phút.");
+            }
+        }
+        else if (preparationMinutes is < 0 or > 240)
         {
             throw new DomainException("Preparation time must be between 0 and 240 minutes.");
+        }
+
+        if (estimatedCost.HasValue && estimatedCost.Value < 0)
+        {
+            throw new DomainException("Giá vốn ước tính không được âm.");
+        }
+
+        var normalizedBadge = freshnessBadge?.Trim();
+        if (normalizedBadge?.Length > MaxFreshnessBadgeLength)
+        {
+            throw new DomainException($"Nhãn độ tươi không được vượt quá {MaxFreshnessBadgeLength} ký tự.");
+        }
+
+        var normalizedAllergens = allergenAlerts?.Trim();
+        if (normalizedAllergens?.Length > MaxAllergenAlertsLength)
+        {
+            throw new DomainException($"Cảnh báo dị ứng không được vượt quá {MaxAllergenAlertsLength} ký tự.");
+        }
+
+        var quota = dailyQuota ?? (listingType == MarketplaceListingType.Food ? Math.Max(availableQuantity, 1) : 1);
+        if (quota is < 1 or > MaxFoodStock)
+        {
+            throw new DomainException($"Daily quota must be between 1 and {MaxFoodStock}.");
         }
 
         ListingType = listingType;
         AvailableQuantity = availableQuantity;
         Unit = NormalizeRequired(unit, MaxUnitLength, nameof(Unit));
         PreparationMinutes = listingType == MarketplaceListingType.Food ? preparationMinutes : null;
+        EstimatedCost = estimatedCost;
+        DailyQuota = quota;
+        FreshnessBadge = string.IsNullOrEmpty(normalizedBadge) ? null : normalizedBadge;
+        AllergenAlerts = string.IsNullOrEmpty(normalizedAllergens) ? null : normalizedAllergens;
+        IsSamplePhoto = isSamplePhoto;
     }
 
     private void ReplaceMedia(IReadOnlyCollection<string> mediaUrls)

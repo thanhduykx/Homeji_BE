@@ -28,6 +28,11 @@ public sealed class MarketplacePostConfiguration : IEntityTypeConfiguration<Mark
         builder.Property(post => post.ReservedQuantity).HasColumnName("reserved_quantity").IsConcurrencyToken().IsRequired();
         builder.Property(post => post.Unit).HasColumnName("unit").HasMaxLength(MarketplacePost.MaxUnitLength).IsRequired();
         builder.Property(post => post.PreparationMinutes).HasColumnName("preparation_minutes");
+        builder.Ignore(post => post.EstimatedCost);
+        builder.Ignore(post => post.DailyQuota);
+        builder.Ignore(post => post.FreshnessBadge);
+        builder.Ignore(post => post.AllergenAlerts);
+        builder.Ignore(post => post.IsSamplePhoto);
         builder.Property(post => post.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(post => post.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.HasMany(post => post.Media)

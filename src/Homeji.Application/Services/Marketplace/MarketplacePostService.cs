@@ -109,7 +109,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.Title!,
             request.Description!,
             request.Price,
-            request.Condition!,
+            request.Condition,
             request.Category!,
             sellerLocation.Address,
             sellerLocation.Latitude,
@@ -120,7 +120,12 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.ListingType,
             request.AvailableQuantity,
             request.Unit ?? "món",
-            request.PreparationMinutes);
+            request.PreparationMinutes,
+            request.EstimatedCost,
+            request.DailyQuota,
+            request.FreshnessBadge,
+            request.AllergenAlerts,
+            request.IsSamplePhoto);
         await _marketplacePosts.AddAsync(post, cancellationToken);
         await _marketplacePosts.SaveChangesAsync(cancellationToken);
         return ToDto(post, seller, null, null);
@@ -140,7 +145,7 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.Title!,
             request.Description!,
             request.Price,
-            request.Condition!,
+            request.Condition,
             request.Category!,
             sellerLocation.Address,
             sellerLocation.Latitude,
@@ -151,7 +156,12 @@ public sealed class MarketplacePostService : IMarketplacePostService
             request.ListingType,
             request.AvailableQuantity,
             request.Unit ?? "món",
-            request.PreparationMinutes);
+            request.PreparationMinutes,
+            request.EstimatedCost,
+            request.DailyQuota,
+            request.FreshnessBadge,
+            request.AllergenAlerts,
+            request.IsSamplePhoto);
         await _marketplacePosts.SaveChangesAsync(cancellationToken);
         var seller = await _profiles.GetByIdAsync(post.SellerId, cancellationToken);
         return ToDto(post, seller, null, null);
@@ -185,7 +195,15 @@ public sealed class MarketplacePostService : IMarketplacePostService
         var errors = new Dictionary<string, string[]>();
         AddRequiredError(errors, "title", request.Title, MarketplacePost.MaxTitleLength);
         AddRequiredError(errors, "description", request.Description, MarketplacePost.MaxDescriptionLength);
-        AddRequiredError(errors, "condition", request.Condition, MarketplacePost.MaxConditionLength);
+        if (request.ListingType != MarketplaceListingType.Food)
+        {
+            AddRequiredError(errors, "condition", request.Condition, MarketplacePost.MaxConditionLength);
+        }
+        else if (!string.IsNullOrWhiteSpace(request.Condition) && request.Condition.Length > MarketplacePost.MaxConditionLength)
+        {
+            errors["condition"] = [$"Condition không được vượt quá {MarketplacePost.MaxConditionLength} ký tự."];
+        }
+
         AddRequiredError(errors, "category", request.Category, MarketplacePost.MaxCategoryLength);
         AddRequiredError(errors, "address", request.Address, MarketplacePost.MaxAddressLength);
         if (request.Price <= 0 || decimal.Truncate(request.Price) != request.Price)
@@ -205,9 +223,36 @@ public sealed class MarketplacePostService : IMarketplacePostService
         }
 
         AddRequiredError(errors, "unit", request.Unit, MarketplacePost.MaxUnitLength);
-        if (request.PreparationMinutes is < 0 or > 240)
+        if (request.ListingType == MarketplaceListingType.Food)
+        {
+            if (request.PreparationMinutes is < 5 or > 120)
+            {
+                errors["preparationMinutes"] = ["Preparation time must be between 5 and 120 minutes."];
+            }
+        }
+        else if (request.PreparationMinutes is < 0 or > 240)
         {
             errors["preparationMinutes"] = ["Preparation time must be between 0 and 240 minutes."];
+        }
+
+        if (request.EstimatedCost is < 0)
+        {
+            errors["estimatedCost"] = ["Estimated cost cannot be negative."];
+        }
+
+        if (request.DailyQuota.HasValue && (request.DailyQuota.Value < 1 || request.DailyQuota.Value > MarketplacePost.MaxFoodStock))
+        {
+            errors["dailyQuota"] = [$"Daily quota must be between 1 and {MarketplacePost.MaxFoodStock}."];
+        }
+
+        if (request.FreshnessBadge?.Length > MarketplacePost.MaxFreshnessBadgeLength)
+        {
+            errors["freshnessBadge"] = [$"Freshness badge cannot exceed {MarketplacePost.MaxFreshnessBadgeLength} characters."];
+        }
+
+        if (request.AllergenAlerts?.Length > MarketplacePost.MaxAllergenAlertsLength)
+        {
+            errors["allergenAlerts"] = [$"Allergen alerts cannot exceed {MarketplacePost.MaxAllergenAlertsLength} characters."];
         }
 
         if (request.Latitude is < -90 or > 90)
@@ -401,7 +446,12 @@ public sealed class MarketplacePostService : IMarketplacePostService
             post.ReservedQuantity,
             post.Unit,
             post.PreparationMinutes,
-            post.IsSynthetic);
+            post.IsSynthetic,
+            post.EstimatedCost,
+            post.DailyQuota,
+            post.FreshnessBadge,
+            post.AllergenAlerts,
+            post.IsSamplePhoto);
     }
 
     private static decimal CalculateDistanceKm(decimal lat1, decimal lon1, decimal lat2, decimal lon2)

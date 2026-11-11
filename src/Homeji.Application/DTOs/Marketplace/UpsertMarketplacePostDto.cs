@@ -14,4 +14,9 @@ public sealed record UpsertMarketplacePostDto(
     Homeji.Domain.Enums.MarketplaceListingType ListingType = Homeji.Domain.Enums.MarketplaceListingType.SecondHand,
     int AvailableQuantity = 1,
     string? Unit = "món",
-    int? PreparationMinutes = null);
+    int? PreparationMinutes = null,
+    decimal? EstimatedCost = null,
+    int? DailyQuota = null,
+    string? FreshnessBadge = null,
+    string? AllergenAlerts = null,
+    bool IsSamplePhoto = false);
