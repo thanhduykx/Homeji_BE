@@ -26,7 +26,9 @@ public sealed class ApplicationDbContextFactory : IDesignTimeDbContextFactory<Ap
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseNpgsql(
                 connectionString,
-                npgsqlOptions => npgsqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName))
+                npgsqlOptions => npgsqlOptions
+                    .MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)
+                    .MigrationsHistoryTable("__EFMigrationsHistory", "public"))
             .Options;
 
         return new ApplicationDbContext(options);

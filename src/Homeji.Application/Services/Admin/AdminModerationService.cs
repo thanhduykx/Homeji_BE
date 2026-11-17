@@ -30,6 +30,7 @@ public sealed class AdminModerationService : IAdminModerationService
 {
     private readonly UserContext _userContext;
     private readonly IRentalPostRepository _posts;
+    private readonly IRentalPublicationStore _rentalPublications;
     private readonly IReportRepository _reports;
     private readonly INotificationRepository _notifications;
     private readonly TimeProvider _timeProvider;
@@ -48,6 +49,7 @@ public sealed class AdminModerationService : IAdminModerationService
     public AdminModerationService(
         UserContext userContext,
         IRentalPostRepository posts,
+        IRentalPublicationStore rentalPublications,
         IReportRepository reports,
         INotificationRepository notifications,
         ISavedPostRepository savedPosts,
@@ -65,6 +67,7 @@ public sealed class AdminModerationService : IAdminModerationService
     {
         _userContext = userContext;
         _posts = posts;
+        _rentalPublications = rentalPublications;
         _reports = reports;
         _notifications = notifications;
         _savedPosts = savedPosts;
@@ -322,7 +325,7 @@ public sealed class AdminModerationService : IAdminModerationService
             await _notifications.AddAsync(matched, cancellationToken);
         }
 
-        await _posts.SaveChangesAsync(cancellationToken);
+        await _rentalPublications.SaveApprovalAsync(post, cancellationToken);
         foreach (var item in notifications)
         {
             await _realtimePublisher.PublishAsync(item, cancellationToken);

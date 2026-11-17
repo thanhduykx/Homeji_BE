@@ -29,7 +29,7 @@ public sealed class MaintenanceAnnouncementDatabaseTests
         var store = new MaintenanceAnnouncements(db, clock);
         var request = new MaintenanceAnnouncementRequestDto("Bảo trì thanh toán", "Nâng cấp hệ thống thanh toán.", now.AddHours(1), now.AddHours(2));
         AdminModerationService Service(Guid userId) => new(new UserContext(new CurrentUser(userId), profiles),
-            null!, null!, new NotificationRepository(db), null!, profiles, new OfflineUsers(), null!, null!, null!, null!, null!, null!, clock, new Realtime(), store);
+            null!, null!, null!, new NotificationRepository(db), null!, profiles, new OfflineUsers(), null!, null!, null!, null!, null!, null!, clock, new Realtime(), store);
         await Assert.ThrowsAsync<ForbiddenAccessException>(() => Service(renter).SendMaintenanceAnnouncementAsync(request));
         await Assert.ThrowsAsync<RequestValidationException>(() => Service(admin).SendMaintenanceAnnouncementAsync(request with { ScheduledStartAt = now.AddHours(-2), ScheduledEndAt = now.AddHours(-1) }));
         var delivered = await Service(admin).SendMaintenanceAnnouncementAsync(request);

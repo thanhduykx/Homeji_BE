@@ -13,7 +13,9 @@ using Homeji.Application.Abstractions.Presence;
 using Homeji.Infrastructure;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.Health;
+using Homeji.Infrastructure.Messaging;
 using Homeji.Api.Caching;
+using Homeji.Api.Observability;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
@@ -53,6 +55,7 @@ builder.Services.AddOptions<PaymentRedirectOptions>()
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHomejiTelemetry(builder.Configuration, builder.Environment);
 if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
 {
     builder.Services.AddHostedService<ReceiptEmailWorker>();
@@ -63,6 +66,14 @@ if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
     builder.Services.AddHostedService<MarketplaceOrderExpirationWorker>();
     builder.Services.AddHostedService<PaymentExpirationWorker>();
     builder.Services.AddHostedService<AiListingModerationWorker>();
+    if (builder.Configuration.IsRentalPublicationWorkerEnabled())
+    {
+        builder.Services.AddHostedService<RentalPublicationWorker>();
+    }
+    if (builder.Configuration.IsRentalPublicationAnalyticsEnabled())
+    {
+        builder.Services.AddHostedService<RentalPublicationAnalyticsWorker>();
+    }
     // Legacy seed repairs must be explicitly enabled; startup must preserve edits
     // made by users and imports rather than rewriting their titles or locations.
     if (builder.Configuration.GetValue("LegacyData:NormalizeLocationsOnStartup", false))

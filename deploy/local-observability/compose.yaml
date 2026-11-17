@@ -1,0 +1,27 @@
+name: homeji-local-observability
+
+services:
+  grafana:
+    image: grafana/otel-lgtm:0.39.0
+    ports:
+      - "127.0.0.1:13001:3000"
+      - "127.0.0.1:14318:4318"
+    volumes:
+      - ./grafana-dashboards.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/homeji.yaml:ro
+      - ./grafana-homeji.json:/otel-lgtm/homeji-dashboards/homeji.json:ro
+
+  kafka:
+    image: apache/kafka:4.4.0
+    profiles: [kafka]
+    ports:
+      - "127.0.0.1:19092:29092"
+    environment:
+      KAFKA_NODE_ID: "1"
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,HOST://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,HOST://127.0.0.1:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
