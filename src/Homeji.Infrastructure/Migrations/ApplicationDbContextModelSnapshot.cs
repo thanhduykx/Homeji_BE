@@ -2695,6 +2695,67 @@ namespace Homeji.Infrastructure.Migrations
                     b.ToTable("signup_verification_challenges", "homeji");
                 });
 
+            modelBuilder.Entity("Homeji.Infrastructure.Messaging.RentalPublication", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("AvailableAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("available_at");
+
+                    b.Property<Guid?>("LeaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("lease_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("published_at");
+
+                    b.Property<Guid>("RentalPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rental_post_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AvailableAt", "Id")
+                        .HasDatabaseName("ix_rental_publications_available")
+                        .HasFilter("published_at IS NULL");
+
+                    b.ToTable("rental_publications", "homeji");
+                });
+
+            modelBuilder.Entity("Homeji.Infrastructure.Messaging.RentalPublicationFact", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("RentalPostId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("rental_post_id");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_rental_publication_facts_occurred");
+
+                    b.ToTable("rental_publication_facts", "homeji");
+                });
+
             modelBuilder.Entity("Homeji.Domain.Entities.AdminReportExport", b =>
                 {
                     b.HasOne("Homeji.Domain.Entities.UserProfile", null)

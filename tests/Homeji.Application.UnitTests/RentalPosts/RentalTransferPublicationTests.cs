@@ -126,6 +126,9 @@ public sealed class RentalTransferPublicationTests
             if (parameter.ParameterType == typeof(UserContext)) return (object)context;
             if (parameter.ParameterType == typeof(TimeProvider)) return new Clock();
             if (parameter.ParameterType == typeof(IRentalPostRepository)) return posts;
+            if (parameter.ParameterType == typeof(IRentalPublicationStore))
+                return Stub<IRentalPublicationStore>((method, _) => method.Name == nameof(IRentalPublicationStore.SaveApprovalAsync)
+                    ? Save() : throw new InvalidOperationException(method.Name));
             if (parameter.ParameterType == typeof(IUserProfileRepository)) return profiles;
             if (parameter.ParameterType == typeof(ContentModerationService)) return moderation;
             if (parameter.ParameterType == typeof(INotificationRepository))

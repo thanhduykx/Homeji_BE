@@ -160,6 +160,8 @@ Local Swagger sẽ nằm tại:
 http://localhost:<port>/swagger
 ```
 
+Cách chạy Kafka, Grafana và kiểm kê sự kiện nằm trong [runbook local](deploy/local-observability/README.md). Có thể chạy cả stack trên [Kubernetes bằng kind](deploy/kubernetes/README.md).
+
 ## API chính
 
 Account/Auth:

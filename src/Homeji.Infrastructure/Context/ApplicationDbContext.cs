@@ -1,4 +1,5 @@
 using Homeji.Domain.Entities;
+using Homeji.Infrastructure.Messaging;
 using Microsoft.EntityFrameworkCore;
 
 namespace Homeji.Infrastructure.Context;
@@ -13,6 +14,7 @@ public sealed class ApplicationDbContext : DbContext
     public DbSet<RoommateProfile> RoommateProfiles => Set<RoommateProfile>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<RentalPost> RentalPosts => Set<RentalPost>();
+    internal DbSet<RentalPublication> RentalPublications => Set<RentalPublication>();
     public DbSet<RentalSourceListing> RentalSourceListings => Set<RentalSourceListing>();
     public DbSet<FoodSourcePlace> FoodSourcePlaces => Set<FoodSourcePlace>();
     public DbSet<RentalPostMedia> RentalPostMedia => Set<RentalPostMedia>();

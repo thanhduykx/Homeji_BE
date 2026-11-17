@@ -33,6 +33,7 @@ using Homeji.Application.Services.Subscriptions;
 using Homeji.Application.Services.Marketplace;
 using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.External;
+using Homeji.Infrastructure.Messaging;
 using Homeji.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -81,6 +82,7 @@ public static class DependencyInjection
                 npgsqlOptions =>
                 {
                     npgsqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                    npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "public");
                     npgsqlOptions.EnableRetryOnFailure(
                         maxRetryCount: 5,
                         maxRetryDelay: TimeSpan.FromSeconds(10),
@@ -93,6 +95,7 @@ public static class DependencyInjection
         services.AddScoped<Homeji.Application.IRepositories.Roommates.IRoommateDirectoryRepository, RoommateDirectoryRepository>();
         services.AddScoped<IAccountEmailRepository, AccountEmailRepository>();
         services.AddScoped<IRentalPostRepository, RentalPostRepository>();
+        services.AddRentalPublicationMessaging(configuration);
         services.AddScoped<IPublicRentalCatalog, PublicRentalCatalog>();
         services.AddScoped<IRentalSourceListingRepository, RentalSourceListingRepository>();
         services.AddScoped<IFoodSourcePlaceRepository, FoodSourcePlaceRepository>();

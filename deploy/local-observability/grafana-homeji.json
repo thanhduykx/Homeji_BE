@@ -1,0 +1,77 @@
+{
+  "uid": "homeji-backend-local",
+  "title": "Homeji Backend",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-15m", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request theo route",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count{job=\"homeji-api\"}[2m]))", "legendFormat": "{{http_route}}" }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 2,
+      "title": "Độ trễ p95 theo route",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{job=\"homeji-api\"}[2m])))", "legendFormat": "{{http_route}}" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 3,
+      "title": "Tỷ lệ HTTP 5xx",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "(sum(rate(http_server_request_duration_seconds_count{job=\"homeji-api\",http_response_status_code=~\"5..\"}[2m])) or 0 * sum(rate(http_server_request_duration_seconds_count{job=\"homeji-api\"}[2m]))) / (sum(rate(http_server_request_duration_seconds_count{job=\"homeji-api\"}[2m])) > 0)" }],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "id": 4,
+      "title": "Lượt AI Search trong 5 phút",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(increase(homeji_ai_search_requests_total{job=\"homeji-api\"}[5m]))" }]
+    },
+    {
+      "id": 5,
+      "title": "Sự kiện tin đăng gửi Kafka",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(homeji_rental_publications_published_total{job=\"homeji-api\"}[5m]))", "legendFormat": "Đã xác nhận" },
+        { "refId": "B", "expr": "sum(increase(homeji_rental_publications_publish_failures_total{job=\"homeji-api\"}[5m]))", "legendFormat": "Lần gửi lỗi" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Độ trễ p95 từ duyệt tin đến Kafka",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (rate(homeji_rental_publications_publish_delay_seconds_bucket{job=\"homeji-api\"}[5m])))" }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 7,
+      "title": "Consumer thống kê tin đăng",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "refId": "A", "expr": "sum(increase(homeji_rental_publications_analytics_recorded_total{job=\"homeji-api\"}[5m]))", "legendFormat": "Đã ghi" },
+        { "refId": "B", "expr": "sum(increase(homeji_rental_publications_analytics_replayed_total{job=\"homeji-api\"}[5m]))", "legendFormat": "Phát lại" },
+        { "refId": "C", "expr": "sum(increase(homeji_rental_publications_analytics_invalid_total{job=\"homeji-api\"}[5m]))", "legendFormat": "Sai định dạng" },
+        { "refId": "D", "expr": "sum(increase(homeji_rental_publications_analytics_failures_total{job=\"homeji-api\"}[5m]))", "legendFormat": "Lỗi xử lý" }
+      ]
+    }
+  ]
+}
