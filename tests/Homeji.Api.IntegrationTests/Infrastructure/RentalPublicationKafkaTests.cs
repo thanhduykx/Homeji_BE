@@ -186,9 +186,9 @@ public sealed class RentalPublicationKafkaTests
             builder.UseSetting("Kafka:RentalPublications:Enabled", "true");
             builder.UseSetting("Kafka:RentalPublications:BootstrapServers", kafka);
             builder.UseSetting("Kafka:RentalPublications:Topic", topic);
+            builder.UseSetting("Kafka:RentalPublications:AnalyticsEnabled", analyticsGroup is null ? "false" : "true");
             if (analyticsGroup is not null)
             {
-                builder.UseSetting("Kafka:RentalPublications:AnalyticsEnabled", "true");
                 builder.UseSetting("Kafka:RentalPublications:AnalyticsGroupId", analyticsGroup);
             }
             builder.ConfigureTestServices(services =>

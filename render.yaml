@@ -31,6 +31,12 @@ services:
         sync: false
       - key: Database__ApplyMigrationsOnStartup
         value: "true"
+      - key: Kafka__RentalPublications__Enabled
+        value: "true"
+      - key: Kafka__RentalPublications__AnalyticsEnabled
+        value: "true"
+      - key: Telemetry__Enabled
+        value: "true"
       - key: ConnectionStrings__DefaultConnection
         sync: false
       - key: Ai__Gemini__ApiKey

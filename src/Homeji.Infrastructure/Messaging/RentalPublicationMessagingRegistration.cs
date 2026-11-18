@@ -10,10 +10,13 @@ namespace Homeji.Infrastructure.Messaging;
 public static class RentalPublicationMessagingRegistration
 {
     public static bool IsRentalPublicationWorkerEnabled(this IConfiguration configuration) =>
-        configuration.GetValue<bool>($"{RentalPublicationKafkaOptions.Section}:Enabled");
+        configuration.GetValue($"{RentalPublicationKafkaOptions.Section}:Enabled", true);
 
     public static bool IsRentalPublicationAnalyticsEnabled(this IConfiguration configuration) =>
-        configuration.GetValue<bool>($"{RentalPublicationKafkaOptions.Section}:AnalyticsEnabled");
+        configuration.GetValue($"{RentalPublicationKafkaOptions.Section}:AnalyticsEnabled", true);
+
+    public static bool HasRentalPublicationKafkaBroker(this IConfiguration configuration) =>
+        !string.IsNullOrWhiteSpace(configuration[$"{RentalPublicationKafkaOptions.Section}:BootstrapServers"]);
 
     internal static IServiceCollection AddRentalPublicationMessaging(this IServiceCollection services, IConfiguration configuration)
     {
