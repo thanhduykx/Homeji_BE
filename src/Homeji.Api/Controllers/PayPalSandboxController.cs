@@ -28,6 +28,40 @@ public sealed class PayPalSandboxController(
         CancellationToken cancellationToken) =>
         await CanUseAsync(user, paypal, cancellationToken) ? NoContent() : NotFound();
 
+    [HttpGet("wallets")]
+    public async Task<IActionResult> GetWallets(
+        [FromServices] UserContext user,
+        [FromServices] IPayPalSandboxClient paypal,
+        CancellationToken cancellationToken)
+    {
+        if (!await CanUseAsync(user, paypal, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var googlePay = IsWalletEnabled("google-pay");
+        var applePay = IsWalletEnabled("apple-pay");
+        return googlePay || applePay ? Ok(new { clientId = paypal.ClientId, googlePay, applePay }) : NoContent();
+    }
+
+    [HttpPost("wallets/{wallet}/orders")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    public async Task<IActionResult> CreateWalletOrder(
+        string wallet,
+        [FromServices] UserContext user,
+        [FromServices] IPayPalSandboxClient paypal,
+        CancellationToken cancellationToken)
+    {
+        if (!IsWalletEnabled(wallet) || !await CanUseAsync(user, paypal, cancellationToken))
+        {
+            return NotFound();
+        }
+
+        var orderId = await paypal.CreateWalletOrderAsync(cancellationToken);
+        var ticket = CreateProtector(user.GetRequiredUserId()).Protect($"{wallet}:{orderId}", TimeSpan.FromHours(1));
+        return Ok(new { orderId, ticket });
+    }
+
     [HttpPost("orders")]
     [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
     public async Task<IActionResult> Create(
@@ -74,8 +108,29 @@ public sealed class PayPalSandboxController(
                 detail: "Đơn PayPal Sandbox đã hết hạn hoặc không thuộc tài khoản của bạn.");
         }
 
-        return Ok(await paypal.CaptureAsync(orderId, cancellationToken));
+        string? wallet = null;
+        var separator = orderId.IndexOf(':');
+        if (separator >= 0)
+        {
+            wallet = orderId[..separator];
+            orderId = orderId[(separator + 1)..];
+            if (!IsWalletEnabled(wallet))
+            {
+                return NotFound();
+            }
+        }
+
+        return Ok(await paypal.CaptureAsync(orderId, cancellationToken, wallet));
     }
+
+    private bool IsWalletEnabled(string wallet) => wallet switch
+    {
+        "google-pay" => settings.Value.GooglePayEnabled,
+        "apple-pay" => settings.Value.ApplePayEnabled
+            && Uri.TryCreate(settings.Value.FrontendOrigin, UriKind.Absolute, out var origin)
+            && origin.Scheme == Uri.UriSchemeHttps && !origin.IsLoopback,
+        _ => false,
+    };
 
     private async Task<bool> CanUseAsync(
         UserContext user, IPayPalSandboxClient paypal, CancellationToken cancellationToken)

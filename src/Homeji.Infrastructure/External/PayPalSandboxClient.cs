@@ -24,22 +24,17 @@ internal sealed class PayPalSandboxClient(HttpClient http, IOptions<PayPalSandbo
     private const string Amount = "1.00";
     private readonly PayPalSandboxCredentials _credentials = settings.Value;
 
+    public string ClientId => _credentials.ClientId;
     public bool IsConfigured => !string.IsNullOrWhiteSpace(_credentials.ClientId)
         && !string.IsNullOrWhiteSpace(_credentials.ClientSecret);
 
     public async Task<(string OrderId, Uri ApprovalUrl)> CreateAsync(
         Uri returnUrl, Uri cancelUrl, CancellationToken cancellationToken)
     {
-        var token = await GetTokenAsync(cancellationToken);
-        using var request = OrderRequest(HttpMethod.Post, "v2/checkout/orders", token);
-        request.Headers.Add("PayPal-Request-Id", Guid.NewGuid().ToString());
-        request.Content = JsonContent.Create(new
+        var order = await CreateOrderAsync(new
         {
             intent = "CAPTURE",
-            purchase_units = new[]
-            {
-                new { description = "Homeji Sandbox", amount = new { currency_code = Currency, value = Amount } },
-            },
+            purchase_units = PurchaseUnits(),
             payment_source = new
             {
                 paypal = new
@@ -53,13 +48,9 @@ internal sealed class PayPalSandboxClient(HttpClient http, IOptions<PayPalSandbo
                     },
                 },
             },
-        });
-
-        using var response = await SendAsync(request, cancellationToken);
-        var order = await ReadAsync<Order>(response, cancellationToken);
+        }, cancellationToken);
         var approval = order.Links?.FirstOrDefault(link => link.Rel is "payer-action" or "approve");
-        if (!IsOrderId(order.Id)
-            || !Uri.TryCreate(approval?.Href, UriKind.Absolute, out var url)
+        if (!Uri.TryCreate(approval?.Href, UriKind.Absolute, out var url)
             || url.Scheme != Uri.UriSchemeHttps || url.Host != "www.sandbox.paypal.com"
             || !url.IsDefaultPort || !string.IsNullOrEmpty(url.UserInfo))
         {
@@ -69,7 +60,30 @@ internal sealed class PayPalSandboxClient(HttpClient http, IOptions<PayPalSandbo
         return (order.Id!, url);
     }
 
-    public async Task<PayPalSandboxCapture> CaptureAsync(string orderId, CancellationToken cancellationToken)
+    public async Task<string> CreateWalletOrderAsync(CancellationToken cancellationToken) =>
+        (await CreateOrderAsync(new
+        {
+            intent = "CAPTURE",
+            purchase_units = PurchaseUnits(),
+            application_context = new { shipping_preference = "NO_SHIPPING" },
+        }, cancellationToken)).Id!;
+
+    private static object[] PurchaseUnits() =>
+        [new { description = "Homeji Sandbox", amount = new { currency_code = Currency, value = Amount } }];
+
+    private async Task<Order> CreateOrderAsync<T>(T body, CancellationToken cancellationToken)
+    {
+        var token = await GetTokenAsync(cancellationToken);
+        using var request = OrderRequest(HttpMethod.Post, "v2/checkout/orders", token);
+        request.Headers.Add("PayPal-Request-Id", Guid.NewGuid().ToString());
+        request.Content = JsonContent.Create(body);
+        using var response = await SendAsync(request, cancellationToken);
+        var order = await ReadAsync<Order>(response, cancellationToken);
+        return IsOrderId(order.Id) ? order : throw ProviderError();
+    }
+
+    public async Task<PayPalSandboxCapture> CaptureAsync(
+        string orderId, CancellationToken cancellationToken, string? wallet = null)
     {
         if (!IsOrderId(orderId))
         {
@@ -78,6 +92,36 @@ internal sealed class PayPalSandboxClient(HttpClient http, IOptions<PayPalSandbo
 
         var token = await GetTokenAsync(cancellationToken);
         var orderPath = $"v2/checkout/orders/{orderId}";
+        if (wallet is not null)
+        {
+            var current = await GetOrderAsync(orderPath, token, cancellationToken);
+            if (current.Id != orderId)
+            {
+                throw ProviderError();
+            }
+
+            if (current.Status is not ("APPROVED" or "COMPLETED"))
+            {
+                return new("unconfirmed", null);
+            }
+
+            if (!(wallet switch
+            {
+                "apple-pay" => current.PaymentSource?.ApplePay is not null,
+                "google-pay" => current.PaymentSource?.GooglePay is { } googlePay
+                    && CanCaptureGooglePay(googlePay.Card?.AuthenticationResult),
+                _ => false,
+            }))
+            {
+                return new("failed", null);
+            }
+
+            if (current.Status == "COMPLETED")
+            {
+                return ReadCapture(current, orderId);
+            }
+        }
+
         using var request = OrderRequest(HttpMethod.Post, $"{orderPath}/capture", token);
         request.Headers.Add("PayPal-Request-Id", $"capture-{orderId}");
         request.Headers.Add("Prefer", "return=representation");
@@ -88,15 +132,29 @@ internal sealed class PayPalSandboxClient(HttpClient http, IOptions<PayPalSandbo
         if (response.StatusCode == HttpStatusCode.UnprocessableEntity)
         {
             // An earlier capture can succeed even when Homeji never receives its response.
-            using var lookup = OrderRequest(HttpMethod.Get, orderPath, token);
-            using var current = await SendAsync(lookup, cancellationToken);
-            order = await ReadAsync<Order>(current, cancellationToken);
+            order = await GetOrderAsync(orderPath, token, cancellationToken);
         }
         else
         {
             order = await ReadAsync<Order>(response, cancellationToken);
         }
 
+        return ReadCapture(order, orderId);
+    }
+
+    private async Task<Order> GetOrderAsync(string orderPath, string token, CancellationToken cancellationToken)
+    {
+        using var request = OrderRequest(HttpMethod.Get, orderPath, token);
+        using var response = await SendAsync(request, cancellationToken);
+        return await ReadAsync<Order>(response, cancellationToken);
+    }
+
+    private static bool CanCaptureGooglePay(AuthenticationResult? authentication) => authentication is
+        null or { LiabilityShift: "POSSIBLE" }
+        or { LiabilityShift: "NO", ThreeDSecure: { EnrollmentStatus: "N" or "U" or "B", AuthenticationStatus: null } };
+
+    private static PayPalSandboxCapture ReadCapture(Order order, string orderId)
+    {
         if (order.Id != orderId)
         {
             throw ProviderError();
@@ -187,7 +245,19 @@ internal sealed class PayPalSandboxClient(HttpClient http, IOptions<PayPalSandbo
 
     private sealed record OAuthToken([property: JsonPropertyName("access_token")] string? AccessToken);
     private sealed record Order(string? Id, string? Status, Link[]? Links,
-        [property: JsonPropertyName("purchase_units")] PurchaseUnit[]? PurchaseUnits);
+        [property: JsonPropertyName("purchase_units")] PurchaseUnit[]? PurchaseUnits,
+        [property: JsonPropertyName("payment_source")] PaymentSource? PaymentSource);
+    private sealed record PaymentSource(
+        [property: JsonPropertyName("apple_pay")] object? ApplePay,
+        [property: JsonPropertyName("google_pay")] GooglePay? GooglePay);
+    private sealed record GooglePay(Card? Card);
+    private sealed record Card([property: JsonPropertyName("authentication_result")] AuthenticationResult? AuthenticationResult);
+    private sealed record AuthenticationResult(
+        [property: JsonPropertyName("liability_shift")] string? LiabilityShift,
+        [property: JsonPropertyName("three_d_secure")] ThreeDSecure? ThreeDSecure);
+    private sealed record ThreeDSecure(
+        [property: JsonPropertyName("enrollment_status")] string? EnrollmentStatus,
+        [property: JsonPropertyName("authentication_status")] string? AuthenticationStatus);
     private sealed record Link(string? Rel, string? Href);
     private sealed record PurchaseUnit(Payments? Payments);
     private sealed record Payments(Capture[]? Captures);

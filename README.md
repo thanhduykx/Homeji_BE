@@ -85,6 +85,15 @@ npm run dev -- --port 5173 --strictPort
 
 Để thử trên Render production, đặt bốn biến trên ở dịch vụ backend `homeji-be`, dùng app PayPal **Sandbox** và đặt `FrontendOrigin` thành origin HTTPS thực tế của frontend. Giữ môi trường API là Production. Homeji chỉ hiển thị và cho phép dùng luồng thử với tài khoản quản trị viên. Có thể tắt luồng bằng cách đặt `Enabled` thành `false`.
 
+#### Google Pay và Apple Pay trong Sandbox
+
+1. Trong [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/), chọn **Sandbox → Apps & Credentials → app đang dùng → Features**. Bật từng phương thức trên app đủ điều kiện. Luồng thử dùng người mua Sandbox ở Mỹ và USD.
+2. Với **Google Pay**, đặt `Payments__PayPalSandbox__GooglePayEnabled=true` ở API. Dùng thiết bị tương thích và [thẻ thử của Google](https://developers.google.com/pay/api/web/guides/resources/test-card-suite).
+3. Với **Apple Pay**, dùng đúng hostname HTTPS công khai đang cấu hình trong `FrontendOrigin`. Đặt tệp liên kết domain **Sandbox** do PayPal cung cấp trong `public/.well-known/` của frontend trước khi build; khi triển khai, đường dẫn `/.well-known/apple-developer-merchantid-domain-association` phải trả về tệp gốc, không chuyển hướng hoặc trả HTML của SPA. Đăng ký đúng hostname trên PayPal rồi đặt `Payments__PayPalSandbox__ApplePayEnabled=true` ở API. Dùng Safari trên thiết bị có [Apple Pay Sandbox](https://developer.apple.com/apple-pay/sandbox-testing/) và thẻ thử. Localhost không dùng để xác thực domain Apple Pay trong luồng này.
+4. Khởi động lại API sau khi đổi biến. Mở `/payments/sandbox`, thử từng ví và kiểm tra mã giao dịch trên trang khớp bản ghi trong PayPal Sandbox. Nút ví chỉ xuất hiện khi SDK nhận diện đủ điều kiện. Nếu PayPal chưa trả kết quả cuối, dùng **Kiểm tra lại giao dịch ví** trong cùng trang.
+
+Hai cờ mặc định tắt, độc lập với nhau. Checkout này không nhận VND và không dùng để thu tiền thật. Tài liệu PayPal: [Google Pay](https://developer.paypal.com/v5/google-pay/integrate/), [Apple Pay](https://developer.paypal.com/v5/apple-pay/integrate/).
+
 ### reCAPTCHA cho chatbot
 
 Chatbot chỉ hỏi xác minh khi một người gửi dồn dập. Đặt các biến môi trường trên máy chủ API:

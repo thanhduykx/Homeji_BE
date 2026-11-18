@@ -53,6 +53,62 @@ public sealed class PayPalSandboxTests
         Assert.Equal(expected == "completed" ? "CAPTUREID" : null, capture.CaptureId);
     }
 
+    [Theory]
+    [InlineData("google-pay", "APPROVED", """{"google_pay":{"card":{"authentication_result":{"liability_shift":"POSSIBLE"}}}}""", "completed", 1)]
+    [InlineData("google-pay", "APPROVED", """{"google_pay":{"card":{"authentication_result":{"liability_shift":"NO","three_d_secure":{"enrollment_status":"Y","authentication_status":"N"}}}}}""", "failed", 0)]
+    [InlineData("google-pay", "PAYER_ACTION_REQUIRED", """{"google_pay":{}}""", "unconfirmed", 0)]
+    [InlineData("google-pay", "APPROVED", """{"paypal":{}}""", "failed", 0)]
+    [InlineData("apple-pay", "APPROVED", """{"apple_pay":{}}""", "completed", 1)]
+    [InlineData("apple-pay", "COMPLETED", """{"apple_pay":{}}""", "completed", 0)]
+    public async Task Wallet_capture_checks_provider_approval_and_funding_source(
+        string wallet, string orderStatus, string paymentSource, string expected, int posts)
+    {
+        using var handler = new SandboxHandler("USD", "1.00", "COMPLETED",
+            walletLookup: (orderStatus, paymentSource));
+        using var http = CreateHttp(handler);
+        var client = new PayPalSandboxClient(http, Credentials);
+
+        Assert.Equal(expected, (await client.CaptureAsync(OrderId, default, wallet)).Status);
+        Assert.Equal(1, handler.OrderLookups);
+        Assert.Equal(posts, handler.CaptureKeys.Count);
+    }
+
+    [Fact]
+    public async Task Wallet_creation_respects_feature_settings_and_issues_an_owner_bound_ticket()
+    {
+        using var handler = new SandboxHandler("USD", "1.00", "COMPLETED",
+            walletLookup: ("APPROVED", """{"google_pay":{}}"""));
+        using var http = CreateHttp(handler);
+        var client = new PayPalSandboxClient(http, Credentials);
+        var owner = new UserContext(new CurrentUser(Guid.NewGuid()), null!);
+        var otherUser = new UserContext(new CurrentUser(Guid.NewGuid()), null!);
+        var controller = new PayPalSandboxController(
+            new HostingEnvironment { EnvironmentName = Environments.Development },
+            Options.Create(new PayPalSandboxOptions
+            {
+                Enabled = true, GooglePayEnabled = true, ApplePayEnabled = true,
+            }),
+            new EphemeralDataProtectionProvider());
+
+        var config = JsonSerializer.SerializeToElement(
+            Assert.IsType<OkObjectResult>(await controller.GetWallets(owner, client, default)).Value);
+        Assert.Equal(Credentials.Value.ClientId, config.GetProperty("clientId").GetString());
+        Assert.True(config.GetProperty("googlePay").GetBoolean());
+        Assert.False(config.GetProperty("applePay").GetBoolean()); // Apple Pay needs a registered public HTTPS domain.
+        Assert.False(config.TryGetProperty("clientSecret", out _));
+        Assert.IsType<NotFoundResult>(await controller.CreateWalletOrder("apple-pay", owner, client, default));
+        Assert.IsType<NotFoundResult>(await controller.CreateWalletOrder("paypal", owner, client, default));
+
+        var created = Assert.IsType<OkObjectResult>(await controller.CreateWalletOrder("google-pay", owner, client, default));
+        var order = JsonSerializer.SerializeToElement(created.Value);
+        Assert.Equal(OrderId, order.GetProperty("orderId").GetString());
+        var captureRequest = new PayPalSandboxController.CaptureRequest { Ticket = order.GetProperty("ticket").GetString()! };
+        Assert.Equal(404, Assert.IsType<ObjectResult>(await controller.Capture(captureRequest, otherUser, client, default)).StatusCode);
+        Assert.Empty(handler.CaptureKeys);
+        var capture = Assert.IsType<OkObjectResult>(await controller.Capture(captureRequest, owner, client, default));
+        Assert.Equal(new PayPalSandboxCapture("completed", "CAPTUREID"), capture.Value);
+    }
+
     [Fact]
     public async Task Ticket_is_bound_to_the_buyer_and_capture_retry_is_idempotent()
     {
@@ -111,6 +167,7 @@ public sealed class PayPalSandboxTests
         if (!allowed)
         {
             Assert.IsType<NotFoundResult>(availability);
+            Assert.IsType<NotFoundResult>(await controller.GetWallets(user, client, default));
             Assert.IsType<NotFoundResult>(create);
             Assert.IsType<NotFoundResult>(await controller.Capture(new(), user, client, default));
             Assert.Empty(handler.CaptureKeys);
@@ -118,6 +175,7 @@ public sealed class PayPalSandboxTests
         }
 
         Assert.IsType<NoContentResult>(availability);
+        Assert.IsType<NoContentResult>(await controller.GetWallets(user, client, default));
         var order = JsonSerializer.SerializeToElement(Assert.IsType<OkObjectResult>(create).Value);
         var request = new PayPalSandboxController.CaptureRequest { Ticket = order.GetProperty("ticket").GetString()! };
         var captured = Assert.IsType<OkObjectResult>(await controller.Capture(request, user, client, default));
@@ -130,7 +188,8 @@ public sealed class PayPalSandboxTests
     private sealed class CurrentUser(Guid id) : ICurrentUser { public Guid? UserId => id; }
 
     private sealed class SandboxHandler(
-        string currency, string amount, string status, string frontendOrigin = "http://localhost:5173") : HttpMessageHandler
+        string currency, string amount, string status, string frontendOrigin = "http://localhost:5173",
+        (string Status, string PaymentSource)? walletLookup = null) : HttpMessageHandler
     {
         public List<string> CaptureKeys { get; } = [];
         public int OrderLookups { get; private set; }
@@ -152,6 +211,13 @@ public sealed class PayPalSandboxTests
                 var expected = body.RootElement.GetProperty("purchase_units")[0].GetProperty("amount");
                 Assert.Equal("USD", expected.GetProperty("currency_code").GetString());
                 Assert.Equal("1.00", expected.GetProperty("value").GetString());
+                if (walletLookup is not null)
+                {
+                    Assert.False(body.RootElement.TryGetProperty("payment_source", out _));
+                    Assert.Equal("NO_SHIPPING",
+                        body.RootElement.GetProperty("application_context").GetProperty("shipping_preference").GetString());
+                    return JsonResponse($$"""{"id":"{{OrderId}}","status":"CREATED"}""");
+                }
                 var experience = body.RootElement.GetProperty("payment_source").GetProperty("paypal").GetProperty("experience_context");
                 Assert.Equal(frontendOrigin + "/payments/sandbox?paypal=return", experience.GetProperty("return_url").GetString());
                 Assert.Equal(frontendOrigin + "/payments/sandbox?paypal=cancel", experience.GetProperty("cancel_url").GetString());
@@ -171,6 +237,13 @@ public sealed class PayPalSandboxTests
             {
                 Assert.Equal($"/v2/checkout/orders/{OrderId}", request.RequestUri.AbsolutePath);
                 OrderLookups++;
+                if (walletLookup is { } walletOrder)
+                {
+                    var units = walletOrder.Status == "COMPLETED"
+                        ? $$$"""[{"payments":{"captures":[{"id":"CAPTUREID","status":"COMPLETED","amount":{"currency_code":"{{{currency}}}","value":"{{{amount}}}"}}]}}]"""
+                        : "[]";
+                    return JsonResponse($$"""{"id":"{{OrderId}}","status":"{{walletOrder.Status}}","payment_source":{{walletOrder.PaymentSource}},"purchase_units":{{units}}}""");
+                }
             }
 
             return JsonResponse($$$"""{"id":"{{{OrderId}}}","status":"COMPLETED","purchase_units":[{"payments":{"captures":[{"id":"CAPTUREID","status":"{{{status}}}","amount":{"currency_code":"{{{currency}}}","value":"{{{amount}}}"}}]}}]}""");
