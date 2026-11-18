@@ -6,8 +6,8 @@ internal sealed class RentalPublicationKafkaOptions
 {
     public const string Section = "Kafka:RentalPublications";
 
-    public bool Enabled { get; set; }
-    public bool AnalyticsEnabled { get; set; }
+    public bool Enabled { get; set; } = true;
+    public bool AnalyticsEnabled { get; set; } = true;
     public string AnalyticsGroupId { get; set; } = "homeji.rental-publications.analytics.v1";
     public string? BootstrapServers { get; set; }
     public string Topic { get; set; } = "homeji.rental-publications.v1";
@@ -15,9 +15,10 @@ internal sealed class RentalPublicationKafkaOptions
     public SaslMechanism? SaslMechanism { get; set; }
     public string? SaslUsername { get; set; }
     public string? SaslPassword { get; set; }
+    public bool HasBroker => !string.IsNullOrWhiteSpace(BootstrapServers);
 
-    public bool IsValid() => (!Enabled && !AnalyticsEnabled) ||
-        (!string.IsNullOrWhiteSpace(BootstrapServers) && Topic.Length is > 0 and <= 249 &&
+    public bool IsValid() => (!Enabled && !AnalyticsEnabled) || !HasBroker ||
+        (Topic.Length is > 0 and <= 249 &&
          Topic is not "." and not ".." &&
          Topic.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or '-') &&
          (!AnalyticsEnabled || (!string.IsNullOrWhiteSpace(AnalyticsGroupId) && AnalyticsGroupId.Length <= 255)) &&
