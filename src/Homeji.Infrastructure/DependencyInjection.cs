@@ -180,6 +180,26 @@ public static class DependencyInjection
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
         services.Configure<PayPalSandboxCredentials>(configuration.GetSection("Payments:PayPalSandbox"));
+        services.Configure<PayPalOptions>(configuration.GetSection(PayPalOptions.SectionName));
+        services.PostConfigure<PayPalOptions>(options =>
+        {
+            var sandbox = configuration.GetSection("Payments:PayPalSandbox");
+            if (string.IsNullOrWhiteSpace(options.ClientId))
+            {
+                options.ClientId = sandbox["ClientId"] ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(options.ClientSecret))
+            {
+                options.ClientSecret = sandbox["ClientSecret"] ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(configuration[$"{PayPalOptions.SectionName}:FrontendOrigin"])
+                && !string.IsNullOrWhiteSpace(sandbox["FrontendOrigin"]))
+            {
+                options.FrontendOrigin = sandbox["FrontendOrigin"]!;
+            }
+        });
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
         services.AddOptions<MarketplaceFinanceOptions>()
             .Bind(configuration.GetSection(MarketplaceFinanceOptions.SectionName))
@@ -201,6 +221,16 @@ public static class DependencyInjection
         services.AddHttpClient<ISignupOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPasswordRecoveryOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
+        services.AddHttpClient<IPayPalExchangeRateService, PayPalExchangeRateService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(4);
+            client.MaxResponseContentBufferSize = 256 * 1024;
+        });
+        services.AddHttpClient<IPayPalPaymentService, PayPalPaymentService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.MaxResponseContentBufferSize = 256 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient<IPayPalSandboxClient, PayPalSandboxClient>(client =>
         {
             client.BaseAddress = new Uri("https://api-m.sandbox.paypal.com/");

@@ -54,3 +54,17 @@ services:
         sync: false
       - key: Payments__PayPalSandbox__ClientSecret
         sync: false
+      - key: Payments__PayPal__Enabled
+        value: "true"
+      - key: Payments__PayPal__Mode
+        value: Sandbox
+      - key: Payments__PayPal__GooglePayEnabled
+        value: "true"
+      - key: Payments__PayPal__ApplePayEnabled
+        value: "true"
+      - key: Payments__PayPal__FrontendOrigin
+        value: https://homeji.onrender.com
+      - key: Payments__PayPal__ClientId
+        sync: false
+      - key: Payments__PayPal__ClientSecret
+        sync: false

@@ -65,4 +65,16 @@ public sealed class SubscriptionsController : ControllerBase
     {
         return Ok(await _subscriptions.CreatePremiumPayOsPaymentAsync(packageCode, expectedAmount, cancellationToken));
     }
+
+    [HttpPost("premium/{packageCode}/paypal/create")]
+    [ProducesResponseType<PayPalPaymentResponseDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<PayPalPaymentResponseDto>> CreatePremiumPayPalPayment(
+        string packageCode,
+        [FromQuery] decimal? expectedAmount,
+        [FromServices] IPayPalPaymentService payPalPayments,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await payPalPayments.CreatePremiumPaymentAsync(packageCode, expectedAmount, cancellationToken));
+    }
 }

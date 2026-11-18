@@ -159,6 +159,95 @@ public sealed class PaymentsController : ControllerBase
             });
     }
 
+    [HttpGet("paypal/quote")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<PayPalCheckoutConfigDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayPalCheckoutConfigDto>> GetPayPalQuote(
+        [FromQuery] decimal? amount,
+        [FromServices] IPayPalPaymentService payPalPayments,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await payPalPayments.GetConfigAndQuoteAsync(amount, cancellationToken));
+    }
+
+    [HttpPost("paypal/create")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    [ProducesResponseType<PayPalPaymentResponseDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayPalPaymentResponseDto>> CreatePayPalPayment(
+        [FromBody] CreatePayPalPaymentDto request,
+        [FromServices] IPayPalPaymentService payPalPayments,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await payPalPayments.CreateWalletTopUpAsync(request, cancellationToken));
+    }
+
+    [HttpGet("{paymentId:guid}/paypal/wallets")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [ProducesResponseType<PayPalCheckoutConfigDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayPalCheckoutConfigDto>> GetPayPalPaymentWallets(
+        Guid paymentId,
+        [FromServices] IPayPalPaymentService payPalPayments,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await payPalPayments.GetPaymentWalletsAsync(paymentId, cancellationToken));
+    }
+
+    [HttpPost("{paymentId:guid}/paypal/wallets/{wallet}/orders")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    [ProducesResponseType<PayPalWalletOrderDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PayPalWalletOrderDto>> CreatePayPalWalletOrder(
+        Guid paymentId,
+        string wallet,
+        [FromServices] IPayPalPaymentService payPalPayments,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await payPalPayments.CreatePaymentWalletOrderAsync(paymentId, wallet, cancellationToken));
+    }
+
+    [HttpPost("{paymentId:guid}/paypal/capture")]
+    [EnableRateLimiting(RateLimitingPolicyNames.CostlyOperations)]
+    [ProducesResponseType<PaymentDto>(StatusCodes.Status200OK)]
+    public async Task<ActionResult<PaymentDto>> CapturePayPalPayment(
+        Guid paymentId,
+        [FromBody] CapturePayPalPaymentDto? request,
+        [FromServices] IPayPalPaymentService payPalPayments,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await payPalPayments.CapturePaymentAsync(paymentId, request ?? new(), cancellationToken));
+    }
+
+    [AllowAnonymous]
+    [HttpGet("paypal/return")]
+    public IActionResult PayPalReturn(
+        [FromQuery] string? orderCode,
+        [FromQuery] string? token)
+    {
+        return RedirectToFrontend(
+            "paypal",
+            orderCode,
+            new Dictionary<string, string?>
+            {
+                ["token"] = token,
+            });
+    }
+
+    [AllowAnonymous]
+    [HttpGet("paypal/cancel")]
+    public IActionResult PayPalCancel(
+        [FromQuery] string? orderCode,
+        [FromQuery] string? token)
+    {
+        return RedirectToFrontend(
+            "paypal",
+            orderCode,
+            new Dictionary<string, string?>
+            {
+                ["token"] = token,
+                ["cancel"] = "true",
+                ["providerStatus"] = "CANCELLED",
+            });
+    }
+
     private RedirectResult RedirectToFrontend(
         string provider,
         string? orderCode,
