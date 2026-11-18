@@ -15,7 +15,9 @@ using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Subscriptions;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Homeji.Infrastructure.Context;
 using Homeji.Infrastructure.External;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Homeji.Api.IntegrationTests.Infrastructure;
@@ -234,13 +236,36 @@ public sealed class PayPalPaymentServiceTests
         Assert.Equal(PaymentStatus.Failed, store.Payments[0].Status);
     }
 
+    [Fact]
+    public async Task Create_premium_payment_wraps_transaction_in_retrying_execution_strategy()
+    {
+        var userId = Guid.NewGuid();
+        var store = new InMemoryStore(userId);
+        var dbOptions = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseNpgsql(
+                "Host=127.0.0.1;Port=59999;Database=homeji_missing;Username=homeji;Password=homeji",
+                npgsql => npgsql.EnableRetryOnFailure(1, TimeSpan.FromMilliseconds(1), null))
+            .Options;
+        await using var dbContext = new ApplicationDbContext(dbOptions);
+        using var http = new HttpClient(new PayPalApiHandler("api-m.paypal.com", "www.paypal.com"));
+        var service = CreateService(http, store, userId, mode: "Live", dbContext: dbContext);
+
+        var ex = await Assert.ThrowsAnyAsync<Exception>(() =>
+            service.CreatePremiumPaymentAsync("PREMIUM_MONTHLY", 99_000m));
+
+        Assert.IsNotType<InvalidOperationException>(ex);
+        Assert.DoesNotContain("does not support user-initiated transactions", ex.Message, StringComparison.Ordinal);
+        Assert.Equal("RetryLimitExceededException", ex.GetType().Name);
+    }
+
     private static PayPalPaymentService CreateService(
         HttpClient http,
         InMemoryStore store,
         Guid userId,
         string mode = "Sandbox",
         string frontendOrigin = "http://localhost:5173",
-        string clientId = "fixture-client-id")
+        string clientId = "fixture-client-id",
+        ApplicationDbContext? dbContext = null)
     {
         var clock = new FixedClock(DateTimeOffset.Parse("2026-11-18T02:00:00Z", CultureInfo.InvariantCulture));
         var options = Options.Create(new PayPalOptions
@@ -337,7 +362,8 @@ public sealed class PayPalPaymentServiceTests
             exchangeRateService,
             options,
             Options.Create(new PremiumSubscriptionOptions()),
-            clock);
+            clock,
+            dbContext: dbContext);
 
         Task AddPaymentAsync(PaymentTransaction payment)
         {

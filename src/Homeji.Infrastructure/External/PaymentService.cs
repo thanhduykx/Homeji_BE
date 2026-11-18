@@ -15,6 +15,7 @@ using Homeji.Application.Services.Common;
 using Homeji.Application.Services.Subscriptions;
 using Homeji.Domain.Entities;
 using Homeji.Domain.Enums;
+using Homeji.Infrastructure.Common;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -643,42 +644,39 @@ public sealed class PaymentService : IPaymentService
             return;
         }
 
-        var userId = payment.UserId;
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var lockKey = userId.ToString("N");
-        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-            cancellationToken);
-
-        await _payments.CancelOverdueAsync(now, userId, cancellationToken);
-
-        // Recheck personalized campaign eligibility under the same account lock. A request
-        // may have read the discounted catalog before another payment consumed the offer.
-        if (_pricing is not null)
+        await FinancialTransaction.ExecuteAsync(_dbContext, payment.UserId, async () =>
         {
-            var currentPlan = await GetPremiumPlanAsync(payment.PackageCode, cancellationToken);
-            if (currentPlan.Price != payment.Amount)
+            var userId = payment.UserId;
+            await _payments.CancelOverdueAsync(now, userId, cancellationToken);
+
+            // Recheck personalized campaign eligibility under the same account lock. A request
+            // may have read the discounted catalog before another payment consumed the offer.
+            if (_pricing is not null)
             {
-                throw Validation("expectedAmount", currentPlan.OfferUsed
-                    ? "Bạn đã dùng ưu đãi của đợt này. Bạn vẫn có thể gia hạn với giá thường; hãy tải lại bảng giá để tiếp tục."
-                    : "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
+                var currentPlan = await GetPremiumPlanAsync(payment.PackageCode, cancellationToken);
+                if (currentPlan.Price != payment.Amount)
+                {
+                    throw Validation("expectedAmount", currentPlan.OfferUsed
+                        ? "Bạn đã dùng ưu đãi của đợt này. Bạn vẫn có thể gia hạn với giá thường; hãy tải lại bảng giá để tiếp tục."
+                        : "Giá gói đã thay đổi. Vui lòng tải lại và xác nhận giá mới.");
+                }
             }
-        }
 
-        var hasPending = await _dbContext.PaymentTransactions.AsNoTracking()
-            .AnyAsync(existing => existing.UserId == userId
-                && existing.Purpose == PaymentPurpose.PremiumSubscription
-                && existing.PackageCode == payment.PackageCode
-                && existing.Status == PaymentStatus.Pending,
-                cancellationToken);
-        if (hasPending)
-        {
-            throw new ConflictException("Bạn đã có một đơn Premium đang chờ thanh toán. Hoàn tất hoặc chờ đơn hết hạn rồi hãy thử lại.");
-        }
+            var hasPending = await _dbContext.PaymentTransactions.AsNoTracking()
+                .AnyAsync(existing => existing.UserId == userId
+                    && existing.Purpose == PaymentPurpose.PremiumSubscription
+                    && existing.PackageCode == payment.PackageCode
+                    && existing.Status == PaymentStatus.Pending,
+                    cancellationToken);
+            if (hasPending)
+            {
+                throw new ConflictException("Bạn đã có một đơn Premium đang chờ thanh toán. Hoàn tất hoặc chờ đơn hết hạn rồi hãy thử lại.");
+            }
 
-        await _payments.AddAsync(payment, cancellationToken);
-        await _payments.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            await _payments.AddAsync(payment, cancellationToken);
+            await _payments.SaveChangesAsync(cancellationToken);
+            return true;
+        }, cancellationToken);
     }
 
     private static string BuildPayOsWebhookSignaturePayload(PayOsWebhookDataDto data)
