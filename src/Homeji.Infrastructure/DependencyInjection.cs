@@ -179,6 +179,7 @@ public static class DependencyInjection
         }
         services.Configure<MomoOptions>(configuration.GetSection("Payments:MoMo"));
         services.Configure<PayOsOptions>(configuration.GetSection("Payments:PayOS"));
+        services.Configure<PayPalSandboxCredentials>(configuration.GetSection("Payments:PayPalSandbox"));
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
         services.AddOptions<MarketplaceFinanceOptions>()
             .Bind(configuration.GetSection(MarketplaceFinanceOptions.SectionName))
@@ -200,6 +201,12 @@ public static class DependencyInjection
         services.AddHttpClient<ISignupOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPasswordRecoveryOtpService, SupabaseAccountService>();
         services.AddHttpClient<IPaymentService, PaymentService>();
+        services.AddHttpClient<IPayPalSandboxClient, PayPalSandboxClient>(client =>
+        {
+            client.BaseAddress = new Uri("https://api-m.sandbox.paypal.com/");
+            client.Timeout = TimeSpan.FromSeconds(5);
+            client.MaxResponseContentBufferSize = 256 * 1024;
+        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
         services.AddHttpClient<IExpiredPaymentCleanup, ExpiredPaymentCleanup>(client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<Homeji.Application.IServices.Moderation.IAiListingModeration, AiListingModeration>();
         services.AddHttpClient<Homeji.Application.IServices.Moderation.IAiListingReviewClient, GeminiListingReviewClient>(client => { client.Timeout = TimeSpan.FromSeconds(30); client.MaxResponseContentBufferSize = 256 * 1024; })

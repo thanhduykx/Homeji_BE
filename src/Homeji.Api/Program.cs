@@ -38,6 +38,8 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 builder.Services.AddControllers();
+builder.Services.AddDataProtection();
+builder.Services.Configure<PayPalSandboxOptions>(builder.Configuration.GetSection(PayPalSandboxOptions.SectionName));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

@@ -54,6 +54,37 @@ Docker chỉ bind port bằng command argument:
 ENTRYPOINT ["dotnet", "Homeji.Api.dll", "--urls", "http://0.0.0.0:8080"]
 ```
 
+### Thử thanh toán quốc tế với PayPal Sandbox
+
+Tạo app **Sandbox** và tài khoản người mua **Personal** trong [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/). Điền các biến môi trường của API hoặc các khóa tương đương trong `src/Homeji.Api/appsettings.Local.json`.
+
+| Biến môi trường API | Giá trị |
+| --- | --- |
+| `Payments__PayPalSandbox__Enabled` | `true` |
+| `Payments__PayPalSandbox__ClientId` | Client ID của app Sandbox |
+| `Payments__PayPalSandbox__ClientSecret` | Secret của app Sandbox |
+| `Payments__PayPalSandbox__FrontendOrigin` | Địa chỉ frontend cục bộ, mặc định `http://localhost:5173`. Dùng đúng hostname và cổng khi mở trình duyệt. |
+
+Trong PowerShell, chạy API từ thư mục backend và giữ tiến trình chạy trong khi thử.
+
+```powershell
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
+$env:BackgroundJobs__Enabled = 'false'
+$env:AuthCookies__AllowedOrigins__0 = 'http://localhost:5173'
+dotnet run --project src/Homeji.Api --launch-profile http
+```
+
+Trong thư mục frontend, trỏ Vite vào API cục bộ.
+
+```powershell
+$env:HOMEJI_API_URL = 'http://localhost:5171'
+npm run dev -- --port 5173 --strictPort
+```
+
+Đăng nhập Homeji, mở **Thanh toán → Thử thanh toán quốc tế · PayPal Sandbox**, rồi dùng tài khoản Personal để duyệt đơn 1 USD. Giữ cùng tab trình duyệt và bấm **Xác nhận giao dịch thử** sau khi quay về. Màn hình hiển thị mã giao dịch khi PayPal xác nhận. Đơn thử không dùng tiền thật và không tạo lịch sử thanh toán, số dư ví hay quyền Premium trong Homeji.
+
+Để thử trên Render production, đặt bốn biến trên ở dịch vụ backend `homeji-be`, dùng app PayPal **Sandbox** và đặt `FrontendOrigin` thành origin HTTPS thực tế của frontend. Giữ môi trường API là Production. Homeji chỉ hiển thị và cho phép dùng luồng thử với tài khoản quản trị viên. Có thể tắt luồng bằng cách đặt `Enabled` thành `false`.
+
 ### reCAPTCHA cho chatbot
 
 Chatbot chỉ hỏi xác minh khi một người gửi dồn dập. Đặt các biến môi trường trên máy chủ API:
