@@ -56,6 +56,12 @@ public sealed class RentalPublicationKafkaTests
         {
             await using var db = new ApplicationDbContext(dbOptions);
             var (actor, postId) = await SeedAsync(db);
+            var operations = new Uri("/api/admin/platform", UriKind.Relative);
+            var owner = await db.RentalPosts.Where(post => post.Id == postId).Select(post => post.OwnerId).SingleAsync();
+            using var renterApi = CreateApi(dbSettings.ConnectionString, kafka, topic, owner);
+            using var renterClient = renterApi.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
+            using var forbidden = await renterClient.GetAsync(operations);
+            Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
             using var offlineApi = CreateApi(dbSettings.ConnectionString, "127.0.0.1:19093", topic, actor);
             using var client = offlineApi.CreateClient(new() { BaseAddress = new Uri("https://localhost") });
             var endpoint = new Uri($"/api/admin/moderation/rental-posts/{postId}/approve", UriKind.Relative);
@@ -76,6 +82,11 @@ public sealed class RentalPublicationKafkaTests
             Assert.Equal(publication.Id, pendingRetry.Id);
             Assert.Null(pendingRetry.PublishedAt);
             Assert.Equal(1, pendingRetry.Attempts);
+            var pending = await client.GetFromJsonAsync<AdminPlatformSnapshot>(operations);
+            Assert.NotNull(pending);
+            Assert.Equal(1, pending.PendingSample);
+            Assert.Equal(1, pending.RetryingInSample);
+            Assert.False(pending.PublisherConfigured);
             await db.Database.ExecuteSqlInterpolatedAsync($"UPDATE homeji.rental_publications SET available_at = now() WHERE id = {publication.Id}");
 
             await admin.CreateTopicsAsync([new TopicSpecification { Name = topic, NumPartitions = 1, ReplicationFactor = 1 }]);
@@ -136,6 +147,12 @@ public sealed class RentalPublicationKafkaTests
             Assert.Equal(postId, fact.RentalPostId);
             using var originalEnvelope = JsonDocument.Parse(publishedPayload!);
             Assert.Equal(originalEnvelope.RootElement.GetProperty("occurredAt").GetDateTimeOffset(), fact.OccurredAt);
+            var current = await analyticsClient.GetFromJsonAsync<AdminPlatformSnapshot>(operations);
+            Assert.NotNull(current);
+            Assert.True(current.AnalyticsConfigured);
+            Assert.Equal(0, current.PendingSample);
+            Assert.Equal(7, current.PublicationDays.Count);
+            Assert.Equal(1L, current.PublicationDays.Sum(day => day.Count));
         }
         finally
         {

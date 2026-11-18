@@ -1,5 +1,6 @@
 using Confluent.Kafka;
 using Homeji.Application.IRepositories.RentalPosts;
+using Homeji.Application.Services.Admin;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -21,6 +22,7 @@ public static class RentalPublicationMessagingRegistration
             .Validate(options => options.IsValid(), "Kafka rental publications require valid broker, topic, group and security settings.")
             .ValidateOnStart();
         services.AddScoped<IRentalPublicationStore, RentalPublicationStore>();
+        services.AddScoped<IAdminPlatformReader, AdminPlatformReader>();
         services.AddScoped<IRentalPublicationDispatcher, RentalPublicationDispatcher>();
         services.AddSingleton<IRentalPublicationAnalytics, RentalPublicationAnalytics>();
         services.AddSingleton<IProducer<string, string>>(serviceProvider =>
