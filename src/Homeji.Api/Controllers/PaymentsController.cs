@@ -159,6 +159,7 @@ public sealed class PaymentsController : ControllerBase
             });
     }
 
+    [AllowAnonymous]
     [HttpGet("paypal/quote")]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [ProducesResponseType<PayPalCheckoutConfigDto>(StatusCodes.Status200OK)]

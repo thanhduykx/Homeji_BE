@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -41,14 +42,28 @@ public sealed class PayPalPaymentService(
 {
     private const string Currency = "USD";
     private const int MaxPayPalItemDescriptionLength = 120;
+    private static readonly Uri SandboxApiBaseUri = new("https://api-m.sandbox.paypal.com/");
+    private static readonly Uri LiveApiBaseUri = new("https://api-m.paypal.com/");
+    private static readonly ConcurrentDictionary<string, bool> DetectedLiveByClientId = new(StringComparer.Ordinal);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly PayPalOptions _options = payPalOptions.Value;
+    private bool _activeIsLive = ResolveInitialIsLive(payPalOptions.Value);
+
+    private Uri ActiveApiBaseUri => GetApiBaseUri(_activeIsLive);
+    private string ActiveCheckoutHost => _activeIsLive ? "www.paypal.com" : "www.sandbox.paypal.com";
+
+    private static bool ResolveInitialIsLive(PayPalOptions options) =>
+        !string.IsNullOrWhiteSpace(options.ClientId)
+        && DetectedLiveByClientId.TryGetValue(options.ClientId, out var detected)
+            ? detected
+            : options.IsLive;
+
+    private static Uri GetApiBaseUri(bool isLive) => isLive ? LiveApiBaseUri : SandboxApiBaseUri;
 
     public async Task<PayPalCheckoutConfigDto> GetConfigAndQuoteAsync(
         decimal? amountVnd,
         CancellationToken cancellationToken = default)
     {
-        userContext.GetRequiredUserId();
         var quote = amountVnd.HasValue
             ? await exchangeRates.QuoteUsdAsync(amountVnd.Value, cancellationToken)
             : null;
@@ -367,7 +382,7 @@ public sealed class PayPalPaymentService(
         var approval = order.Links?.FirstOrDefault(link => link.Rel is "payer-action" or "approve");
         if (!Uri.TryCreate(approval?.Href, UriKind.Absolute, out var approvalUrl)
             || approvalUrl.Scheme != Uri.UriSchemeHttps
-            || !string.Equals(approvalUrl.Host, _options.CheckoutHost, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(approvalUrl.Host, ActiveCheckoutHost, StringComparison.OrdinalIgnoreCase)
             || !approvalUrl.IsDefaultPort
             || !string.IsNullOrEmpty(approvalUrl.UserInfo))
         {
@@ -592,7 +607,7 @@ public sealed class PayPalPaymentService(
         var configured = _options.IsConfigured;
         return new PayPalCheckoutConfigDto(
             configured,
-            _options.IsLive ? "live" : "sandbox",
+            _activeIsLive ? "live" : "sandbox",
             configured ? _options.ClientId : null,
             configured && _options.GooglePayEnabled,
             configured && IsApplePayEnabled(),
@@ -614,16 +629,13 @@ public sealed class PayPalPaymentService(
     private Uri GetValidatedOrigin()
     {
         if (!Uri.TryCreate(_options.FrontendOrigin, UriKind.Absolute, out var origin)
-            || origin.AbsolutePath != "/"
             || !string.IsNullOrEmpty(origin.UserInfo)
-            || !string.IsNullOrEmpty(origin.Query)
-            || !string.IsNullOrEmpty(origin.Fragment)
             || origin.Scheme is not ("http" or "https"))
         {
             throw new InvalidOperationException("Chưa cấu hình FrontendOrigin hợp lệ cho PayPal.");
         }
 
-        return origin;
+        return new Uri(origin.GetLeftPart(UriPartial.Authority));
     }
 
     private void EnsureConfigured()
@@ -668,19 +680,64 @@ public sealed class PayPalPaymentService(
 
     private async Task<string> GetTokenAsync(CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(_options.ApiBaseUri, "v1/oauth2/token"));
         var credentials = Convert.ToBase64String(
             Encoding.UTF8.GetBytes($"{_options.ClientId}:{_options.ClientSecret}"));
-        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+        var triedLive = _activeIsLive;
+
+        using var primary = await SendTokenRequestAsync(GetApiBaseUri(triedLive), credentials, cancellationToken);
+        if (primary.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            var alternateLive = !triedLive;
+            using var alternate = await SendTokenRequestAsync(GetApiBaseUri(alternateLive), credentials, cancellationToken);
+            if (alternate.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                throw new ExternalDependencyException(
+                    "PayPal từ chối ClientId / ClientSecret (401 invalid_client ở cả Sandbox và Live). Vui lòng kiểm tra lại Payments__PayPal__ClientId và Payments__PayPal__ClientSecret trên Render.");
+            }
+
+            var alternateToken = await ReadAsync<OAuthToken>(alternate, cancellationToken);
+            if (string.IsNullOrWhiteSpace(alternateToken.AccessToken))
+            {
+                throw ProviderError();
+            }
+
+            _activeIsLive = alternateLive;
+            if (!string.IsNullOrWhiteSpace(_options.ClientId))
+            {
+                DetectedLiveByClientId[_options.ClientId] = alternateLive;
+            }
+
+            return alternateToken.AccessToken;
+        }
+
+        var token = await ReadAsync<OAuthToken>(primary, cancellationToken);
+        return !string.IsNullOrWhiteSpace(token.AccessToken)
+            ? token.AccessToken
+            : throw ProviderError();
+    }
+
+    private Task<HttpResponseMessage> SendTokenRequestAsync(
+        Uri baseUri,
+        string basicCredentials,
+        CancellationToken cancellationToken)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, new Uri(baseUri, "v1/oauth2/token"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Basic", basicCredentials);
         request.Content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
         });
-        using var response = await SendAsync(request, cancellationToken);
-        var token = await ReadAsync<OAuthToken>(response, cancellationToken);
-        return !string.IsNullOrWhiteSpace(token.AccessToken)
-            ? token.AccessToken
-            : throw ProviderError();
+        return SendAndDisposeRequestAsync(request, cancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> SendAndDisposeRequestAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        using (request)
+        {
+            return await SendAsync(request, cancellationToken);
+        }
     }
 
     private async Task<HttpResponseMessage> SendAsync(
@@ -705,10 +762,7 @@ public sealed class PayPalPaymentService(
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {
-        if (!response.IsSuccessStatusCode)
-        {
-            throw ProviderError();
-        }
+        await EnsurePayPalSuccessAsync(response, cancellationToken);
 
         var rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
         try
@@ -727,10 +781,7 @@ public sealed class PayPalPaymentService(
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {
-        if (!response.IsSuccessStatusCode)
-        {
-            throw ProviderError();
-        }
+        await EnsurePayPalSuccessAsync(response, cancellationToken);
 
         try
         {
@@ -743,9 +794,72 @@ public sealed class PayPalPaymentService(
         }
     }
 
+    private static async Task EnsurePayPalSuccessAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return;
+        }
+
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+        throw ProviderError(FormatPayPalErrorDetail((int)response.StatusCode, response.ReasonPhrase, body));
+    }
+
+    private static string FormatPayPalErrorDetail(int statusCode, string? reasonPhrase, string body)
+    {
+        string? code = null;
+        string? detail = null;
+
+        if (!string.IsNullOrWhiteSpace(body))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(body);
+                var root = document.RootElement;
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    code = TryGetJsonString(root, "error") ?? TryGetJsonString(root, "name");
+                    detail = TryGetJsonString(root, "error_description");
+                    if (string.IsNullOrWhiteSpace(detail)
+                        && root.TryGetProperty("details", out var details)
+                        && details.ValueKind == JsonValueKind.Array
+                        && details.GetArrayLength() > 0
+                        && details[0].ValueKind == JsonValueKind.Object)
+                    {
+                        detail = TryGetJsonString(details[0], "issue")
+                            ?? TryGetJsonString(details[0], "description");
+                    }
+
+                    detail ??= TryGetJsonString(root, "message");
+                }
+            }
+            catch (JsonException)
+            {
+                // Ignore non-JSON bodies and fall back to HTTP status text.
+            }
+        }
+
+        var summary = (code, detail) switch
+        {
+            ({ Length: > 0 }, { Length: > 0 }) => $"{statusCode} {code}: {detail}",
+            ({ Length: > 0 }, _) => $"{statusCode} {code}",
+            (_, { Length: > 0 }) => $"{statusCode} {detail}",
+            _ => string.IsNullOrWhiteSpace(reasonPhrase) ? statusCode.ToString(CultureInfo.InvariantCulture) : $"{statusCode} {reasonPhrase}",
+        };
+
+        return summary.Length <= 240 ? summary : summary[..240];
+    }
+
+    private static string? TryGetJsonString(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+
     private HttpRequestMessage OrderRequest(HttpMethod method, string relativePath, string token)
     {
-        var request = new HttpRequestMessage(method, new Uri(_options.ApiBaseUri, relativePath));
+        var request = new HttpRequestMessage(method, new Uri(ActiveApiBaseUri, relativePath));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
     }
@@ -943,8 +1057,10 @@ public sealed class PayPalPaymentService(
     private static bool IsOrderId(string? id) =>
         id is { Length: > 0 and <= 32 } && id.All(char.IsAsciiLetterOrDigit);
 
-    private static ExternalDependencyException ProviderError() =>
-        new("Cổng PayPal chưa trả về kết quả hợp lệ. Vui lòng kiểm tra cấu hình hoặc thử lại.");
+    private static ExternalDependencyException ProviderError(string? detail = null) =>
+        new(string.IsNullOrWhiteSpace(detail)
+            ? "Cổng PayPal chưa trả về kết quả hợp lệ. Vui lòng kiểm tra cấu hình hoặc thử lại."
+            : $"Cổng PayPal báo lỗi ({detail}).");
 
     private static RequestValidationException Validation(string field, string message) =>
         new(new Dictionary<string, string[]> { [field] = [message] });

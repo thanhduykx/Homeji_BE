@@ -200,19 +200,59 @@ public sealed class PayPalPaymentServiceTests
         Assert.Equal(300_000m, store.Wallet.Balance);
     }
 
+    [Fact]
+    public async Task Create_wallet_topup_falls_back_to_live_api_when_sandbox_oauth_returns_unauthorized()
+    {
+        var userId = Guid.NewGuid();
+        var store = new InMemoryStore(userId);
+        var liveClientId = $"live-client-{Guid.NewGuid():N}";
+        var tokenHostsTried = new List<string>();
+        using var liveHandler = new PayPalApiHandler("api-m.paypal.com", "www.paypal.com");
+        var handler = new AsyncDelegateHandler((request, cancellationToken) =>
+        {
+            if (request.RequestUri!.AbsolutePath == "/v1/oauth2/token")
+            {
+                tokenHostsTried.Add(request.RequestUri.Host);
+                if (request.RequestUri.Host == "api-m.sandbox.paypal.com")
+                {
+                    return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                    {
+                        Content = new StringContent(
+                            """{"error":"invalid_client","error_description":"Client Authentication failed"}""",
+                            Encoding.UTF8,
+                            "application/json"),
+                    });
+                }
+            }
+
+            return liveHandler.ForwardAsync(request, cancellationToken);
+        });
+        using var http = new HttpClient(handler);
+        var service = CreateService(http, store, userId, mode: "Sandbox", clientId: liveClientId);
+
+        var created = await service.CreateWalletTopUpAsync(new CreatePayPalPaymentDto(200_000m, "Nạp ví Homeji"));
+        var config = await service.GetConfigAndQuoteAsync(200_000m);
+
+        Assert.Equal(["api-m.sandbox.paypal.com", "api-m.paypal.com"], tokenHostsTried);
+        Assert.Equal(RedirectOrderId, created.PayPalOrderId);
+        Assert.StartsWith("https://www.paypal.com/", created.ApprovalUrl, StringComparison.Ordinal);
+        Assert.Equal("live", config.Mode);
+    }
+
     private static PayPalPaymentService CreateService(
         HttpClient http,
         InMemoryStore store,
         Guid userId,
         string mode = "Sandbox",
-        string frontendOrigin = "http://localhost:5173")
+        string frontendOrigin = "http://localhost:5173",
+        string clientId = "fixture-client-id")
     {
         var clock = new FixedClock(DateTimeOffset.Parse("2026-11-18T02:00:00Z", CultureInfo.InvariantCulture));
         var options = Options.Create(new PayPalOptions
         {
             Enabled = true,
             Mode = mode,
-            ClientId = "fixture-client-id",
+            ClientId = clientId,
             ClientSecret = "fixture-client-secret",
             GooglePayEnabled = true,
             ApplePayEnabled = true,
@@ -366,11 +406,22 @@ public sealed class PayPalPaymentServiceTests
             CancellationToken cancellationToken) => Task.FromResult(handler(request));
     }
 
+    private sealed class AsyncDelegateHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) => handler(request, cancellationToken);
+    }
+
     private sealed class PayPalApiHandler(string expectedApiHost, string expectedCheckoutHost) : HttpMessageHandler
     {
         private readonly Dictionary<string, string> _orderAmounts = new(StringComparer.Ordinal);
         public string WalletOrderStatus { get; set; } = "APPROVED";
         public string WalletPaymentSource { get; set; } = "{}";
+
+        public Task<HttpResponseMessage> ForwardAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) => SendAsync(request, cancellationToken);
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,

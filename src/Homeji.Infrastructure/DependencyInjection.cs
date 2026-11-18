@@ -183,21 +183,36 @@ public static class DependencyInjection
         services.Configure<PayPalOptions>(configuration.GetSection(PayPalOptions.SectionName));
         services.PostConfigure<PayPalOptions>(options =>
         {
+            static string NormalizeSetting(string? value) =>
+                string.IsNullOrWhiteSpace(value)
+                    ? string.Empty
+                    : value.Trim().Trim('"', '\'').Trim();
+
             var sandbox = configuration.GetSection("Payments:PayPalSandbox");
+            options.ClientId = NormalizeSetting(options.ClientId);
+            options.ClientSecret = NormalizeSetting(options.ClientSecret);
+            options.Mode = NormalizeSetting(options.Mode);
+            options.FrontendOrigin = NormalizeSetting(options.FrontendOrigin);
+
             if (string.IsNullOrWhiteSpace(options.ClientId))
             {
-                options.ClientId = sandbox["ClientId"] ?? string.Empty;
+                options.ClientId = NormalizeSetting(sandbox["ClientId"]);
             }
 
             if (string.IsNullOrWhiteSpace(options.ClientSecret))
             {
-                options.ClientSecret = sandbox["ClientSecret"] ?? string.Empty;
+                options.ClientSecret = NormalizeSetting(sandbox["ClientSecret"]);
             }
 
             if (string.IsNullOrWhiteSpace(configuration[$"{PayPalOptions.SectionName}:FrontendOrigin"])
                 && !string.IsNullOrWhiteSpace(sandbox["FrontendOrigin"]))
             {
-                options.FrontendOrigin = sandbox["FrontendOrigin"]!;
+                options.FrontendOrigin = NormalizeSetting(sandbox["FrontendOrigin"]);
+            }
+
+            if (string.IsNullOrWhiteSpace(options.Mode))
+            {
+                options.Mode = "Sandbox";
             }
         });
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));
