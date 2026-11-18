@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -43,22 +42,8 @@ public sealed class PayPalPaymentService(
     private const string Currency = "USD";
     private const int MaxPayPalItemDescriptionLength = 120;
     private static readonly Uri SandboxApiBaseUri = new("https://api-m.sandbox.paypal.com/");
-    private static readonly Uri LiveApiBaseUri = new("https://api-m.paypal.com/");
-    private static readonly ConcurrentDictionary<string, bool> DetectedLiveByClientId = new(StringComparer.Ordinal);
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly PayPalOptions _options = payPalOptions.Value;
-    private bool _activeIsLive = ResolveInitialIsLive(payPalOptions.Value);
-
-    private Uri ActiveApiBaseUri => GetApiBaseUri(_activeIsLive);
-    private string ActiveCheckoutHost => _activeIsLive ? "www.paypal.com" : "www.sandbox.paypal.com";
-
-    private static bool ResolveInitialIsLive(PayPalOptions options) =>
-        !string.IsNullOrWhiteSpace(options.ClientId)
-        && DetectedLiveByClientId.TryGetValue(options.ClientId, out var detected)
-            ? detected
-            : options.IsLive;
-
-    private static Uri GetApiBaseUri(bool isLive) => isLive ? LiveApiBaseUri : SandboxApiBaseUri;
 
     public async Task<PayPalCheckoutConfigDto> GetConfigAndQuoteAsync(
         decimal? amountVnd,
@@ -249,9 +234,9 @@ public sealed class PayPalPaymentService(
             throw ProviderError();
         }
 
-        var capture = finalOrder.PurchaseUnits is [{ Payments.Captures: [var singleCapture] }]
-            ? singleCapture
-            : null;
+        var captures = finalOrder.PurchaseUnits?.FirstOrDefault()?.Payments?.Captures;
+        var capture = captures?.FirstOrDefault(item => string.Equals(item.Status, "COMPLETED", StringComparison.Ordinal))
+            ?? captures?.LastOrDefault();
         if (capture is null)
         {
             return PaymentMapper.ToDto(payment);
@@ -382,7 +367,7 @@ public sealed class PayPalPaymentService(
         var approval = order.Links?.FirstOrDefault(link => link.Rel is "payer-action" or "approve");
         if (!Uri.TryCreate(approval?.Href, UriKind.Absolute, out var approvalUrl)
             || approvalUrl.Scheme != Uri.UriSchemeHttps
-            || !string.Equals(approvalUrl.Host, ActiveCheckoutHost, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(approvalUrl.Host, _options.CheckoutHost, StringComparison.OrdinalIgnoreCase)
             || !approvalUrl.IsDefaultPort
             || !string.IsNullOrEmpty(approvalUrl.UserInfo))
         {
@@ -607,7 +592,7 @@ public sealed class PayPalPaymentService(
         var configured = _options.IsConfigured;
         return new PayPalCheckoutConfigDto(
             configured,
-            _activeIsLive ? "live" : "sandbox",
+            _options.IsLive ? "live" : "sandbox",
             configured ? _options.ClientId : null,
             configured && _options.GooglePayEnabled,
             configured && IsApplePayEnabled(),
@@ -682,32 +667,14 @@ public sealed class PayPalPaymentService(
     {
         var credentials = Convert.ToBase64String(
             Encoding.UTF8.GetBytes($"{_options.ClientId}:{_options.ClientSecret}"));
-        var triedLive = _activeIsLive;
 
-        using var primary = await SendTokenRequestAsync(GetApiBaseUri(triedLive), credentials, cancellationToken);
-        if (primary.StatusCode == HttpStatusCode.Unauthorized)
+        using var primary = await SendTokenRequestAsync(_options.ApiBaseUri, credentials, cancellationToken);
+        if (primary.StatusCode == HttpStatusCode.Unauthorized && _options.IsLive)
         {
-            var alternateLive = !triedLive;
-            using var alternate = await SendTokenRequestAsync(GetApiBaseUri(alternateLive), credentials, cancellationToken);
-            if (alternate.StatusCode == HttpStatusCode.Unauthorized)
-            {
-                throw new ExternalDependencyException(
-                    "PayPal từ chối ClientId / ClientSecret (401 invalid_client ở cả Sandbox và Live). Vui lòng kiểm tra lại Payments__PayPal__ClientId và Payments__PayPal__ClientSecret trên Render.");
-            }
-
-            var alternateToken = await ReadAsync<OAuthToken>(alternate, cancellationToken);
-            if (string.IsNullOrWhiteSpace(alternateToken.AccessToken))
-            {
-                throw ProviderError();
-            }
-
-            _activeIsLive = alternateLive;
-            if (!string.IsNullOrWhiteSpace(_options.ClientId))
-            {
-                DetectedLiveByClientId[_options.ClientId] = alternateLive;
-            }
-
-            return alternateToken.AccessToken;
+            using var sandboxProbe = await SendTokenRequestAsync(SandboxApiBaseUri, credentials, cancellationToken);
+            throw new ExternalDependencyException(sandboxProbe.IsSuccessStatusCode
+                ? "Chế độ PayPal đang là Live nhưng ClientId/ClientSecret trên máy chủ lại thuộc tài khoản PayPal Sandbox. Vui lòng cập nhật khóa PayPal Live."
+                : "PayPal Live từ chối ClientId / ClientSecret (401 invalid_client). Vui lòng kiểm tra lại Payments__PayPal__ClientId và Payments__PayPal__ClientSecret.");
         }
 
         var token = await ReadAsync<OAuthToken>(primary, cancellationToken);
@@ -859,7 +826,7 @@ public sealed class PayPalPaymentService(
 
     private HttpRequestMessage OrderRequest(HttpMethod method, string relativePath, string token)
     {
-        var request = new HttpRequestMessage(method, new Uri(ActiveApiBaseUri, relativePath));
+        var request = new HttpRequestMessage(method, new Uri(_options.ApiBaseUri, relativePath));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return request;
     }

@@ -194,25 +194,28 @@ public static class DependencyInjection
             options.Mode = NormalizeSetting(options.Mode);
             options.FrontendOrigin = NormalizeSetting(options.FrontendOrigin);
 
-            if (string.IsNullOrWhiteSpace(options.ClientId))
-            {
-                options.ClientId = NormalizeSetting(sandbox["ClientId"]);
-            }
-
-            if (string.IsNullOrWhiteSpace(options.ClientSecret))
-            {
-                options.ClientSecret = NormalizeSetting(sandbox["ClientSecret"]);
-            }
-
-            if (string.IsNullOrWhiteSpace(configuration[$"{PayPalOptions.SectionName}:FrontendOrigin"])
-                && !string.IsNullOrWhiteSpace(sandbox["FrontendOrigin"]))
-            {
-                options.FrontendOrigin = NormalizeSetting(sandbox["FrontendOrigin"]);
-            }
-
             if (string.IsNullOrWhiteSpace(options.Mode))
             {
-                options.Mode = "Sandbox";
+                options.Mode = "Live";
+            }
+
+            if (!options.IsLive)
+            {
+                if (string.IsNullOrWhiteSpace(options.ClientId))
+                {
+                    options.ClientId = NormalizeSetting(sandbox["ClientId"]);
+                }
+
+                if (string.IsNullOrWhiteSpace(options.ClientSecret))
+                {
+                    options.ClientSecret = NormalizeSetting(sandbox["ClientSecret"]);
+                }
+
+                if (string.IsNullOrWhiteSpace(configuration[$"{PayPalOptions.SectionName}:FrontendOrigin"])
+                    && !string.IsNullOrWhiteSpace(sandbox["FrontendOrigin"]))
+                {
+                    options.FrontendOrigin = NormalizeSetting(sandbox["FrontendOrigin"]);
+                }
             }
         });
         services.Configure<PremiumSubscriptionOptions>(configuration.GetSection(PremiumSubscriptionOptions.SectionName));

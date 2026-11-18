@@ -5,7 +5,7 @@ public sealed class PayPalOptions
     public const string SectionName = "Payments:PayPal";
 
     public bool Enabled { get; set; } = true;
-    public string Mode { get; set; } = "Sandbox";
+    public string Mode { get; set; } = "Live";
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecret { get; set; } = string.Empty;
     public bool GooglePayEnabled { get; set; } = true;

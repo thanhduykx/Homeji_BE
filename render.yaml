@@ -51,9 +51,9 @@ services:
       - key: Payments__Redirects__FrontendPaymentUrl
         value: https://homeji.onrender.com/payments
       - key: Payments__PayPalSandbox__Enabled
-        value: "true"
+        value: "false"
       - key: Payments__PayPalSandbox__GooglePayEnabled
-        value: "true"
+        value: "false"
       - key: Payments__PayPalSandbox__FrontendOrigin
         value: https://homeji.onrender.com
       - key: Payments__PayPalSandbox__ClientId
@@ -63,7 +63,7 @@ services:
       - key: Payments__PayPal__Enabled
         value: "true"
       - key: Payments__PayPal__Mode
-        value: Sandbox
+        value: Live
       - key: Payments__PayPal__GooglePayEnabled
         value: "true"
       - key: Payments__PayPal__ApplePayEnabled
