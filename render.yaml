@@ -44,3 +44,13 @@ services:
         value: https://homeji.onrender.com/auth/callback
       - key: Payments__Redirects__FrontendPaymentUrl
         value: https://homeji.onrender.com/payments
+      - key: Payments__PayPalSandbox__Enabled
+        value: "true"
+      - key: Payments__PayPalSandbox__GooglePayEnabled
+        value: "true"
+      - key: Payments__PayPalSandbox__FrontendOrigin
+        value: https://homeji.onrender.com
+      - key: Payments__PayPalSandbox__ClientId
+        sync: false
+      - key: Payments__PayPalSandbox__ClientSecret
+        sync: false
