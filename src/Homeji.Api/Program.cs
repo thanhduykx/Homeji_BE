@@ -72,7 +72,8 @@ if (builder.Configuration.GetValue("BackgroundJobs:Enabled", true))
     {
         builder.Services.AddHostedService<RentalPublicationWorker>();
     }
-    if (builder.Configuration.IsRentalPublicationAnalyticsEnabled())
+    if (builder.Configuration.IsRentalPublicationAnalyticsEnabled() &&
+        builder.Configuration.HasRentalPublicationKafkaBroker())
     {
         builder.Services.AddHostedService<RentalPublicationAnalyticsWorker>();
     }

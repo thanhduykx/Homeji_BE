@@ -31,7 +31,7 @@ internal sealed class AdminPlatformReader(
             .Select(date => new AdminPublicationDay(date, dailyCounts.GetValueOrDefault(date))).ToArray();
         var jobsEnabled = configuration.GetValue("BackgroundJobs:Enabled", true);
         return new(now, jobsEnabled && configuration.IsRentalPublicationWorkerEnabled(),
-            jobsEnabled && configuration.IsRentalPublicationAnalyticsEnabled(), configuration.GetValue<bool>("Telemetry:Enabled"),
+            jobsEnabled && configuration.IsRentalPublicationAnalyticsEnabled(), configuration.GetValue("Telemetry:Enabled", true),
             Math.Min(attempts.Count, SampleLimit), attempts.Take(SampleLimit).Count(attempt => attempt > 0),
             attempts.Count > SampleLimit, days);
     }

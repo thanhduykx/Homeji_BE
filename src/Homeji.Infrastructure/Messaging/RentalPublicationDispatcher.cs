@@ -2,6 +2,7 @@ using System.Diagnostics.Metrics;
 using Confluent.Kafka;
 using Homeji.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,7 +10,7 @@ namespace Homeji.Infrastructure.Messaging;
 
 internal sealed partial class RentalPublicationDispatcher(
     ApplicationDbContext db,
-    IProducer<string, string> producer,
+    IServiceProvider services,
     IOptions<RentalPublicationKafkaOptions> options,
     TimeProvider timeProvider,
     ILogger<RentalPublicationDispatcher> logger) : IRentalPublicationDispatcher
@@ -40,26 +41,38 @@ internal sealed partial class RentalPublicationDispatcher(
         foreach (var publication in batch)
         {
             var currentLease = db.RentalPublications.Where(item => item.Id == publication.Id && item.LeaseId == lease);
-            try
+            if (options.Value.HasBroker)
             {
-                var delivery = await producer.ProduceAsync(options.Value.Topic, new Message<string, string>
+                try
                 {
-                    Key = publication.RentalPostId.ToString(),
-                    Value = new RentalPublicationEnvelope(publication.Id, RentalPublicationEnvelope.PublishedEventType,
-                        RentalPublicationEnvelope.Version, publication.OccurredAt, publication.RentalPostId).Serialize()
-                }, cancellationToken);
-                if (delivery.Status != PersistenceStatus.Persisted)
+                    var producer = services.GetRequiredService<IProducer<string, string>>();
+                    var delivery = await producer.ProduceAsync(options.Value.Topic, new Message<string, string>
+                    {
+                        Key = publication.RentalPostId.ToString(),
+                        Value = new RentalPublicationEnvelope(publication.Id, RentalPublicationEnvelope.PublishedEventType,
+                            RentalPublicationEnvelope.Version, publication.OccurredAt, publication.RentalPostId).Serialize()
+                    }, cancellationToken);
+                    if (delivery.Status != PersistenceStatus.Persisted)
+                    {
+                        await ScheduleRetryAsync(currentLease, publication.Attempts, cancellationToken);
+                        LogPublishFailed(logger, "not_persisted");
+                        continue;
+                    }
+                }
+                catch (ProduceException<string, string> exception)
                 {
                     await ScheduleRetryAsync(currentLease, publication.Attempts, cancellationToken);
-                    LogPublishFailed(logger, "not_persisted");
+                    LogPublishFailed(logger, exception.Error.Code.ToString());
                     continue;
                 }
             }
-            catch (ProduceException<string, string> exception)
+            else if (options.Value.AnalyticsEnabled)
             {
-                await ScheduleRetryAsync(currentLease, publication.Attempts, cancellationToken);
-                LogPublishFailed(logger, exception.Error.Code.ToString());
-                continue;
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO homeji.rental_publication_facts (event_id, rental_post_id, occurred_at)
+                    VALUES ({publication.Id}, {publication.RentalPostId}, {publication.OccurredAt.ToUniversalTime()})
+                    ON CONFLICT (event_id) DO NOTHING
+                    """, cancellationToken);
             }
 
             var publishedAt = timeProvider.GetUtcNow();
