@@ -94,6 +94,12 @@ npm run dev -- --port 5173 --strictPort
 
 Hai cờ mặc định tắt, độc lập với nhau. Checkout này không nhận VND và không dùng để thu tiền thật. Tài liệu PayPal: [Google Pay](https://developer.paypal.com/v5/google-pay/integrate/), [Apple Pay](https://developer.paypal.com/v5/apple-pay/integrate/).
 
+### Apple Pay và Google Pay qua MoMo
+
+Checkout mua Premium và nạp ví có thể tạo đơn VND bằng `payWithApplePay` hoặc `payWithGPay` trên cổng MoMo. Homeji dùng kết quả IPN của MoMo để xác nhận giao dịch.
+
+Sau khi kiểm thử với thông tin tích hợp Test và được MoMo cấp quyền cho mã đối tác Production, bật từng phương thức trên API bằng `Payments__MoMo__ApplePayEnabled=true` và `Payments__MoMo__GooglePayEnabled=true`. Mỗi tùy chọn xuất hiện khi backend đã bật và thiết bị báo hỗ trợ. Giữ `Payments__MoMo__RequestType=captureWallet` cho nút thanh toán MoMo hiện tại.
+
 ### reCAPTCHA cho chatbot
 
 Chatbot chỉ hỏi xác minh khi một người gửi dồn dập. Đặt các biến môi trường trên máy chủ API:

@@ -592,12 +592,12 @@ public sealed class PayPalPaymentService(
             configured,
             _options.IsLive ? "live" : "sandbox",
             configured ? _options.ClientId : null,
-            configured && _options.GooglePayEnabled,
-            configured && IsApplePayEnabled(),
+            configured && IsWalletEnabled("google-pay"),
+            configured && IsWalletEnabled("apple-pay"),
             quote);
     }
 
-    private bool IsWalletEnabled(string wallet) => wallet switch
+    private bool IsWalletEnabled(string wallet) => !_options.IsLive && wallet switch
     {
         "google-pay" => _options.GooglePayEnabled,
         "apple-pay" => IsApplePayEnabled(),
@@ -885,7 +885,7 @@ public sealed class PayPalPaymentService(
             || ticketUserId != userId
             || !Guid.TryParseExact(fields[1], "N", out var ticketPaymentId)
             || ticketPaymentId != paymentId
-            || !IsWalletEnabled(fields[2])
+            || fields[2] is not ("google-pay" or "apple-pay")
             || !IsOrderId(fields[3])
             || !decimal.TryParse(fields[4], NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var expectedUsd)
             || expectedUsd <= 0

@@ -5,6 +5,8 @@ namespace Homeji.Api.Authentication;
 
 public sealed class HttpCurrentUser : ICurrentUser
 {
+    public string? Email => _httpContextAccessor.HttpContext?.User.FindFirstValue("email");
+
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public HttpCurrentUser(IHttpContextAccessor httpContextAccessor)

@@ -16,5 +16,9 @@ public sealed class MomoOptions
 
     public string RequestType { get; set; } = "captureWallet";
 
+    public bool ApplePayEnabled { get; set; }
+
+    public bool GooglePayEnabled { get; set; }
+
     public string Lang { get; set; } = "vi";
 }

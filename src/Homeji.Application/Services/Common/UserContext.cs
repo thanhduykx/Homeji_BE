@@ -28,6 +28,8 @@ public sealed class UserContext
             ?? throw new UnauthorizedAccessException("Token đăng nhập không chứa thông tin người dùng hợp lệ.");
     }
 
+    public string? GetEmail() => _currentUser.Email;
+
     public async Task<UserProfile> GetRequiredProfileAsync(CancellationToken cancellationToken)
     {
         var userId = GetRequiredUserId();

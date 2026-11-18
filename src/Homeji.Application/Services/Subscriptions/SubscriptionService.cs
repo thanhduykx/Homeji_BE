@@ -106,9 +106,9 @@ public sealed class SubscriptionService : ISubscriptionService
 
     public Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
         string packageCode,
-        decimal? expectedAmount = null, CancellationToken cancellationToken = default)
+        decimal? expectedAmount = null, string? wallet = null, CancellationToken cancellationToken = default)
     {
-        return _payments.CreatePremiumMomoPaymentAsync(packageCode, expectedAmount, cancellationToken);
+        return _payments.CreatePremiumMomoPaymentAsync(packageCode, expectedAmount, wallet, cancellationToken);
     }
 
     public Task<PayOsPaymentResponseDto> CreatePremiumPayOsPaymentAsync(

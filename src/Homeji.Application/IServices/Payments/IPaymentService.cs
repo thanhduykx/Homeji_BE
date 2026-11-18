@@ -14,9 +14,11 @@ public interface IPaymentService
         int take,
         CancellationToken cancellationToken = default);
 
-    Task<MomoPaymentResponseDto> CreateMomoPaymentAsync(CreateMomoPaymentDto request, CancellationToken cancellationToken = default);
+    MomoWalletAvailabilityDto GetMomoWalletAvailability();
 
-    Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(string packageCode, decimal? expectedAmount = null, CancellationToken cancellationToken = default);
+    Task<MomoPaymentResponseDto> CreateMomoPaymentAsync(CreateMomoPaymentDto request, string? wallet = null, CancellationToken cancellationToken = default);
+
+    Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(string packageCode, decimal? expectedAmount = null, string? wallet = null, CancellationToken cancellationToken = default);
 
     Task<PaymentDto> HandleMomoIpnAsync(MomoIpnDto request, CancellationToken cancellationToken = default);
 

@@ -51,9 +51,10 @@ public sealed class SubscriptionsController : ControllerBase
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status401Unauthorized)]
     public async Task<ActionResult<MomoPaymentResponseDto>> CreatePremiumMomoPayment(
         string packageCode,
-        [FromQuery] decimal? expectedAmount, CancellationToken cancellationToken)
+        [FromQuery] decimal? expectedAmount,
+        [FromQuery] string? wallet, CancellationToken cancellationToken)
     {
-        return Ok(await _subscriptions.CreatePremiumMomoPaymentAsync(packageCode, expectedAmount, cancellationToken));
+        return Ok(await _subscriptions.CreatePremiumMomoPaymentAsync(packageCode, expectedAmount, wallet, cancellationToken));
     }
 
     [HttpPost("premium/{packageCode}/payos/create")]

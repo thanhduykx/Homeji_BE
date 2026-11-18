@@ -110,8 +110,19 @@ public sealed class PaymentService : IPaymentService
         return payments.Select(PaymentMapper.ToDto).ToArray();
     }
 
+    public MomoWalletAvailabilityDto GetMomoWalletAvailability()
+    {
+        var configured = IsMomoConfigured();
+        return new MomoWalletAvailabilityDto(
+            configured && _momoOptions.ApplePayEnabled,
+            configured && _momoOptions.GooglePayEnabled,
+            Uri.TryCreate(_momoOptions.Endpoint, UriKind.Absolute, out var endpoint)
+                && endpoint.Host == "test-payment.momo.vn");
+    }
+
     public async Task<MomoPaymentResponseDto> CreateMomoPaymentAsync(
         CreateMomoPaymentDto request,
+        string? wallet = null,
         CancellationToken cancellationToken = default)
     {
         return await CreateMomoPaymentInternalAsync(
@@ -119,12 +130,15 @@ public sealed class PaymentService : IPaymentService
             request.Description ?? "Nap vi Homeji",
             PaymentPurpose.WalletTopUp,
             null,
+            wallet,
             cancellationToken);
     }
 
     public async Task<MomoPaymentResponseDto> CreatePremiumMomoPaymentAsync(
         string packageCode,
-        decimal? expectedAmount = null, CancellationToken cancellationToken = default)
+        decimal? expectedAmount = null,
+        string? wallet = null,
+        CancellationToken cancellationToken = default)
     {
         var plan = await GetPremiumPlanAsync(packageCode, cancellationToken);
         if (expectedAmount.HasValue && plan.Price != expectedAmount.Value)
@@ -137,6 +151,7 @@ public sealed class PaymentService : IPaymentService
             BuildPremiumDescription(plan),
             PaymentPurpose.PremiumSubscription,
             plan.Code,
+            wallet,
             cancellationToken);
     }
 
@@ -145,11 +160,25 @@ public sealed class PaymentService : IPaymentService
         string? requestedDescription,
         PaymentPurpose purpose,
         string? packageCode,
+        string? wallet,
         CancellationToken cancellationToken)
     {
         var userId = _userContext.GetRequiredUserId();
         await _userContext.GetRequiredProfileAsync(cancellationToken);
         EnsureMomoConfigured();
+        var requestType = wallet switch
+        {
+            null => _momoOptions.RequestType,
+            "apple-pay" when _momoOptions.ApplePayEnabled => "payWithApplePay",
+            "google-pay" when _momoOptions.GooglePayEnabled => "payWithGPay",
+            "apple-pay" or "google-pay" => throw Validation("wallet", "Phương thức này chưa được bật trên cổng MoMo."),
+            _ => throw Validation("wallet", "Ví thanh toán không hợp lệ."),
+        };
+        var email = wallet is null ? null : _userContext.GetEmail();
+        if (wallet is not null && string.IsNullOrWhiteSpace(email))
+        {
+            throw Validation("wallet", "Tài khoản cần có email để thanh toán bằng Apple Pay hoặc Google Pay qua MoMo.");
+        }
         var amount = ToWholeVnd(requestedAmount);
         ValidateWalletTopUpAmount(purpose, amount);
         var description = NormalizeDescription(requestedDescription);
@@ -169,7 +198,7 @@ public sealed class PaymentService : IPaymentService
             $"partnerCode={_momoOptions.PartnerCode}",
             $"redirectUrl={_momoOptions.RedirectUrl}",
             $"requestId={requestId}",
-            $"requestType={_momoOptions.RequestType}");
+            $"requestType={requestType}");
 
         var payload = new
         {
@@ -182,10 +211,15 @@ public sealed class PaymentService : IPaymentService
             redirectUrl = _momoOptions.RedirectUrl,
             ipnUrl = _momoOptions.IpnUrl,
             extraData,
-            requestType = _momoOptions.RequestType,
+            requestType,
             signature = Sign(rawSignature, _momoOptions.SecretKey),
             lang = _momoOptions.Lang,
         };
+        var paymentPayload = JsonSerializer.SerializeToNode(payload, JsonOptions)!.AsObject();
+        if (email is not null)
+        {
+            paymentPayload["userInfo"] = new System.Text.Json.Nodes.JsonObject { ["email"] = email };
+        }
 
         var payment = new PaymentTransaction(userId, PaymentMethod.Momo, amount, orderCode, description, now, purpose, packageCode);
         payment.AttachMomoPayment(requestId, null, null, null, null, null, now);
@@ -199,19 +233,30 @@ public sealed class PaymentService : IPaymentService
         }
 
         using var response = await SendAsync(
-            () => _httpClient.PostAsJsonAsync(_momoOptions.Endpoint, payload, JsonOptions, cancellationToken),
+            () => _httpClient.PostAsJsonAsync(_momoOptions.Endpoint, paymentPayload, JsonOptions, cancellationToken),
             "MoMo",
             cancellationToken);
         var responseText = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode && wallet is null)
         {
             throw ProviderFailure("MoMo", responseText);
         }
 
         using var document = ParseProviderResponse("MoMo", responseText);
         var root = document.RootElement;
-        if (!TryGetInt32(root, "resultCode", out var resultCode) || resultCode != 0)
+        var hasResultCode = TryGetInt32(root, "resultCode", out var resultCode);
+        if (!response.IsSuccessStatusCode || !hasResultCode || resultCode != 0)
         {
+            if (wallet is not null && hasResultCode && resultCode is 11 or 13 or 20 or 22)
+            {
+                await _payments.ExecuteForOrderAsync(orderCode, async () =>
+                {
+                    var current = await _payments.GetByOrderCodeAsync(orderCode, cancellationToken) ?? payment;
+                    current.MarkFailed("MoMo từ chối tạo giao dịch.", null, _timeProvider.GetUtcNow());
+                    await _payments.SaveChangesAsync(cancellationToken);
+                    return current;
+                }, cancellationToken);
+            }
             throw ProviderFailure("MoMo", GetString(root, "message") ?? "Yêu cầu thanh toán bị từ chối.");
         }
 
@@ -795,15 +840,18 @@ public sealed class PaymentService : IPaymentService
 
     private void EnsureMomoConfigured()
     {
-        if (string.IsNullOrWhiteSpace(_momoOptions.PartnerCode)
-            || string.IsNullOrWhiteSpace(_momoOptions.AccessKey)
-            || string.IsNullOrWhiteSpace(_momoOptions.SecretKey)
-            || string.IsNullOrWhiteSpace(_momoOptions.RedirectUrl)
-            || string.IsNullOrWhiteSpace(_momoOptions.IpnUrl))
+        if (!IsMomoConfigured())
         {
             throw new InvalidOperationException("Chưa cấu hình thanh toán MoMo.");
         }
     }
+
+    private bool IsMomoConfigured() =>
+        !string.IsNullOrWhiteSpace(_momoOptions.PartnerCode)
+        && !string.IsNullOrWhiteSpace(_momoOptions.AccessKey)
+        && !string.IsNullOrWhiteSpace(_momoOptions.SecretKey)
+        && !string.IsNullOrWhiteSpace(_momoOptions.RedirectUrl)
+        && !string.IsNullOrWhiteSpace(_momoOptions.IpnUrl);
 
     private void EnsurePayOsConfigured()
     {

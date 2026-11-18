@@ -57,13 +57,19 @@ public sealed class PaymentsController : ControllerBase
         return Ok(await _paymentService.GetPaymentByOrderCodeAsync(orderCode, cancellationToken));
     }
 
+    [HttpGet("momo/wallets")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    public ActionResult<MomoWalletAvailabilityDto> GetMomoWallets() =>
+        Ok(_paymentService.GetMomoWalletAvailability());
+
     [HttpPost("momo/create")]
     [ProducesResponseType<MomoPaymentResponseDto>(StatusCodes.Status200OK)]
     public async Task<ActionResult<MomoPaymentResponseDto>> CreateMomoPayment(
         [FromBody] CreateMomoPaymentViewModel request,
+        [FromQuery] string? wallet,
         CancellationToken cancellationToken)
     {
-        return Ok(await _paymentService.CreateMomoPaymentAsync(PaymentViewMapper.ToDto(request), cancellationToken));
+        return Ok(await _paymentService.CreateMomoPaymentAsync(PaymentViewMapper.ToDto(request), wallet, cancellationToken));
     }
 
     [AllowAnonymous]
