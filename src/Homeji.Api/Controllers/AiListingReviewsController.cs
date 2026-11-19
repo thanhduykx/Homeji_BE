@@ -9,5 +9,6 @@ public sealed class AiListingReviewsController(IAiListingModeration moderation) 
     [HttpGet] public async Task<ActionResult<AiReviewDashboardDto>> Get(CancellationToken ct) => Ok(await moderation.GetDashboardAsync(ct));
     [HttpPut("settings")] public async Task<IActionResult> Settings(AiReviewSettingsDto settings, CancellationToken ct) { await moderation.UpdateSettingsAsync(settings, ct); return NoContent(); }
     [HttpPost("backfill")] public async Task<IActionResult> Backfill(CancellationToken ct) { await moderation.QueueBackfillAsync(ct); return NoContent(); }
-    [HttpPost("{id:guid}/resolve")] public async Task<IActionResult> Resolve(Guid id, AiReviewDecisionDto decision, CancellationToken ct) { await moderation.ResolveAsync(id, decision.Restore, ct); return NoContent(); }
+    [HttpPost("{id:guid}/resolve")] public async Task<IActionResult> Resolve(Guid id, AiReviewDecisionDto decision, CancellationToken ct) { await moderation.ResolveAsync(id, decision.Restore, decision.Reason, ct); return NoContent(); }
+    [HttpPost("resolve-all")] public async Task<ActionResult<AiReviewBatchResultDto>> ResolveAll(AiReviewBatchDecisionDto decision, CancellationToken ct) { var count = await moderation.ResolveAllAsync(decision.Restore, decision.Reason, decision.Ids, ct); return Ok(new AiReviewBatchResultDto(count)); }
 }

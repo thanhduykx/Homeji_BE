@@ -6,7 +6,8 @@ public interface IAiListingModeration
     Task<AiReviewDashboardDto> GetDashboardAsync(CancellationToken cancellationToken);
     Task UpdateSettingsAsync(AiReviewSettingsDto settings, CancellationToken cancellationToken);
     Task QueueBackfillAsync(CancellationToken cancellationToken);
-    Task ResolveAsync(Guid reviewId, bool restore, CancellationToken cancellationToken);
+    Task ResolveAsync(Guid reviewId, bool restore, string? reason = null, CancellationToken cancellationToken = default);
+    Task<int> ResolveAllAsync(bool restore, string? reason = null, IReadOnlyList<Guid>? ids = null, CancellationToken cancellationToken = default);
 }
 public interface IAiListingReviewClient
 {

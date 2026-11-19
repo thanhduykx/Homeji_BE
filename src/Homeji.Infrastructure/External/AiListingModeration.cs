@@ -138,7 +138,7 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
         await AdminAsync(cancellationToken);
         await LockedAsync(async () => { (await ScheduleAsync(cancellationToken)).BackfillBefore = clock.GetUtcNow(); return true; }, cancellationToken);
     }
-    public async Task ResolveAsync(Guid reviewId, bool restore, CancellationToken cancellationToken)
+    public async Task ResolveAsync(Guid reviewId, bool restore, string? reason = null, CancellationToken cancellationToken = default)
     {
         var admin = await AdminAsync(cancellationToken);
         await LockedAsync(async () => {
@@ -149,8 +149,9 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
                 if (source is null || Hash(source.Value.Json) != job.ContentHash)
                     throw new RequestValidationException(new Dictionary<string, string[]> { ["review"] = ["Nội dung tin đã đổi. Hãy kiểm tra phiên bản mới trước khi ẩn."] });
                 var now = clock.GetUtcNow();
+                var finalReason = !string.IsNullOrWhiteSpace(reason) ? reason.Trim() : (job.Reason ?? "Quản trị viên yêu cầu kiểm tra lại nội dung.");
                 if (source.Value.Rental is { } rental && rental.Status is RentalPostStatus.Active or RentalPostStatus.Pending)
-                { job.RecordBlock((int)rental.Status, now); rental.HideForAiReview(job.Reason ?? "Quản trị viên yêu cầu kiểm tra lại nội dung.", now); }
+                { job.RecordBlock((int)rental.Status, now); rental.HideForAiReview(finalReason, now); }
                 else if (source.Value.Market is { Status: MarketplacePostStatus.Active, ReservedQuantity: 0 } market)
                 { job.RecordBlock((int)market.Status, now); market.Archive(now); }
                 else throw new RequestValidationException(new Dictionary<string, string[]> { ["review"] = ["Tin đã đổi trạng thái hoặc đang có đơn xử lý. Hãy kiểm tra đơn trước khi ẩn tin."] });
@@ -164,6 +165,59 @@ public sealed class AiListingModeration(ApplicationDbContext db, IAiListingRevie
                 else source.Value.Market!.RestoreAfterAiReview(clock.GetUtcNow());
             }
             job.Resolve(admin.Id, restore, clock.GetUtcNow()); return true;
+        }, cancellationToken);
+    }
+
+    public async Task<int> ResolveAllAsync(bool restore, string? reason = null, IReadOnlyList<Guid>? ids = null, CancellationToken cancellationToken = default)
+    {
+        var admin = await AdminAsync(cancellationToken);
+        return await LockedAsync(async () => {
+            var query = db.AiListingReviews.Where(j => j.ReviewedAt == null && (j.State == "needs_review" || j.State == "blocked"));
+            if (ids is { Count: > 0 }) query = query.Where(j => ids.Contains(j.Id));
+            var jobs = await query.ToListAsync(cancellationToken);
+            var now = clock.GetUtcNow();
+            var count = 0;
+            var finalReason = !string.IsNullOrWhiteSpace(reason) ? reason.Trim() : "Quản trị viên yêu cầu kiểm tra lại nội dung.";
+            foreach (var job in jobs)
+            {
+                try
+                {
+                    if (!restore && job.State == "needs_review")
+                    {
+                        var source = await SourceAsync(job, cancellationToken);
+                        if (source is not null && Hash(source.Value.Json) == job.ContentHash)
+                        {
+                            var itemReason = !string.IsNullOrWhiteSpace(reason) ? finalReason : (job.Reason ?? finalReason);
+                            if (source.Value.Rental is { } rental && rental.Status is RentalPostStatus.Active or RentalPostStatus.Pending)
+                            {
+                                job.RecordBlock((int)rental.Status, now);
+                                rental.HideForAiReview(itemReason, now);
+                            }
+                            else if (source.Value.Market is { Status: MarketplacePostStatus.Active, ReservedQuantity: 0 } market)
+                            {
+                                job.RecordBlock((int)market.Status, now);
+                                market.Archive(now);
+                            }
+                        }
+                    }
+                    else if (restore && job.State == "blocked")
+                    {
+                        var source = await SourceAsync(job, cancellationToken);
+                        if (source is not null && Hash(source.Value.Json) == job.ContentHash && source.Value.UpdatedAt == job.BlockedAt)
+                        {
+                            if (source.Value.Rental is { } rental && job.PreviousStatus.HasValue) rental.RestoreAfterAiReview(job.PreviousStatus.Value, now);
+                            else source.Value.Market?.RestoreAfterAiReview(now);
+                        }
+                    }
+                    job.Resolve(admin.Id, restore, now);
+                    count++;
+                }
+                catch
+                {
+                    // Continue with remaining items in batch if one fails
+                }
+            }
+            return count;
         }, cancellationToken);
     }
 

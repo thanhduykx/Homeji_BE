@@ -6,4 +6,6 @@ public sealed record AiReviewDashboardDto(AiReviewSettingsDto Settings, DateTime
 {
     public DateTimeOffset? LastHeartbeatAt { get; init; }
 }
-public sealed record AiReviewDecisionDto(bool Restore);
+public sealed record AiReviewDecisionDto(bool Restore, string? Reason = null);
+public sealed record AiReviewBatchDecisionDto(bool Restore, string? Reason = null, IReadOnlyList<Guid>? Ids = null);
+public sealed record AiReviewBatchResultDto(int ResolvedCount);
