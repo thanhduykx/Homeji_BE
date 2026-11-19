@@ -47,6 +47,12 @@ Homeji khởi đầu với Chợ đồ cũ (`MarketplaceListingType.SecondHand`)
 2. **Thiết kế lại luồng Quản lý Bếp & Đơn hàng (Kitchen Order Board):** Cung cấp công tắc 1-chạm bật/tắt nhận đơn (`IsOpenNow`), quản lý thực đơn hôm nay và bảng điều khiển đơn hàng theo thời gian thực (chuông báo ting-ting, đếm ngược 30 phút, cập nhật trạng thái nấu).
 3. **Thiết kế lại luồng Mua & Đặt món (Buyer Experience):** Nâng cấp `FoodMarketplaceView` với bộ lọc bữa ăn linh hoạt, giỏ hàng dính cố định (`Sticky Floating Cart Bar`), checkout linh hoạt 2 chế độ (`Pickup` vs `SellerDelivery` tận phòng KTX), hỗ trợ voucher và nạp nhanh ví Homeji.
 4. **Chuẩn hóa Cỗ máy trạng thái F&B (State Machine):** Nâng cấp cỗ máy trạng thái với 6 bước rõ ràng, đảm bảo tuyệt đối quy tắc **Escrow Hold 24 giờ** theo đúng [`CONTEXT.md`](file:///c:/Homeji/CONTEXT.md) để bảo vệ sức khỏe người mua và quyền lợi người bán.
+5. **Nâng cấp Cảm quan & Trải nghiệm Tương tác UI/UX (Sensory & Micro-Interaction Elevation):** Tích hợp có chọn lọc tinh hoa từ 5 nguồn UI/UX hiện đại (`horizonx.so`, `grainient.spply` / `grainient.supply`, `uiarc.dev`, `uberdessigner.ai` / `uberdesigner.ai`, `bencho.dev`), xem nghiên cứu toàn diện tại [`docs/research/2026-11-19-uiux-sources-evaluation.md`](file:///c:/Homeji/docs/research/2026-11-19-uiux-sources-evaluation.md):
+   - **Thẩm mỹ dải màu ấm & lớp hạt ẩm thực (Warm Culinary Grainient — `grainient.supply`):** Bổ sung bảng màu dải ấm hữu cơ (cam nướng `--food-warm-amber: #ff9f43`, đỏ sốt `--food-warm-terracotta: #ee5253`, mật ong `--food-warm-honey: #feca57`) kết hợp procedural SVG noise `<feTurbulence>` (0 byte asset tải về) tạo chiều sâu analog mộc mạc, tươi ngon cho món ăn sinh viên thay vì các mảng thẻ phẳng cứng nhắc.
+   - **Tương tác âm thanh & phản hồi xúc giác an toàn (Tactile UI Audio & Haptics — `bencho.dev`):** Kế thừa kiến trúc âm thanh an toàn từ [`src/lib/sellerOrderSound.ts`](file:///C:/EXE101_Homeji/src/lib/sellerOrderSound.ts) với Web Audio API thuần (chuông bếp 3 nốt E5-G5-B5, tiếng pop chỉnh số lượng) có cơ chế `arm()` từ cử chỉ người dùng, tự dọn node bộ nhớ và rung haptic trên điện thoại, đồng thời có công tắc "Chế độ yên lặng KTX" (Dorm Silent Mode).
+   - **Vật lý chuyển động lò xo mượt mà (Spring Physics Motion — `uiarc.dev`):** Ứng dụng mô hình chuyển động đàn hồi chuẩn hóa từ [`src/lib/motionTokens.ts`](file:///C:/EXE101_Homeji/src/lib/motionTokens.ts) (`SPRING.soft`: stiffness 380, damping 32, mass 0.8) cho thanh giỏ hàng dính đáy (Sticky Floating Cart) và bộ lọc bữa ăn chuyển động không gián đoạn (`layoutId`).
+   - **Bố cục Studio chia đôi màn hình & Thẻ Bento (Split-Screen & Bento Hierarchy — `uberdesigner.ai`):** Nâng cấp Seller Food Studio thành giao diện 2 cột tương tác tức thì (vừa nhập liệu vừa thấy Live Card Preview) và bảng điều khiển Bếp theo lưới Bento trực quan.
+   - **Hiệu ứng nghiêng chiều sâu siêu nhẹ (Micro-Depth Perspective Tilt — `horizonx.so`):** Kế thừa tư duy 3D của HorizonX (vốn đã áp dụng tại `landing-hx`) bằng CSS 3D Transform + `motion/react` nghiêng nhẹ $\pm 5^\circ - 6^\circ$ cho thẻ món ăn và huy hiệu bếp sạch mà không cần nạp Three.js nặng nề.
 
 ---
 
@@ -56,7 +62,14 @@ Homeji khởi đầu với Chợ đồ cũ (`MarketplaceListingType.SecondHand`)
 - **Ranh giới tài chính nội bộ:** Số dư Homeji là sổ cái kép (double-entry ledger) nội bộ tuân thủ Nghị định 52/2024/NĐ-CP; nạp trước mua sau, không có số dư âm, không P2P, giá tối thiểu mỗi món 10.000đ, giá trị giỏ hàng tối thiểu 25.000đ, hoa hồng sàn 10% (Gói Bắt đầu), dự phòng rủi ro 0.5% GMV.
 - **Kiến trúc công nghệ & Quy chuẩn mã nguồn:**
   - Backend: Clean Architecture (.NET 9), bảo đảm tương thích ngược với dữ liệu cũ, không làm vỡ 700 unit tests và 267 integration tests hiện hành.
-  - Frontend: React 19 + TypeScript + Vite, plain CSS tokens trong `src/index.css` (`--grab-green`, `--maps-blue`, `--surface-*`), Motion (`motion/react`), tôn trọng quy tắc Map-first trong [`PRODUCT.md`](file:///C:/EXE101_Homeji/PRODUCT.md) (không áp hiệu ứng `whileTap` scale lên nút trên map shell).
+  - Frontend: React 19 + TypeScript + Vite, plain CSS tokens trong `src/index.css` (`--grab-green: #087f8c`, `--maps-blue`, `--surface-*`), Motion (`motion/react`), tôn trọng quy tắc Map-first trong [`PRODUCT.md`](file:///C:/EXE101_Homeji/PRODUCT.md) (không áp hiệu ứng `whileTap` scale lên nút trên map shell).
+- **Ma trận Ràng buộc Kỹ thuật khi Tiếp nhận 5 Nguồn UI/UX:**
+  - **Không tải runtime 3D cồng kềnh (HorizonX Guardrail):** Tuyệt đối không nhúng Three.js canvas hay WebGL shader nặng vào giao diện chợ đồ ăn; chỉ cho phép CSS 3D Transform nhẹ (`perspective: 800px`, `rotateX/rotateY`) qua Motion tokens trên lá thẻ con (leaf component) để bảo toàn pin và CPU điện thoại sinh viên.
+  - **Bảo toàn Stacking Context (Containing Block Guardrail):** Tuyệt đối không đặt `transform: perspective(...)` hoặc `transform: rotateX/Y` lên container cha chứa các thành phần bám dính như `StickyFloatingCartBar` hay Bottom Sheet, tránh phá vỡ vị trí dính theo chuẩn W3C.
+  - **Không tải asset ảnh texture hay video loop lớn (Grainient Guardrail):** Không dùng file ảnh bitmap 4K/12K hay video mp4/webm làm nền; 100% texture hạt phải tạo bằng SVG `<feTurbulence>` nội dòng kết hợp CSS gradients thuần để bảo vệ dung lượng 4G/5G của người dùng.
+  - **Không cài đặt Tailwind CSS hay @shadcn/ui (Arc UI Guardrail):** Mọi vi tương tác và chuyển động lò xo từ Arc UI phải được chuyển ngữ 100% sang `motion/react` và plain CSS variables theo [`DESIGN.md`](file:///C:/EXE101_Homeji/DESIGN.md) và [`src/lib/motionTokens.ts`](file:///C:/EXE101_Homeji/src/lib/motionTokens.ts).
+  - **Bảo tồn bản sắc thương hiệu Homeji (Uberdesigner Guardrail):** Tuân thủ nghiêm ngặt bảng màu sản phẩm Homeji (`--grab-green: #087f8c`, `--maps-blue: #1a73e8`), không sử dụng theme SaaS tím neon hoặc dark-mode giả lập xa rời đời sống xóm trọ sinh viên.
+  - **Không tải file audio tĩnh & Luôn có gating gesture + nút Mute (Bencho Guardrail):** 100% âm thanh giao diện phải được tổng hợp từ Web Audio API nội sinh (zero byte asset dung lượng tải) tuân thủ kiến trúc an toàn `SellerOrderSound` (`arm()` từ user gesture, ngắt kết nối node khi kết thúc); luôn cung cấp công tắc tắt âm (Dorm Silent Mode) để sinh viên không làm phiền bạn cùng phòng hay trong lớp học.
 
 ---
 
@@ -211,9 +224,11 @@ $$\text{MarginPercent} = \frac{\text{EstimatedProfit}}{\text{Price}} \times 100\
 
 ## 2. Thiết Kế Giao Diện & Trải Nghiệm Người Dùng (UI/UX Redesign)
 
-### 2.1. Phân Hệ Đăng Đồ Ăn (Seller Food Studio)
+Kế thừa các mô hình thiết kế xuất sắc từ `uberdessigner.ai` (Bố cục Split-Screen & Thẻ Bento), `grainient.spply` (Chất liệu dải ấm hữu cơ), `uiarc.dev` (Vật lý chuyển động đàn hồi) và `bencho.dev` (Phản hồi xúc giác đa giác quan):
 
-Xây dựng component chuyên biệt `MarketplaceSellFoodForm` trong `src/components/marketplace/food/`, tách biệt hoàn toàn khỏi form đồ cũ:
+### 2.1. Phân Hệ Đăng Đồ Ăn (Seller Food Studio — Mô hình Split-Screen từ `uberdesigner.ai`)
+
+Xây dựng component chuyên biệt `MarketplaceSellFoodForm` trong `src/components/marketplace/food/`, áp dụng cấu trúc hai cột đáp ứng (Desktop/Tablet) và dạng trượt cuộn đồng bộ (Mobile):
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -228,11 +243,12 @@ Xây dựng component chuyên biệt `MarketplaceSellFoodForm` trong `src/compon
 │ • Giá bán: [35.000 đ]                    │ │  Còn 15 suất hôm nay         │ │
 │ • Chi phí vốn: [18.000 đ] (nguyên liệu) │ │  [+ Thêm vào giỏ]            │ │
 │ ┌──────────────────────────────────────┐ │ └──────────────────────────────┘ │
-│ │ BẢNG TÍNH LỢI NHUẬN RÒNG             │ │                                  │
-│ │ Phí sàn (10%): -3.500 đ              │ │ Món của bạn hiển thị đẹp mắt     │ │
-│ │ Thực nhận: 31.500 đ                  │ │ và đúng chuẩn chợ ẩm thực.       │ │
+│ │ BẢNG TÍNH LỢI NHUẬN RÒNG             │ │  • Nền Grainient dải màu ấm     │
+│ │ Phí sàn (10%): -3.500 đ              │ │  • Lớp hạt SVG nhẹ hữu cơ      │
+│ │ Thực nhận: 31.500 đ                  │ │  • Nghiêng 3D nhẹ (HorizonX)   │
 │ │ Lãi ước tính: +13.500 đ (Biên 38.6%) │ │                                  │
-│ └──────────────────────────────────────┘ │                                  │
+│ │ [ Thước đo biên lãi chuyển màu ]     │ │ Món của bạn hiển thị đẹp mắt     │
+│ └──────────────────────────────────────┘ │ và đúng chuẩn chợ ẩm thực.       │
 │ • Số suất mở bán hôm nay: [- 15 +] suất │                                  │
 │ • Thời gian nấu: [15 phút] [20 phút]    │                                  │
 ├──────────────────────────────────────────┤                                  │
@@ -247,19 +263,27 @@ Xây dựng component chuyên biệt `MarketplaceSellFoodForm` trong `src/compon
 └──────────────────────────────────────────┴──────────────────────────────────┘
 ```
 
+- **Thước đo biên lãi đổi màu sống động (Chroma Margin Gauge):** Thanh đo lợi nhuận ròng đổi màu liên tục theo giá trị nhập liệu:
+  - `< 15%`: Đỏ rực (`#ea4335`) — Báo động lỗ hoặc công nấu không đủ bù chi phí.
+  - `15% - 25%`: Cam hổ phách (`#f39c12`) — Biên lãi mỏng, cảnh báo cân nhắc giá vốn.
+  - `> 25%`: Xanh Grab an toàn (`#087f8c` / `#39b54a`) — Biên lãi lý tưởng, khuyên mở bán.
+- **Thẻ xem trước Grainient & HorizonX Micro-Tilt:** Thẻ Live Card bên phải được phủ lớp nền gradient ấm kết hợp hạt mịn `<feTurbulence>`, hỗ trợ xoay nghiêng 3D tinh tế $\pm 5^\circ - 6^\circ$ khi rê chuột (`perspective: 800px`, `rotateX/rotateY` qua `motion/react`). *Lưu ý: Không bọc `transform` lên container cha chứa các thành phần fixed/sticky.*
+
 ---
 
-### 2.2. Phân Hệ Quản Lý Bếp (Kitchen Order Board)
+### 2.2. Phân Hệ Quản Lý Bếp (Kitchen Order Board — Mô hình Bento Grid & Bencho Audio)
 
 Tích hợp vào tab Quản lý đơn bán (`tab === 'sales'`):
 
-1. **Thanh trạng thái Bếp (Master Kitchen Bar):**
-   - Công tắc nhận đơn: `[Bếp đang mở nhận đơn]` $\leftrightarrow$ `[Tạm ngưng nhận đơn]`.
-   - Nút quản lý nhanh thực đơn: Bấm để cập nhật tức thời số suất bán còn lại hoặc báo hết món 1 chạm.
-2. **Bảng Kanban Xử Lý Đơn 3 Cột (Live Order Kanban):**
-   - **Cột 1: ĐƠN MỚI ĐẾN (Chuông báo ting-ting, đếm ngược 30 phút):**
-     - Hiển thị danh sách món, số lượng, phương thức nhận (Tự lấy hay Giao phòng nào), ghi chú khách.
-     - Hai nút bấm hành động lớn: `[NHẬN ĐƠN & NẤU]` / `[TỪ CHỐI ĐƠN]`.
+1. **Bảng điều khiển trạng thái Bếp kiểu Bento (Bento Kitchen Header):**
+   - **Thẻ 1 (Doanh thu & Số đơn ca này):** Hiển thị tổng tiền tích lũy và số đơn hoàn tất hôm nay.
+   - **Thẻ 2 (Công tắc nhận đơn Bencho Tactile Switch):** Nút trượt lò xo đàn hồi `[Bếp Mở]` $\leftrightarrow$ `[Tạm Nghỉ]` kèm âm click êm dịu từ Web Audio API và công tắc phụ "Chế độ yên lặng KTX".
+   - **Thẻ 3 (Hạn mức suất ăn còn lại):** Thanh tiến trình thể hiện số suất đã bán / tổng `DailyQuota`.
+2. **Bảng Kanban Xử Lý Đơn 3 Cột (Live Order Kanban với Arc UI Gestures):**
+   - **Cột 1: ĐƠN MỚI ĐẾN (Chuông báo 3 nốt Web Audio theo `SellerOrderSound`, đếm ngược 30 phút, rung haptic):**
+     - Hiển thị danh sách món, số lượng, phương thức nhận (Tự lấy hay Giao phòng KTX), ghi chú khách.
+     - Thẻ đơn hàng hỗ trợ cử chỉ vuốt ngang ngón tay (Arc UI Gesture): Vuốt sang phải để "Nhận đơn & Nấu" (vệt sáng xanh lá), vuốt sang trái để "Từ chối" (vệt sáng đỏ).
+     - Nút bấm lớn dự phòng: `[NHẬN ĐƠN & NẤU]` / `[TỪ CHỐI ĐƠN]`.
    - **Cột 2: ĐANG NẤU (Preparing):**
      - Đếm ngược thời gian nấu theo `PreparationMinutes`.
      - Nút bấm: `[MÓN ĐÃ SẴN SÀNG]`.
@@ -269,23 +293,24 @@ Tích hợp vào tab Quản lý đơn bán (`tab === 'sales'`):
 
 ---
 
-### 2.3. Phân Hệ Mua Đồ Ăn & Giỏ Hàng (Buyer Experience & Checkout)
+### 2.3. Phân Hệ Mua Đồ Ăn & Giỏ Hàng (Buyer Experience — Arc UI Motion & Bencho Haptics)
 
 Nâng cấp các component hiện có trong `src/components/marketplace/food/`:
 
-1. **Bộ lọc ẩm thực theo bữa ăn:**
-   - Tabs trượt mượt mà: `[Tất cả]`, `[Trưa nay ăn gì?]`, `[Ăn vặt chiều]`, `[Món ăn khuya]`, `[Giải khát]`.
+1. **Bộ lọc ẩm thực theo bữa ăn với Tab trượt liền mạch (`layoutId` Sliding Pill):**
+   - Tabs trượt mượt mà: `[Tất cả]`, `[Trưa nay ăn gì?]`, `[Ăn vặt chiều]`, `[Món ăn khuya]`, `[Giải khát]` sử dụng `layoutId="activeMealCategoryTab"` cho vệt sáng chuyển động không ngắt quãng.
    - Bộ lọc khoảng cách: `[Gần tôi < 500m (Đi bộ)]`, `[Dưới 1.5 km]`.
-2. **Thanh Giỏ Hàng Dính Đáy (Sticky Floating Cart Bar):**
-   - Hiển thị cố định ở chân trang trên thiết bị di động.
-   - Thể hiện: Số lượng món, Tổng tiền tạm tính, Thanh trạng thái: *"Thêm X đ để đạt đơn tối thiểu 25.000đ"*.
+2. **Thanh Giỏ Hàng Dính Đáy Đàn Hồi (Arc UI Elastic Sticky Floating Cart Bar):**
+   - Hiển thị cố định ở chân trang trên thiết bị di động, xuất hiện bằng hiệu ứng trượt lò xo (`SPRING.soft`: `stiffness: 380, damping: 32, mass: 0.8`).
+   - Huy hiệu số lượng món nhún nảy đàn hồi (`SPRING.snappy`: `scale: [1, 1.25, 1]`) kèm tiếng "pop" siêu nhẹ mỗi khi người mua bấm thêm món.
+   - Thể hiện: Số lượng món, Tổng tiền tạm tính, Thanh tiến trình trực quan: *"Thêm X đ để đạt đơn tối thiểu 25.000đ"*.
 3. **Drawer Thanh Toán Linh Hoạt (Dual Fulfillment Checkout Dialog):**
    - **Tab 1: Tự đến lấy tại bếp (`Pickup`):** Hiển thị bản đồ chỉ đường, địa chỉ bếp, thời gian dự kiến món sẵn sàng.
    - **Tab 2: Bếp giao tận phòng (`SellerDelivery`):** Form nhập chi tiết:
      - Tên người nhận & Số điện thoại.
      - Tòa nhà / KTX / Số phòng (ví dụ: *Phòng 402, Nhà B3, KTX Khu B*).
      - Phí ship nội bộ cố định (0đ hoặc 5.000đ - 10.000đ).
-   - **Thanh toán Số dư Homeji & Nạp nhanh:** Nếu số dư không đủ, nút CTA tự động chuyển thành *"Nạp thêm X đ và Đặt món"* (kích hoạt QR nạp tiền tức thời).
+   - **Thanh toán Số dư Homeji & Nạp nhanh:** Nếu số dư không đủ, nút CTA tự động chuyển thành *"Nạp thêm X đ và Đặt món"* (kích hoạt QR nạp tiền tức thời; phát tiếng chime mừng thành công khi hoàn tất).
 
 ---
 
@@ -384,7 +409,56 @@ Dành riêng cho hệ sinh thái sinh viên và ký túc xá Thủ Đức / ĐHQ
 - Huy hiệu xác minh: `[Bếp Sinh Viên Tự Nấu]`, `[Đã Xác Minh CCCD]`, `[Được Chứng Nhận Bởi Cùng Tòa KTX]`.
 - Đánh giá đính kèm ảnh thật của người mua sau khi ăn, giúp các bếp nấu ăn sạch sẽ, uy tín nhanh chóng xây dựng được lượng khách quen ổn định.
 
-## 5. Âm Thanh & Cảnh Báo Đẩy Thời Gian Thực (Web Audio & SignalR)
-- Tích hợp SignalR đã có sẵn trong Homeji:
-  - Khi có đơn mới: Phát chuông bếp "ting ting" vui nhộn qua Web Audio API, rung nhẹ trên điện thoại.
-  - Khi bếp bắt đầu nấu hoặc khi món đã sẵn sàng: Gửi thông báo tức thời tới màn hình người mua để người mua chủ động xuống sảnh nhận món.
+## 5. Động Cơ Âm Thanh Xúc Giác & Rung Đẩy Thời Gian Thực (Tactile Audio & Haptic Feedback Engine — Bencho & Arc UI Pattern)
+- **Vấn đề thực tế:** Khi nấu ăn bận rộn trong phòng trọ KTX hoặc khi đang di chuyển, người bán rất dễ bỏ lỡ thông báo đơn hàng nếu chỉ dựa vào tin nhắn màn hình; ngược lại, chuông điện thoại thông thường quá ồn ào và dễ gây phiền toái cho bạn cùng phòng.
+- **Giải pháp Boost (Kế thừa từ `bencho.dev` & chuẩn hóa theo `src/lib/sellerOrderSound.ts`):**
+  - **Kiến trúc Web Audio API không tốn tài nguyên tải (Zero Asset Payload):**
+    - Toàn bộ âm thanh được tổng hợp thời gian thực từ mã lệnh JavaScript (sử dụng `AudioContext`, `OscillatorNode` và `GainNode`), không tải bất kỳ file `.mp3` hay `.wav` tĩnh nào làm nặng ứng dụng.
+    - *Gating cử chỉ an toàn:* Bắt buộc gọi `arm()` từ cú chạm/click đầu tiên của người dùng để tương thích tuyệt đối với Autoplay Policy trên iOS Safari và Chrome.
+    - *Chống rò rỉ bộ nhớ:* Đăng ký sự kiện `oscillator.onended = () => { osc.disconnect(); gain.disconnect(); }` ngắt kết nối node ngay khi âm thanh kết thúc.
+    - *Chuông bếp 3 nốt ngân vang (Đơn mới đến):* Hợp âm E minor arpeggio gồm E5 (659 Hz), G5 (784 Hz) và B5 (988 Hz) ngân vang thanh thoát 0.48 giây (khớp chuẩn `SellerOrderSound`).
+    - *Xúc giác "pop" (Chỉnh số lượng suất):* Tần số lướt mềm mại từ 320 Hz xuống 120 Hz trong 60ms khi bấm tăng/giảm `DailyQuota` hoặc giỏ hàng.
+    - *Âm thanh chúc mừng "chime" (Áp voucher & Đặt món thành công):* Chuỗi arpeggio F major (F5 - A5 - C6) ngân vang nhẹ nhàng.
+  - **Rung phản hồi điện thoại (Mobile Haptic Feedback):**
+    - Kích hoạt `navigator.vibrate([100, 50, 100])` trên điện thoại người bán khi đơn mới xuất hiện trên bảng Kanban.
+    - Xung rung siêu ngắn `navigator.vibrate(40)` khi bấm chuyển trạng thái "Bắt đầu nấu" hoặc "Món đã sẵn sàng".
+  - **Công tắc "Chế độ yên lặng KTX" (Dorm Silent Mode):**
+    - Bật/tắt 1-chạm ở góc bảng điều khiển, tự động ghi nhớ vào `localStorage` (`homeji_dorm_silent_mode`) để sinh viên thoải mái bán hàng trong giờ học hoặc đêm khuya mà không làm ồn bạn cùng phòng.
+
+## 6. Hệ Thống Thẩm Mỹ Ẩm Thực Sinh Viên Grainient & Micro-Depth (Grainient & HorizonX Pattern)
+- **Vấn đề thực tế:** Giao diện thẻ phẳng (flat UI) thông thường tạo cảm giác công nghiệp, khô cứng, thiếu sự hấp dẫn vị giác của một chợ ẩm thực tự nấu.
+- **Giải pháp Boost (Kế thừa từ `grainient.supply` & `horizonx.so`):**
+  - **Dải màu ẩm thực ấm áp & Hạt hữu cơ (Warm Culinary Grainient):**
+    - Phối hợp các dải màu kích thích cảm xúc ăn uống: Màu cam nướng giòn (`--food-warm-amber: #ff9f43`), đỏ sốt gia vị (`--food-warm-terracotta: #ee5253`), vàng tươi mật ong (`--food-warm-honey: #feca57`) kết hợp màu xanh thương hiệu Homeji (`--grab-green: #087f8c`).
+    - Lớp hạt phủ mịn màng tạo từ bộ lọc SVG thuần (`<feTurbulence baseFrequency="0.7" numOctaves="3"/>`, độ đục 3.5%), mang lại cảm giác thủ công (handcrafted/analog), gần gũi như món ăn mẹ nấu hoặc bếp nhà làm.
+  - **Hiệu ứng nghiêng 3D chiều sâu siêu nhẹ (Micro-Depth Perspective Tilt):**
+    - Kế thừa triết lý chiều sâu từ HorizonX (vốn đã áp dụng tại `landing-hx`) nhưng **không nạp Three.js canvas nặng nề**.
+    - Sử dụng `motion/react` kết hợp CSS 3D transforms (`perspective: 800px`, `rotateX`, `rotateY`) tính toán theo tọa độ chuột/chạm để thẻ món ăn đặc sắc và huy hiệu `[Bếp Sinh Viên Tự Nấu]` nghiêng nhẹ tối đa $\pm 5^\circ - 6^\circ$, tạo cảm giác trực quan nổi bật mà không tốn pin hay GPU của điện thoại sinh viên.
+    - *Lưu ý kỹ thuật sống còn:* Chỉ áp dụng `transform` trên lá thẻ con (leaf component), tuyệt đối không áp lên container cha chứa `position: fixed` hay `position: sticky` để tránh phá vỡ containing block của thanh giỏ hàng.
+
+## 7. Studio Đăng Món Chia Đôi Màn Hình & Trực Quan Hóa Biên Lãi Đổi Màu (Uberdesigner Split-Screen & Dynamic Chroma Margin)
+- **Vấn đề thực tế:** Sinh viên nấu ăn thường bối rối khi định giá món ăn, không biết mình có bị lỗ vốn nguyên liệu và tiền hộp xốp hay không, và không hình dung được bài đăng của mình sẽ trông như thế nào khi lên chợ.
+- **Giải pháp Boost (Kế thừa từ `uberdesigner.ai`):**
+  - **Giao diện Studio 2 cột phản hồi tức thì (Live Split-Screen):**
+    - Cột trái: Các trường nhập liệu thông minh (tên món, ca bán, nguyên liệu, giá vốn, giá bán).
+    - Cột phải: Thẻ món ăn thời gian thực (Live Food Card Preview) nhảy chuyển động mượt mà theo từng ký tự gõ phím.
+  - **Thước đo biên lãi đổi màu sắc thái (Dynamic Chroma Margin Visualizer):**
+    - Hiển thị thanh tiến trình lợi nhuận ròng với màu sắc biến thiên linh hoạt:
+      - *Vùng Đỏ nguy hiểm (`#ea4335`, < 15%):* Cảnh báo: *"Biên lãi quá thấp, bạn có nguy cơ lỗ công nấu và tiền hộp!"*
+      - *Vùng Cam thận trọng (`#f39c12`, 15% - 25%):* Gợi ý: *"Biên lãi mỏng. Phù hợp bán số lượng lớn hoặc xả món."*
+      - *Vùng Xanh Grab lý tưởng (`#087f8c` / `#39b54a`, > 25%):* Động viên: *"Biên lãi an toàn! Đảm bảo thu nhập tốt cho sinh viên."*
+
+## 8. Thanh Giỏ Hàng Vật Lý Lò Xo & Thẻ Đơn Hàng Cử Chỉ Vuốt Nấu (Arc UI Spring Cart & Swipeable Kanban)
+- **Vấn đề thực tế:** Thao tác trên thiết bị di động cần nhanh chóng, mượt mà và trực quan, giảm thiểu số lần bấm nút không cần thiết khi tay đang dính dầu mỡ hoặc đang đi bộ dưới sân KTX.
+- **Giải pháp Boost (Kế thừa từ `uiarc.dev` & chuẩn hóa theo `src/lib/motionTokens.ts`):**
+  - **Thanh giỏ hàng nổi đàn hồi (Spring Floating Cart Bar):**
+    - Khi bấm thêm món, thanh giỏ hàng trượt nở từ đáy màn hình với lực lò xo tự nhiên (`SPRING.soft`: `stiffness: 380, damping: 32, mass: 0.8`).
+    - Huy hiệu đếm số suất ăn nhún nảy đàn hồi (`SPRING.snappy`: `stiffness: 520, damping: 34`, scale: `[1, 1.25, 1]`) tạo cảm giác phấn khích khi mua sắm.
+  - **Thẻ đơn hàng tương tác cử chỉ vuốt (Swipe-to-Action Kanban Tickets):**
+    - Trên màn hình nhận đơn của bếp, người bán chỉ cần quẹt tay sang phải để nhận đơn nấu (hiển thị dải nền xanh Grab-green) hoặc quẹt tay sang trái để từ chối (hiển thị dải nền đỏ cam). Thao tác một tay cực kỳ tiện lợi khi người nấu đang đứng bếp.
+
+## 9. Cầu Nối Ngữ Cảnh UI Sẵn Sàng Cho Trợ Lý AI Qua Giao Thức MCP (Agentic MCP UI Context & Design Token Bridge)
+- **Vấn đề thực tế:** Các thư viện như HorizonX, Arc UI và Bencho đều hỗ trợ giao thức MCP (Model Context Protocol) để các AI Coding Agent (Cursor, Claude Code, Gemini CLI) có thể tự động truy xuất và dựng giao diện chuẩn xác. Homeji trước đây chưa có tài liệu ngữ cảnh UI chuẩn hóa, khiến các AI Agent dễ tự ý sinh mã Tailwind hoặc linh kiện không đúng quy cách.
+- **Giải pháp Boost:**
+  - Chuẩn hóa toàn bộ hệ thống tokens, quy tắc chuyển động Motion, biến số CSS và các thành phần giao diện mẫu thành một tài liệu ngữ cảnh chuyên biệt [`docs/ui/mcp-ui-context.md`](file:///c:/Homeji/docs/ui/mcp-ui-context.md).
+  - Cho phép các trợ lý AI đọc trực tiếp file ngữ cảnh này để tự động thiết kế các màn hình chợ ẩm thực đạt chuẩn 100% về thương hiệu Homeji, bảo đảm không bao giờ sinh thừa thư viện hay vi phạm các ràng buộc hệ thống.
